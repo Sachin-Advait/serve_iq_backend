@@ -10,6 +10,9 @@ public class ServiceRequest {
     @NotBlank
     private String name;
 
+    @NotBlank
+    private String arabicName;
+
     private String parentId;
     private Integer slaSec = 900;
     private Boolean enabled = true;

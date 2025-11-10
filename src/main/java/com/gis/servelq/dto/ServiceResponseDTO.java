@@ -11,6 +11,7 @@ public class ServiceResponseDTO {
     private String id;
     private String code;
     private String name;
+    private String arabicName;
     private String parentId;
     private Integer slaSec;
     private Boolean enabled;
@@ -24,6 +25,7 @@ public class ServiceResponseDTO {
         dto.setId(service.getId());
         dto.setCode(service.getCode());
         dto.setName(service.getName());
+        dto.setArabicName(service.getArabicName());
         dto.setParentId(service.getParentId());
         dto.setSlaSec(service.getSlaSec());
         dto.setEnabled(service.getEnabled());

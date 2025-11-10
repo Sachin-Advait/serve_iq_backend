@@ -19,8 +19,8 @@ public class User {
 
     @NotBlank
     @Column(unique = true)
-    private String username;
-
+    private String email;
+    private String name;
     @NotBlank
     private String password;
 

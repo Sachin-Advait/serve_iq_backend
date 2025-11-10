@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -17,7 +18,6 @@ public class TokenService {
     private final TokenRepository tokenRepository;
     private final ServiceRepository serviceRepository;
     private final BranchRepository branchRepository;
-    private final VisitorRepository visitorRepository;
     private final CounterRepository counterRepository;
 
     @Transactional
@@ -29,17 +29,6 @@ public class TokenService {
         Branch branch = branchRepository.findById(request.getBranchId())
                 .orElseThrow(() -> new RuntimeException("Branch not found"));
 
-        // Create or find visitor
-        Visitor visitor = null;
-        if (request.getCivilId() != null && !request.getCivilId().isEmpty()) {
-            visitor = visitorRepository.findByCivilId(request.getCivilId())
-                    .orElseGet(() -> {
-                        Visitor newVisitor = new Visitor();
-                        newVisitor.setCivilId(request.getCivilId());
-                        return visitorRepository.save(newVisitor);
-                    });
-        }
-
         // Generate token number
         String tokenNumber = generateTokenNumber(branch, serviceModel);
 
@@ -50,10 +39,7 @@ public class TokenService {
         token.setServiceId(serviceModel.getId());
         token.setPriority(request.getPriority());
         token.setStatus(TokenStatus.WAITING);
-
-        if (visitor != null) {
-            token.setVisitorId(visitor.getId());
-        }
+        token.setCivilId(request.getCivilId());
 
         Token savedToken = tokenRepository.save(token);
 
@@ -89,14 +75,18 @@ public class TokenService {
                 .orElseThrow(() -> new RuntimeException("Token not found"));
     }
 
-    private String generateTokenNumber(Branch branch,  ServiceModel serviceModel) {
+    private String generateTokenNumber(Branch branch, ServiceModel serviceModel) {
         String prefix = serviceModel.getCode() + "-";
 
         Optional<Integer> lastNumber = tokenRepository.findLastTokenNumber(
-                branch.getId(), serviceModel.getId(), prefix);
+                branch.getId(), serviceModel.getId(), prefix
+        );
 
-        int nextNumber = lastNumber.orElse(0) + 1;
-        return prefix + String.format("%03d", nextNumber);
+        // If no previous token found, start from 1000
+        int nextNumber = lastNumber.orElse(1000) + 1;
+
+        // Return without zero-padding — e.g. REG-1001, REG-1002, etc.
+        return prefix + nextNumber;
     }
 
     public List<TokenDTO> getUpcomingTokensForCounter(String counterId) {
@@ -155,10 +145,7 @@ public class TokenService {
         response.setCounterId(counter.getId());
         response.setCounterName(counter.getName());
         response.setCalledAt(nextToken.getCalledAt());
-
-        if (nextToken.getVisitor() != null) {
-            response.setVisitorName(nextToken.getVisitor().getCivilId());
-        }
+        response.setCivilId(nextToken.getCivilId());
 
         // Calculate waiting count for the service
         long waitingCount = tokenRepository.countByServiceIdAndStatus(
@@ -217,4 +204,20 @@ public class TokenService {
                 .map(LiveTokenDTO::fromEntity)
                 .toList();
     }
+
+
+    public List<RecentServiceDTO> getRecentServices() {
+        List<Token> completedTokens = tokenRepository.findByStatus(TokenStatus.DONE);
+
+        return completedTokens.stream()
+                .map(token -> RecentServiceDTO.fromEntity(
+                        token.getToken(),
+                        token.getCivilId(),
+                        token.getService().getName(),
+                        token.getStartAt(),
+                        token.getEndAt()
+                ))
+                .collect(Collectors.toList());
+    }
+
 }

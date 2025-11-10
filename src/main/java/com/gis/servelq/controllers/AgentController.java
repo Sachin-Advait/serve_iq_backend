@@ -1,10 +1,13 @@
 package com.gis.servelq.controllers;
 
 import com.gis.servelq.dto.AgentCallResponse;
+import com.gis.servelq.dto.RecentServiceDTO;
 import com.gis.servelq.services.TokenService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/agent")
@@ -35,5 +38,11 @@ public class AgentController {
         var tokens = tokenService.getUpcomingTokensForCounter(counterId);
         return ResponseEntity.ok(tokens);
 
+    }
+
+    @GetMapping("/recent-services")
+    public ResponseEntity<List<RecentServiceDTO>> getRecentServices() {
+        List<RecentServiceDTO> recentServices = tokenService.getRecentServices();
+        return ResponseEntity.ok(recentServices);
     }
 }

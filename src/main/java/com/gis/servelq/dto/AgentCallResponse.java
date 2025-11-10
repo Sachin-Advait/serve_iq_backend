@@ -9,7 +9,7 @@ public class AgentCallResponse {
     private String tokenId;
     private String token;
     private String serviceName;
-    private String visitorName;
+    private String civilId;
     private String counterId;
     private String counterName;
     private LocalDateTime calledAt;

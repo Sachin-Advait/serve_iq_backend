@@ -43,12 +43,8 @@ public class Token {
     @NotNull
     private TokenStatus status = TokenStatus.WAITING;
 
-    @Column(name = "visitor_id")
-    private String visitorId;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "visitor_id", insertable = false, updatable = false)
-    private Visitor visitor;
+    @Column(name = "civil_id")
+    private String civilId;
 
     @Column(name = "counter_id")
     private String counterId;

@@ -21,7 +21,8 @@ public class AuthController {
         User user = userService.registerUser(dto);
         UserResponse response = new UserResponse();
         response.setId(user.getId());
-        response.setUsername(user.getUsername());
+        response.setName(user.getName());
+        response.setEmail(user.getEmail());
         response.setRole(user.getRole());
         response.setBranchId(user.getBranchId());
         return response;
@@ -29,12 +30,8 @@ public class AuthController {
 
     @PostMapping("/login")
     public UserResponse login(@RequestBody LoginRequest dto) {
-        User user = userService.findByUsername(dto.getUsername())
+        User user = userService.findByEmail(dto.getEmail())
                 .orElseThrow(() -> new RuntimeException("User not found"));
-
-//        if (!passwordEncoder.matches(dto.getPassword(), user.getPassword())) {
-//            throw new RuntimeException("Invalid password");
-//        }
 
         if (!dto.getPassword().matches(user.getPassword())) {
             throw new RuntimeException("Invalid password");
@@ -42,7 +39,8 @@ public class AuthController {
 
         UserResponse response = new UserResponse();
         response.setId(user.getId());
-        response.setUsername(user.getUsername());
+        response.setName(user.getName());
+        response.setEmail(user.getEmail());
         response.setRole(user.getRole());
         response.setBranchId(user.getBranchId());
         return response;

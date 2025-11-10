@@ -28,6 +28,9 @@ public class ServiceModel {
     @NotBlank
     private String name;
 
+    @NotBlank
+    private String arabicName;
+
     @Column(name = "parent_id")
     private String parentId;
 

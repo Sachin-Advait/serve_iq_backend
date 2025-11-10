@@ -9,11 +9,11 @@ import lombok.Data;
 @Data
 public class RegisterRequest {
     @NotBlank
-    private String username;
-
+    private String email;
     @NotBlank
     private String password;
-
+    @NotBlank
+    private String name;
     @NotNull
     private UserRole role = UserRole.USER;
 
