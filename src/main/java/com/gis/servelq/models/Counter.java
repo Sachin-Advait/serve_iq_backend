@@ -15,6 +15,7 @@ import java.util.List;
 @Table(name = "counters")
 @Data
 public class Counter {
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
@@ -25,12 +26,8 @@ public class Counter {
     @NotBlank
     private String name;
 
-    @NotBlank
-    @Column(name = "branch_id")
-    private String branchId;
-
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "branch_id", insertable = false, updatable = false)
+    @JoinColumn(name = "branch_id", nullable = false)
     private Branch branch;
 
     @NotNull
@@ -47,7 +44,7 @@ public class Counter {
             joinColumns = @JoinColumn(name = "counter_id"),
             inverseJoinColumns = @JoinColumn(name = "service_id")
     )
-    private List<ServiceModel> services = new ArrayList<>(); // Changed back to 'services'
+    private List<ServiceModel> services = new ArrayList<>();
 
     @OneToMany(mappedBy = "counter", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Token> tokens = new ArrayList<>();

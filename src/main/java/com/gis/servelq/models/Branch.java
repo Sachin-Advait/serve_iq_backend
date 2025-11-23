@@ -26,20 +26,11 @@ public class Branch {
     @NotBlank
     private String name;
 
-    @Column(name = "timezone")
-    private String timezone = "Asia/Muscat";
-
     @NotNull
     private Boolean enabled = true;
 
     @OneToMany(mappedBy = "branch", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<ServiceModel> serviceModels = new ArrayList<>();
-
-    @OneToMany(mappedBy = "branch", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Counter> counters = new ArrayList<>();
-
-    @OneToMany(mappedBy = "branch", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Token> tokens = new ArrayList<>();
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

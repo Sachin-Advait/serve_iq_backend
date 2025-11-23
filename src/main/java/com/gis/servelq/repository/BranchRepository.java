@@ -10,4 +10,5 @@ import java.util.Optional;
 public interface BranchRepository extends JpaRepository<Branch, String> {
     Optional<Branch> findByCode(String code);
     Optional<Branch> findByIdAndEnabledTrue(String id);
+
 }
