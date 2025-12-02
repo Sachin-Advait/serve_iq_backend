@@ -45,4 +45,6 @@ public interface TokenRepository extends JpaRepository<Token, String> {
 
 
     long countByServiceIdAndStatus(String serviceId, TokenStatus status);
+
+    Optional<Token> findFirstByCounterIdAndStatus(String counterId, TokenStatus status);
 }

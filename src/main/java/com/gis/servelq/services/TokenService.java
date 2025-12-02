@@ -274,4 +274,28 @@ public class TokenService {
         return tokenRepository.save(token);
     }
 
+    public LiveTokenDTO getServingOrCallingTokenByCounter(String counterId) {
+
+        // 1️⃣ Try SERVING token
+        Optional<Token> serving = tokenRepository
+                .findFirstByCounterIdAndStatus(counterId, TokenStatus.SERVING);
+
+        if (serving.isPresent()) {
+            return LiveTokenDTO.fromEntity(serving.get());
+        }
+
+        // 2️⃣ If no serving, try CALLING token
+        Optional<Token> calling = tokenRepository
+                .findFirstByCounterIdAndStatus(counterId, TokenStatus.CALLING);
+
+        if (calling.isPresent()) {
+            return LiveTokenDTO.fromEntity(calling.get());
+        }
+
+        throw new RuntimeException("No serving or calling token found for this counter");
+    }
+
+
+
+
 }
