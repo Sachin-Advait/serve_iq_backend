@@ -15,29 +15,59 @@ import java.util.List;
 @RequestMapping("/api/services")
 @RequiredArgsConstructor
 public class ServiceController {
+
     private final ServiceManagementService serviceManagementService;
 
+    // CREATE
     @PostMapping
     public ResponseEntity<ServiceModel> createService(@Valid @RequestBody ServiceRequest request) {
-        ServiceModel service = serviceManagementService.createService(request);
-        return ResponseEntity.ok(service);
+        return ResponseEntity.ok(serviceManagementService.createService(request));
     }
 
+    // READ: Get service by ID
+    @GetMapping("/{id}")
+    public ResponseEntity<ServiceResponseDTO> getServiceById(@PathVariable String id) {
+        return ResponseEntity.ok(serviceManagementService.getServiceById(id));
+    }
+
+    // READ: Main services
     @GetMapping("/branch/main/{branchId}")
     public ResponseEntity<List<ServiceResponseDTO>> getMainServices(@PathVariable String branchId) {
-        List<ServiceResponseDTO> services = serviceManagementService.getMainServices(branchId);
-        return ResponseEntity.ok(services);
+        return ResponseEntity.ok(serviceManagementService.getMainServices(branchId));
     }
 
+    // READ: Sub-services
     @GetMapping("/subservices/{parentId}")
     public ResponseEntity<List<ServiceResponseDTO>> getSubServices(@PathVariable String parentId) {
-        List<ServiceResponseDTO> services = serviceManagementService.getSubServices(parentId);
-        return ResponseEntity.ok(services);
+        return ResponseEntity.ok(serviceManagementService.getSubServices(parentId));
     }
 
+    // READ: all services in a branch
     @GetMapping("/branch/{branchId}")
     public ResponseEntity<List<ServiceResponseDTO>> getAllServices(@PathVariable String branchId) {
-        List<ServiceResponseDTO> services = serviceManagementService.getAllServices(branchId);
-        return ResponseEntity.ok(services);
+        return ResponseEntity.ok(serviceManagementService.getAllServices(branchId));
+    }
+
+    // UPDATE
+    @PutMapping("/{id}")
+    public ResponseEntity<ServiceModel> updateService(
+            @PathVariable String id,
+            @Valid @RequestBody ServiceRequest request
+    ) {
+        return ResponseEntity.ok(serviceManagementService.updateService(id, request));
+    }
+
+    // DELETE (soft delete)
+    @PatchMapping("/{id}/disable")
+    public ResponseEntity<String> disableService(@PathVariable String id) {
+        serviceManagementService.disableService(id);
+        return ResponseEntity.ok("Service disabled successfully");
+    }
+
+    // DELETE (hard delete)
+    @DeleteMapping("/{id}")
+    public ResponseEntity<String> deleteService(@PathVariable String id) {
+        serviceManagementService.deleteService(id);
+        return ResponseEntity.ok("Service deleted permanently");
     }
 }
