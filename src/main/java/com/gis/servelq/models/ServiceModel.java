@@ -34,7 +34,6 @@ public class ServiceModel {
     @Column(name = "parent_id")
     private String parentId;
 
-    // Prevent recursive serialization of parent <-> child
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_id", insertable = false, updatable = false)
     @JsonBackReference

@@ -36,6 +36,7 @@ public class ServiceManagementService {
         ServiceModel serviceModel = new ServiceModel();
         serviceModel.setCode(request.getCode());
         serviceModel.setName(request.getName());
+        serviceModel.setArabicName(request.getArabicName());
         serviceModel.setParentId(request.getParentId());
         serviceModel.setSlaSec(request.getSlaSec());
         serviceModel.setEnabled(request.getEnabled());

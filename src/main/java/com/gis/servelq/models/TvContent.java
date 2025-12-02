@@ -21,7 +21,7 @@ public class TvContent {
 
     private String type; // "URL" or "VIDEO"
 
-    private boolean active;
+    private Boolean active;
 
     private String size; // For videos
 }

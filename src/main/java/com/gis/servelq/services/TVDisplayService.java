@@ -1,6 +1,7 @@
 package com.gis.servelq.services;
 
 import com.gis.servelq.dto.TVDisplayResponse;
+import com.gis.servelq.models.Branch;
 import com.gis.servelq.models.Token;
 import com.gis.servelq.models.TokenStatus;
 import com.gis.servelq.repository.BranchRepository;
@@ -19,7 +20,7 @@ public class TVDisplayService {
 
     public TVDisplayResponse getTVDisplayData(String branchId) {
         // Validate branch
-        branchRepository.findByIdAndEnabledTrue(branchId)
+      Branch branch = branchRepository.findByIdAndEnabledTrue(branchId)
                 .orElseThrow(() -> new RuntimeException("Branch not found or disabled"));
 
         // Get latest called tokens (last 2)
@@ -36,6 +37,8 @@ public class TVDisplayService {
                 .stream().limit(10).toList();
 
         TVDisplayResponse response = new TVDisplayResponse();
+
+        response.setBranchName(branch.getName());
 
         // Map latest calls
         response.setLatestCalls(latestCalled.stream().map(token -> {
