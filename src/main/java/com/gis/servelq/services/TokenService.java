@@ -256,36 +256,11 @@ public class TokenService {
             throw new RuntimeException("Token cannot be transferred from status: " + token.getStatus());
         }
 
-        // --- Transfer Branch ---
-        if (request.getToBranchId() != null &&
-                !request.getToBranchId().equals(token.getBranchId())) {
 
-            Branch branch = branchRepository.findById(request.getToBranchId())
-                    .orElseThrow(() -> new RuntimeException("Target branch not found"));
-
-            token.setBranchId(branch.getId());
-        }
-
-        // --- Transfer Service ---
-        if (request.getToServiceId() != null &&
-                !request.getToServiceId().equals(token.getServiceId())) {
-
-            ServiceModel service = serviceRepository.findById(request.getToServiceId())
-                    .orElseThrow(() -> new RuntimeException("Target service not found"));
-
-            token.setServiceId(service.getId());
-        }
-
-        // --- Transfer to Counter ---
-
-        if (request.getToCounterId() != null) {
-            Counter counter = counterRepository.findById(request.getToCounterId())
+        Counter counter = counterRepository.findById(request.getToCounterId())
                     .orElseThrow(() -> new RuntimeException("Target counter not found"));
 
-            token.setCounterId(counter.getId());
-        } else {
-            token.setCounterId(null); // remove old assignment
-        }
+        token.setCounterId(counter.getId());
 
         // Reset status to WAITING
         token.setStatus(TokenStatus.WAITING);

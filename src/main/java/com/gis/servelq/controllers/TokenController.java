@@ -48,5 +48,4 @@ public class TokenController {
         Token token = tokenService.transferToken(request);
         return ResponseEntity.ok(TokenDTO.fromEntity(token));
     }
-
 }
