@@ -150,6 +150,11 @@ public class TokenService {
         Token token = tokenRepository.findById(tokenId)
                 .orElseThrow(() -> new RuntimeException("Token not found"));
 
+        // Allow only tokens that are in CALLING state
+        if (token.getStatus() != TokenStatus.CALLING) {
+          return;
+        }
+
         token.setStatus(TokenStatus.SERVING);
         token.setStartAt(LocalDateTime.now());
         tokenRepository.save(token);
