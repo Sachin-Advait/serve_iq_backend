@@ -76,7 +76,7 @@ public class TokenService {
     private String generateTokenNumber(Branch branch) {
         Optional<Integer> lastNumber = tokenRepository.findLastTokenNumber(branch.getId());
         int nextNumber = lastNumber.orElse(1000) + 1;
-        return "A" + nextNumber;
+        return String.valueOf(nextNumber);
     }
 
     public List<TokenDTO> getUpcomingTokensForCounter(String counterId) {
