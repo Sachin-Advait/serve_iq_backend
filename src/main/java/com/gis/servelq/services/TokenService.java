@@ -95,23 +95,39 @@ public class TokenService {
             throw new RuntimeException("Counter is paused");
         }
 
+
         // Find the next token for this counter's services
         List<ServiceModel> counterServiceModels = counter.getServices();
         Token nextToken = null;
 
-        for ( ServiceModel serviceModel : counterServiceModels) {
-            Optional<Token> token = tokenRepository
+        for (ServiceModel serviceModel : counterServiceModels) {
+
+            Optional<Token> optionalToken = tokenRepository
                     .findFirstByServiceIdAndStatusOrderByPriorityAscCreatedAtAsc(
                             serviceModel.getId(), TokenStatus.WAITING);
 
-            if (token.isPresent()) {
-                if (nextToken == null || token.get().getPriority() < nextToken.getPriority() ||
-                        (token.get().getPriority().equals(nextToken.getPriority()) &&
-                                token.get().getCreatedAt().isBefore(nextToken.getCreatedAt()))) {
-                    nextToken = token.get();
-                }
+            if (optionalToken.isEmpty()) {
+                continue;
+            }
+
+            Token token = optionalToken.get();
+
+            // 🔥 Step 1: Prefer tokens already assigned to this counter
+            if (counterId.equals(token.getCounterId())) {
+                nextToken = token;
+                break; // No need to continue — highest priority case
+            }
+
+            // 🔥 Step 2: Old logic (priority + createdAt)
+            if (nextToken == null
+                    || token.getPriority() < nextToken.getPriority()
+                    || (token.getPriority().equals(nextToken.getPriority())
+                    && token.getCreatedAt().isBefore(nextToken.getCreatedAt()))) {
+
+                nextToken = token;
             }
         }
+
 
         if (nextToken == null) {
             throw new RuntimeException("No tokens available");
