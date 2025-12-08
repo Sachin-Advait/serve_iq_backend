@@ -1,7 +1,7 @@
 package com.gis.servelq.controllers;
 
 import com.gis.servelq.dto.CounterRequest;
-import com.gis.servelq.dto.CounterResponse;
+import com.gis.servelq.dto.CounterResponseDTO;
 import com.gis.servelq.models.CounterStatus;
 import com.gis.servelq.services.CounterService;
 import jakarta.validation.Valid;
@@ -22,7 +22,7 @@ public class CounterController {
     @PostMapping
     public ResponseEntity<?> createCounter(@Valid @RequestBody CounterRequest request) {
         try {
-            CounterResponse counter = counterService.createCounter(request);
+            CounterResponseDTO counter = counterService.createCounter(request);
             return ResponseEntity.status(HttpStatus.CREATED).body(counter);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -31,22 +31,22 @@ public class CounterController {
 
     // Get all counters
     @GetMapping
-    public ResponseEntity<List<CounterResponse>> getAllCounters() {
-        List<CounterResponse> counters = counterService.getAllCounters();
+    public ResponseEntity<List<CounterResponseDTO>> getAllCounters() {
+        List<CounterResponseDTO> counters = counterService.getAllCounters();
         return ResponseEntity.ok(counters);
     }
 
     // Get counters by branch
     @GetMapping("/branch/{branchId}")
-    public ResponseEntity<List<CounterResponse>> getCountersByBranch(@PathVariable String branchId) {
-        List<CounterResponse> counters = counterService.getCountersByBranch(branchId);
+    public ResponseEntity<List<CounterResponseDTO>> getCountersByBranch(@PathVariable String branchId) {
+        List<CounterResponseDTO> counters = counterService.getCountersByBranch(branchId);
         return ResponseEntity.ok(counters);
     }
 
     // Get counter by ID
     @GetMapping("/{counterId}")
-    public ResponseEntity<CounterResponse> getCounterById(@PathVariable String counterId) {
-        CounterResponse counter = counterService.getCounterById(counterId);
+    public ResponseEntity<CounterResponseDTO> getCounterById(@PathVariable String counterId) {
+        CounterResponseDTO counter = counterService.getCounterById(counterId);
         return ResponseEntity.ok(counter);
     }
 
@@ -56,7 +56,7 @@ public class CounterController {
             @PathVariable String counterId,
             @Valid @RequestBody CounterRequest request) {
         try {
-            CounterResponse counter = counterService.updateCounter(counterId, request);
+            CounterResponseDTO counter = counterService.updateCounter(counterId, request);
             return ResponseEntity.ok(counter);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -78,7 +78,7 @@ public class CounterController {
     @PatchMapping("/{counterId}/enable")
     public ResponseEntity<?> enableCounter(@PathVariable String counterId) {
         try {
-            CounterResponse counter = counterService.toggleCounter(counterId, true);
+            CounterResponseDTO counter = counterService.toggleCounter(counterId, true);
             return ResponseEntity.ok(counter);
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
@@ -89,7 +89,7 @@ public class CounterController {
     @PatchMapping("/{counterId}/disable")
     public ResponseEntity<?> disableCounter(@PathVariable String counterId) {
         try {
-            CounterResponse counter = counterService.toggleCounter(counterId, false);
+            CounterResponseDTO counter = counterService.toggleCounter(counterId, false);
             return ResponseEntity.ok(counter);
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
@@ -100,7 +100,7 @@ public class CounterController {
     @PatchMapping("/{counterId}/pause")
     public ResponseEntity<?> pauseCounter(@PathVariable String counterId) {
         try {
-            CounterResponse counter = counterService.togglePauseCounter(counterId, true);
+            CounterResponseDTO counter = counterService.togglePauseCounter(counterId, true);
             return ResponseEntity.ok(counter);
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
@@ -111,7 +111,7 @@ public class CounterController {
     @PatchMapping("/{counterId}/resume")
     public ResponseEntity<?> resumeCounter(@PathVariable String counterId) {
         try {
-            CounterResponse counter = counterService.togglePauseCounter(counterId, false);
+            CounterResponseDTO counter = counterService.togglePauseCounter(counterId, false);
             return ResponseEntity.ok(counter);
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
@@ -124,7 +124,7 @@ public class CounterController {
             @PathVariable String counterId,
             @RequestParam CounterStatus status) {
         try {
-            CounterResponse counter = counterService.updateCounterStatus(counterId, status);
+            CounterResponseDTO counter = counterService.updateCounterStatus(counterId, status);
             return ResponseEntity.ok(counter);
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();

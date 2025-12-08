@@ -3,6 +3,8 @@ package com.gis.servelq.dto;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class TokenRequest {
     @NotBlank
@@ -10,7 +12,7 @@ public class TokenRequest {
 
     @NotBlank
     private String branchId;
-    private String civilId;
-    private String counterId;
-    private Integer priority = 100;
+    private String mobileNumber;
+    private List<String> counterIds;
+    private Integer priority;
 }

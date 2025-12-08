@@ -4,9 +4,6 @@ import com.gis.servelq.models.CounterStatus;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
-import java.util.ArrayList;
-import java.util.List;
-
 @Data
 public class CounterRequest {
     @NotBlank(message = "Counter code is required")
@@ -19,9 +16,8 @@ public class CounterRequest {
     private String branchId;
 
     private String userId;
-    private Boolean enabled = true;
-    private Boolean paused = false;
+    private Boolean enabled;
+    private Boolean paused;
     private CounterStatus status;
-
-    private List<String> serviceIds = new ArrayList<>();
+    private String serviceId;
 }

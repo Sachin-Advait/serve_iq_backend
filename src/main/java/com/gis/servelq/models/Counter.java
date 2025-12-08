@@ -8,8 +8,6 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 @Entity
 @Table(name = "counters")
@@ -19,30 +17,29 @@ public class Counter {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
+
     @NotBlank
     private String code;
+
     @NotBlank
     private String name;
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "branch_id", nullable = false)
-    private Branch branch;
+
     @NotNull
     private Boolean enabled = true;
+
     @NotNull
     private Boolean paused = false;
+
+    @Column(name = "branch_id")
+    private String branchId;
+
     @Column(name = "user_id")
     private String userId;
-    private CounterStatus status = CounterStatus.IDLE;
 
-    @ManyToMany
-    @JoinTable(
-            name = "counter_services",
-            joinColumns = @JoinColumn(name = "counter_id"),
-            inverseJoinColumns = @JoinColumn(name = "service_id")
-    )
-    private List<ServiceModel> services = new ArrayList<>();
-    @OneToMany(mappedBy = "counter", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Token> tokens = new ArrayList<>();
+    @Column(name = "service_id")
+    private String serviceId;
+
+    private CounterStatus status = CounterStatus.IDLE;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

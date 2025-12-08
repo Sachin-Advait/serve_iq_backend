@@ -1,5 +1,6 @@
 package com.gis.servelq.models;
 
+import com.gis.servelq.utils.StringListConverter;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -7,6 +8,7 @@ import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "tokens")
@@ -23,52 +25,44 @@ public class Token {
     @Column(name = "branch_id")
     private String branchId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "branch_id", insertable = false, updatable = false)
-    private Branch branch;
-
     @NotBlank
     @Column(name = "service_id")
     private String serviceId;
 
-    // Change this from serviceModel to service
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "service_id", insertable = false, updatable = false)
-    private ServiceModel service;
+    @NotBlank
+    @Column(name = "service_name")
+    private String serviceName;
 
     @NotNull
-    private Integer priority = 100;
+    private Integer priority = 50;
 
     @Enumerated(EnumType.STRING)
     @NotNull
     private TokenStatus status = TokenStatus.WAITING;
 
-    @Column(name = "civil_id")
-    private String civilId;
+    @Column(name = "mobile_number")
+    private String mobileNumber;
 
-    @Column(name = "counter_id")
-    private String counterId;
+    @Column(name = "assigned_counter_id")
+    private String assignedCounterId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "counter_id", insertable = false, updatable = false)
-    private Counter counter;
+    @Column(name = "assigned_counter_name")
+    private String assignedCounterName;
+
+    @Column(name = "counter_ids")
+    @Convert(converter = StringListConverter.class)
+    private List<String> counterId;
+
+    private Boolean isTransfer = false;
+    private String transferFrom;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
-
-    @Column(name = "called_at")
-    private LocalDateTime calledAt;
 
     @Column(name = "start_at")
     private LocalDateTime startAt;
 
     @Column(name = "end_at")
     private LocalDateTime endAt;
-
-    @Column(name = "appt_time")
-    private LocalDateTime apptTime;
-
-    @Column(name = "no_show_count")
-    private Integer noShowCount = 0;
 }

@@ -1,7 +1,7 @@
 package com.gis.servelq.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.gis.servelq.models.ServiceModel;
+import com.gis.servelq.models.Services;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -24,7 +24,7 @@ public class ServiceResponseDTO {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    public static ServiceResponseDTO fromEntity(ServiceModel service) {
+    public static ServiceResponseDTO fromEntity(Services service) {
         ServiceResponseDTO dto = new ServiceResponseDTO();
         dto.setId(service.getId());
         dto.setCode(service.getCode());
@@ -32,17 +32,10 @@ public class ServiceResponseDTO {
         dto.setArabicName(service.getArabicName());
         dto.setParentId(service.getParentId());
 
-        // Only override if children exist
         if (service.getChildren() != null && !service.getChildren().isEmpty()) {
-            dto.setChildrenIds(
-                    service.getChildren()
-                            .stream()
-                            .map(ServiceModel::getId)
-                            .toList()
-            );
+            dto.setChildrenIds(service.getChildren());
         }
 
-        dto.setSlaSec(service.getSlaSec());
         dto.setEnabled(service.getEnabled());
         dto.setBranchId(service.getBranchId());
         dto.setCreatedAt(service.getCreatedAt());

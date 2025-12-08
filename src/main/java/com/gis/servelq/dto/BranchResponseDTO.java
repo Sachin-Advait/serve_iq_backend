@@ -5,7 +5,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-public class BranchResponse {
+public class BranchResponseDTO {
     private String id;
     private String code;
     private String name;

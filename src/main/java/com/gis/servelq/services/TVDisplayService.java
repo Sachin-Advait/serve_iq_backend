@@ -1,6 +1,6 @@
 package com.gis.servelq.services;
 
-import com.gis.servelq.dto.TVDisplayResponse;
+import com.gis.servelq.dto.TVDisplayResponseDTO;
 import com.gis.servelq.models.Branch;
 import com.gis.servelq.models.Token;
 import com.gis.servelq.models.TokenStatus;
@@ -18,7 +18,7 @@ public class TVDisplayService {
     private final TokenRepository tokenRepository;
     private final BranchRepository branchRepository;
 
-    public TVDisplayResponse getTVDisplayData(String branchId) {
+    public TVDisplayResponseDTO getTVDisplayData(String branchId) {
 
         Branch branch = branchRepository.findByIdAndEnabledTrue(branchId)
                 .orElseThrow(() -> new RuntimeException("Branch not found or disabled"));
@@ -36,27 +36,25 @@ public class TVDisplayService {
                         branchId, TokenStatus.WAITING)
                 .stream().limit(10).toList();
 
-        TVDisplayResponse response = new TVDisplayResponse();
+        TVDisplayResponseDTO response = new TVDisplayResponseDTO();
 
         response.setBranchName(branch.getName());
 
         // Map latest calls
         response.setLatestCalls(latestCalled.stream().map(token -> {
-            TVDisplayResponse.DisplayToken dt = new TVDisplayResponse.DisplayToken();
+            TVDisplayResponseDTO.DisplayToken dt = new TVDisplayResponseDTO.DisplayToken();
             dt.setToken(token.getToken());
-            dt.setCounter(token.getCounter() != null ? token.getCounter().getName() : "N/A");
-            dt.setService(token.getService().getName());
-            dt.setCalledAt(token.getCalledAt());
+            dt.setCounter(token.getAssignedCounterName());
+            dt.setService(token.getServiceName());
             return dt;
         }).collect(Collectors.toList()));
 
         // Map now serving
         response.setNowServing(nowServing.stream().map(token -> {
-            TVDisplayResponse.DisplayToken dt = new TVDisplayResponse.DisplayToken();
+            TVDisplayResponseDTO.DisplayToken dt = new TVDisplayResponseDTO.DisplayToken();
             dt.setToken(token.getToken());
-            dt.setCounter(token.getCounter() != null ? token.getCounter().getName() : "N/A");
-            dt.setService(token.getService().getName());
-            dt.setCalledAt(token.getCalledAt());
+            dt.setCounter(token.getAssignedCounterName());
+            dt.setService(token.getServiceName());
             return dt;
         }).collect(Collectors.toList()));
 

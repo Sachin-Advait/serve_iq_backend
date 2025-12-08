@@ -1,7 +1,7 @@
 package com.gis.servelq.services;
 
-import com.gis.servelq.dto.TVDisplayResponse;
-import com.gis.servelq.dto.TokenDTO;
+import com.gis.servelq.dto.TVDisplayResponseDTO;
+import com.gis.servelq.dto.TokenResponseDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -21,12 +21,15 @@ public class SocketService {
     }
 
     public void tvSocket(String branchId) {
-        TVDisplayResponse data = tvDisplayService.getTVDisplayData(branchId);
+        TVDisplayResponseDTO data = tvDisplayService.getTVDisplayData(branchId);
         broadcast("/topic/tv/" + branchId, data);
     }
 
-    public void agentUpcoming(String counterId) {
-        List<TokenDTO> data = agentService.getUpcomingTokensForCounter(counterId);
-        broadcast("/topic/agent-upcoming/" + counterId, data);
+    public void agentUpcoming(List<String> counterIds) {
+
+        for (String counterId : counterIds) {
+            List<TokenResponseDTO> data = agentService.getUpcomingTokensForCounter(counterId);
+            broadcast("/topic/agent-upcoming/" + counterId, data);
+        }
     }
 }

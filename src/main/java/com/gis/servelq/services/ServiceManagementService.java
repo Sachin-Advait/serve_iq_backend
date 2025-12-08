@@ -2,7 +2,7 @@ package com.gis.servelq.services;
 
 import com.gis.servelq.dto.ServiceRequest;
 import com.gis.servelq.dto.ServiceResponseDTO;
-import com.gis.servelq.models.ServiceModel;
+import com.gis.servelq.models.Services;
 import com.gis.servelq.repository.BranchRepository;
 import com.gis.servelq.repository.ServiceRepository;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.stream.Collectors;
+
 @Service
 @RequiredArgsConstructor
 public class ServiceManagementService {
@@ -18,10 +19,12 @@ public class ServiceManagementService {
     private final BranchRepository branchRepository;
 
     // CREATE
-    public ServiceModel createService(ServiceRequest request) {
+    public Services createService(ServiceRequest request) {
 
         serviceRepository.findByCodeAndBranchId(request.getCode(), request.getBranchId())
-                .ifPresent(s -> { throw new RuntimeException("Service code already exists"); });
+                .ifPresent(s -> {
+                    throw new RuntimeException("Service code already exists");
+                });
 
         if (request.getParentId() != null) {
             serviceRepository.findById(request.getParentId())
@@ -31,7 +34,7 @@ public class ServiceManagementService {
         branchRepository.findById(request.getBranchId())
                 .orElseThrow(() -> new RuntimeException("Branch does not exist"));
 
-        ServiceModel serviceModel = new ServiceModel();
+        Services serviceModel = new Services();
         copyRequestToEntity(serviceModel, request);
 
         return serviceRepository.save(serviceModel);
@@ -39,7 +42,7 @@ public class ServiceManagementService {
 
     // READ: Get by ID
     public ServiceResponseDTO getServiceById(String id) {
-        ServiceModel service = serviceRepository.findById(id)
+        Services service = serviceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Service not found"));
         return ServiceResponseDTO.fromEntity(service);
     }
@@ -63,14 +66,16 @@ public class ServiceManagementService {
     }
 
     // UPDATE
-    public ServiceModel updateService(String id, ServiceRequest request) {
+    public Services updateService(String id, ServiceRequest request) {
 
-        ServiceModel service = serviceRepository.findById(id)
+        Services service = serviceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Service not found"));
 
         if (!service.getCode().equals(request.getCode())) {
             serviceRepository.findByCodeAndBranchId(request.getCode(), request.getBranchId())
-                    .ifPresent(s -> { throw new RuntimeException("Service code already exists"); });
+                    .ifPresent(s -> {
+                        throw new RuntimeException("Service code already exists");
+                    });
         }
 
         copyRequestToEntity(service, request);
@@ -80,7 +85,7 @@ public class ServiceManagementService {
 
     // SOFT DELETE
     public void disableService(String id) {
-        ServiceModel service = serviceRepository.findById(id)
+        Services service = serviceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Service not found"));
         service.setEnabled(false);
         serviceRepository.save(service);
@@ -96,12 +101,11 @@ public class ServiceManagementService {
 
 
     // Helper method
-    private void copyRequestToEntity(ServiceModel entity, ServiceRequest req) {
+    private void copyRequestToEntity(Services entity, ServiceRequest req) {
         entity.setCode(req.getCode());
         entity.setName(req.getName());
         entity.setArabicName(req.getArabicName());
         entity.setParentId(req.getParentId());
-        entity.setSlaSec(req.getSlaSec());
         entity.setEnabled(req.getEnabled());
         entity.setBranchId(req.getBranchId());
     }

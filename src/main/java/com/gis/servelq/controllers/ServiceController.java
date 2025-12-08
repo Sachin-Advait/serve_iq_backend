@@ -2,7 +2,7 @@ package com.gis.servelq.controllers;
 
 import com.gis.servelq.dto.ServiceRequest;
 import com.gis.servelq.dto.ServiceResponseDTO;
-import com.gis.servelq.models.ServiceModel;
+import com.gis.servelq.models.Services;
 import com.gis.servelq.services.ServiceManagementService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +20,7 @@ public class ServiceController {
 
     // CREATE
     @PostMapping
-    public ResponseEntity<ServiceModel> createService(@Valid @RequestBody ServiceRequest request) {
+    public ResponseEntity<Services> createService(@Valid @RequestBody ServiceRequest request) {
         return ResponseEntity.ok(serviceManagementService.createService(request));
     }
 
@@ -50,7 +50,7 @@ public class ServiceController {
 
     // UPDATE
     @PutMapping("/{id}")
-    public ResponseEntity<ServiceModel> updateService(
+    public ResponseEntity<Services> updateService(
             @PathVariable String id,
             @Valid @RequestBody ServiceRequest request
     ) {

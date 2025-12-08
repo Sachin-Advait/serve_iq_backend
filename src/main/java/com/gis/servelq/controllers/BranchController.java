@@ -1,7 +1,7 @@
 package com.gis.servelq.controllers;
 
 import com.gis.servelq.dto.BranchRequest;
-import com.gis.servelq.dto.BranchResponse;
+import com.gis.servelq.dto.BranchResponseDTO;
 import com.gis.servelq.services.BranchService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +23,7 @@ public class BranchController {
     @PostMapping
     public ResponseEntity<?> createBranch(@Valid @RequestBody BranchRequest branchRequest) {
         try {
-            BranchResponse createdBranch = branchService.createBranch(branchRequest);
+            BranchResponseDTO createdBranch = branchService.createBranch(branchRequest);
             return ResponseEntity.status(HttpStatus.CREATED).body(createdBranch);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -32,23 +32,23 @@ public class BranchController {
 
     // Get all branches
     @GetMapping
-    public ResponseEntity<List<BranchResponse>> getAllBranches() {
-        List<BranchResponse> branches = branchService.getAllBranches();
+    public ResponseEntity<List<BranchResponseDTO>> getAllBranches() {
+        List<BranchResponseDTO> branches = branchService.getAllBranches();
         return ResponseEntity.ok(branches);
     }
 
     // Get branch by ID
     @GetMapping("/{id}")
-    public ResponseEntity<BranchResponse> getBranchById(@PathVariable String id) {
-        Optional<BranchResponse> branch = branchService.getBranchById(id);
+    public ResponseEntity<BranchResponseDTO> getBranchById(@PathVariable String id) {
+        Optional<BranchResponseDTO> branch = branchService.getBranchById(id);
         return branch.map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     // Get branch by code
     @GetMapping("/code/{code}")
-    public ResponseEntity<BranchResponse> getBranchByCode(@PathVariable String code) {
-        Optional<BranchResponse> branch = branchService.getBranchByCode(code);
+    public ResponseEntity<BranchResponseDTO> getBranchByCode(@PathVariable String code) {
+        Optional<BranchResponseDTO> branch = branchService.getBranchByCode(code);
         return branch.map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -57,7 +57,7 @@ public class BranchController {
     @PutMapping("/{id}")
     public ResponseEntity<?> updateBranch(@PathVariable String id, @Valid @RequestBody BranchRequest branchDetails) {
         try {
-            BranchResponse updatedBranch = branchService.updateBranch(id, branchDetails);
+            BranchResponseDTO updatedBranch = branchService.updateBranch(id, branchDetails);
             return ResponseEntity.ok(updatedBranch);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -79,7 +79,7 @@ public class BranchController {
     @PatchMapping("/{id}/disable")
     public ResponseEntity<?> disableBranch(@PathVariable String id) {
         try {
-            BranchResponse disabledBranch = branchService.disableBranch(id);
+            BranchResponseDTO disabledBranch = branchService.disableBranch(id);
             return ResponseEntity.ok(disabledBranch);
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
@@ -90,7 +90,7 @@ public class BranchController {
     @PatchMapping("/{id}/enable")
     public ResponseEntity<?> enableBranch(@PathVariable String id) {
         try {
-            BranchResponse enabledBranch = branchService.enableBranch(id);
+            BranchResponseDTO enabledBranch = branchService.enableBranch(id);
             return ResponseEntity.ok(enabledBranch);
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();

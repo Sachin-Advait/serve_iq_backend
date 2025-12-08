@@ -1,11 +1,11 @@
 package com.gis.servelq.dto;
 
 import lombok.Data;
-import java.time.LocalDateTime;
+
 import java.util.List;
 
 @Data
-public class TVDisplayResponse {
+public class TVDisplayResponseDTO {
     private List<DisplayToken> latestCalls;
     private List<DisplayToken> nowServing;
     private List<String> upcomingTokens;
@@ -16,6 +16,5 @@ public class TVDisplayResponse {
         private String token;
         private String counter;
         private String service;
-        private LocalDateTime calledAt;
     }
 }

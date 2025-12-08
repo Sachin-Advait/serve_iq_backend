@@ -1,7 +1,7 @@
 package com.gis.servelq.services;
 
 import com.gis.servelq.dto.BranchRequest;
-import com.gis.servelq.dto.BranchResponse;
+import com.gis.servelq.dto.BranchResponseDTO;
 import com.gis.servelq.models.Branch;
 import com.gis.servelq.repository.BranchRepository;
 import lombok.RequiredArgsConstructor;
@@ -19,8 +19,8 @@ public class BranchService {
     private final BranchRepository branchRepository;
 
     // Convert Entity to Response DTO
-    private BranchResponse convertToResponse(Branch branch) {
-        BranchResponse response = new BranchResponse();
+    private BranchResponseDTO convertToResponse(Branch branch) {
+        BranchResponseDTO response = new BranchResponseDTO();
         response.setId(branch.getId());
         response.setCode(branch.getCode());
         response.setName(branch.getName());
@@ -41,7 +41,7 @@ public class BranchService {
 
     // Create a new branch
     @Transactional
-    public BranchResponse createBranch(BranchRequest branchRequest) {
+    public BranchResponseDTO createBranch(BranchRequest branchRequest) {
         // Check if branch code already exists
         if (branchRepository.findByCode(branchRequest.getCode()).isPresent()) {
             throw new RuntimeException("Branch with code " + branchRequest.getCode() + " already exists");
@@ -59,7 +59,7 @@ public class BranchService {
     }
 
     // Get all branches
-    public List<BranchResponse> getAllBranches() {
+    public List<BranchResponseDTO> getAllBranches() {
         return branchRepository.findAll()
                 .stream()
                 .map(this::convertToResponse)
@@ -67,20 +67,20 @@ public class BranchService {
     }
 
     // Get branch by ID
-    public Optional<BranchResponse> getBranchById(String id) {
+    public Optional<BranchResponseDTO> getBranchById(String id) {
         return branchRepository.findById(id)
                 .map(this::convertToResponse);
     }
 
     // Get branch by code
-    public Optional<BranchResponse> getBranchByCode(String code) {
+    public Optional<BranchResponseDTO> getBranchByCode(String code) {
         return branchRepository.findByCode(code)
                 .map(this::convertToResponse);
     }
 
     // Update branch
     @Transactional
-    public BranchResponse updateBranch(String id, BranchRequest branchDetails) {
+    public BranchResponseDTO updateBranch(String id, BranchRequest branchDetails) {
         Branch existingBranch = branchRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Branch not found with id: " + id));
 
@@ -118,7 +118,7 @@ public class BranchService {
 
     // Soft delete (disable) branch
     @Transactional
-    public BranchResponse disableBranch(String id) {
+    public BranchResponseDTO disableBranch(String id) {
         Branch branch = branchRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Branch not found with id: " + id));
 
@@ -129,7 +129,7 @@ public class BranchService {
 
     // Enable branch
     @Transactional
-    public BranchResponse enableBranch(String id) {
+    public BranchResponseDTO enableBranch(String id) {
         Branch branch = branchRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Branch not found with id: " + id));
 
