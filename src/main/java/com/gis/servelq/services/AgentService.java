@@ -57,19 +57,19 @@ public class AgentService {
 
         Token nextToken = optionalToken.get();
 
-        // Update token
         nextToken.setStatus(TokenStatus.CALLING);
         nextToken.setAssignedCounterId(counterId);
         nextToken.setAssignedCounterName(counter.getName());
         tokenRepository.save(nextToken);
 
-        // Update counter
         counter.setStatus(CounterStatus.CALLING);
         counterRepository.save(counter);
 
         socketService.tvSocket(nextToken.getBranchId());
 
-        // Prepare response
+        // Notify agent screen
+        notifyAgentUpcoming(counterId);
+
         AgentCallResponseDTO response = new AgentCallResponseDTO();
         response.setTokenId(nextToken.getId());
         response.setToken(nextToken.getToken());
@@ -102,7 +102,10 @@ public class AgentService {
                     .orElseThrow(() -> new RuntimeException("Counter not found"));
             counter.setStatus(CounterStatus.SERVING);
             counterRepository.save(counter);
+
+            notifyAgentUpcoming(counter.getId());
         }
+
         socketService.tvSocket(token.getBranchId());
     }
 
@@ -120,7 +123,10 @@ public class AgentService {
                     .orElseThrow(() -> new RuntimeException("Counter not found"));
             counter.setStatus(CounterStatus.IDLE);
             counterRepository.save(counter);
+
+            notifyAgentUpcoming(counter.getId());
         }
+
         socketService.tvSocket(token.getBranchId());
     }
 
@@ -148,6 +154,9 @@ public class AgentService {
         Counter counter = counterRepository.findById(token.getAssignedCounterId())
                 .orElseThrow(() -> new RuntimeException("Counter not found"));
 
+        notifyAgentUpcoming(counter.getId());
+        socketService.tvSocket(token.getBranchId());
+
         AgentCallResponseDTO response = new AgentCallResponseDTO();
         response.setTokenId(token.getId());
         response.setToken(token.getToken());
@@ -160,7 +169,6 @@ public class AgentService {
                 token.getServiceId(), TokenStatus.WAITING);
 
         response.setWaitingCount((int) waitingCount);
-        socketService.tvSocket(token.getBranchId());
         return response;
     }
 
@@ -189,11 +197,11 @@ public class AgentService {
 
         Token updated = tokenRepository.save(token);
 
-        // Notify TV displays
+        // refresh TV screen
         socketService.tvSocket(token.getBranchId());
 
-        // Notify agent(s) of that counter
-        socketService.agentUpcoming(List.of(toCounter.getId()));
+        // refresh agent screen for that counter
+        notifyAgentUpcoming(toCounter.getId());
 
         return updated;
     }
@@ -225,5 +233,11 @@ public class AgentService {
         response.setWaitingCount((int) waitingCount);
 
         return response;
+    }
+
+    // 🔥 NEW METHOD → replaces old socketService.agentUpcoming()
+    public void notifyAgentUpcoming(String counterId) {
+        List<TokenResponseDTO> data = getUpcomingTokensForCounter(counterId);
+        socketService.broadcast("/topic/agent-upcoming/" + counterId, data);
     }
 }

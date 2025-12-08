@@ -24,13 +24,18 @@ public interface TokenRepository extends JpaRepository<Token, String> {
 
     long countByServiceIdAndStatus(String serviceId, TokenStatus status);
 
-    @Query("SELECT t FROM Token t WHERE t.branchId = :branchId AND t.status IN ('CALLING') " +
-            "ORDER BY t.calledAt DESC")
+    @Query("""
+    SELECT t FROM Token t 
+    WHERE t.branchId = :branchId 
+      AND t.status = com.gis.servelq.models.TokenStatus.CALLING
+    ORDER BY t.startAt DESC
+    """)
     List<Token> findLatestCalledTokens(@Param("branchId") String branchId);
+
 
     @Query("""
             SELECT t FROM Token t
-            WHERE t.status = 'WAITING'
+            WHERE t.status = com.gis.servelq.models.TokenStatus.WAITING
               AND (
                     t.counterId IS NULL
                     OR t.counterId = ''

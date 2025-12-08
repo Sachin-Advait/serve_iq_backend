@@ -14,17 +14,21 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class TokenService {
+
     private final TokenRepository tokenRepository;
     private final ServiceRepository serviceRepository;
     private final BranchRepository branchRepository;
     private final SocketService socketService;
+    private final AgentService agentService; // ✅ NEW
 
     @Transactional
     public TokenResponseDTO generateToken(TokenRequest request) {
+
         Services serviceModel = serviceRepository.findById(request.getServiceId())
                 .orElseThrow(() -> new RuntimeException("Service not found"));
 
@@ -43,15 +47,25 @@ public class TokenService {
         token.setStatus(TokenStatus.WAITING);
         token.setMobileNumber(request.getMobileNumber());
 
-        if (request.getCounterIds() != null) token.setCounterId(request.getCounterIds());
+        if (request.getCounterIds() != null) {
+            token.setCounterId(request.getCounterIds());
+        }
 
         Token savedToken = tokenRepository.save(token);
 
-        long waitingCount = tokenRepository.countByServiceIdAndStatus(
-                serviceModel.getId(),
-                TokenStatus.WAITING
+        // Update waiting count for the service
+        tokenRepository.countByServiceIdAndStatus(
+                serviceModel.getId(), TokenStatus.WAITING
         );
-        socketService.agentUpcoming(request.getCounterIds());
+
+        // ✅ FIXED — notify each counter using AgentService method
+        if (request.getCounterIds() != null) {
+            for (String counterId : request.getCounterIds()) {
+                agentService.notifyAgentUpcoming(counterId);
+            }
+        }
+
+        // Refresh TV display
         socketService.tvSocket(request.getBranchId());
 
         return TokenResponseDTO.fromEntity(savedToken);
