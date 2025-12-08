@@ -1,5 +1,6 @@
 package com.gis.servelq.dto;
 
+import com.gis.servelq.models.CounterStatus;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
@@ -20,7 +21,7 @@ public class CounterRequest {
     private String userId;
     private Boolean enabled = true;
     private Boolean paused = false;
-    private String status = "IDLE";
+    private CounterStatus status;
 
     private List<String> serviceIds = new ArrayList<>();
 }

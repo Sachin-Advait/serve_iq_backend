@@ -2,6 +2,7 @@ package com.gis.servelq.controllers;
 
 import com.gis.servelq.dto.CounterRequest;
 import com.gis.servelq.dto.CounterResponse;
+import com.gis.servelq.models.CounterStatus;
 import com.gis.servelq.services.CounterService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -121,7 +122,7 @@ public class CounterController {
     @PatchMapping("/{counterId}/status")
     public ResponseEntity<?> updateCounterStatus(
             @PathVariable String counterId,
-            @RequestParam String status) {
+            @RequestParam CounterStatus status) {
         try {
             CounterResponse counter = counterService.updateCounterStatus(counterId, status);
             return ResponseEntity.ok(counter);

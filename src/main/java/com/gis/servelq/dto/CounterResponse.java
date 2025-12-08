@@ -1,6 +1,6 @@
 package com.gis.servelq.dto;
 
-import com.gis.servelq.models.ServiceModel;
+import com.gis.servelq.models.CounterStatus;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -14,7 +14,7 @@ public class CounterResponse {
     private BranchResponse branch;
     private Boolean enabled;
     private Boolean paused;
-    private String status;
+    private CounterStatus status;
     private String userId;
     private String username;
     private List<ServiceResponseDTO> services;

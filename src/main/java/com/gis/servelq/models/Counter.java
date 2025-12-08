@@ -19,27 +19,20 @@ public class Counter {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
-
     @NotBlank
     private String code;
-
     @NotBlank
     private String name;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "branch_id", nullable = false)
     private Branch branch;
-
     @NotNull
     private Boolean enabled = true;
-
     @NotNull
     private Boolean paused = false;
-
     @Column(name = "user_id")
     private String userId;
-
-    private String status = "IDLE";
+    private CounterStatus status = CounterStatus.IDLE;
 
     @ManyToMany
     @JoinTable(
@@ -48,7 +41,6 @@ public class Counter {
             inverseJoinColumns = @JoinColumn(name = "service_id")
     )
     private List<ServiceModel> services = new ArrayList<>();
-
     @OneToMany(mappedBy = "counter", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Token> tokens = new ArrayList<>();
 

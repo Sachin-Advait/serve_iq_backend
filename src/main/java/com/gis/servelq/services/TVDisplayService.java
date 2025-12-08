@@ -19,8 +19,8 @@ public class TVDisplayService {
     private final BranchRepository branchRepository;
 
     public TVDisplayResponse getTVDisplayData(String branchId) {
-        // Validate branch
-      Branch branch = branchRepository.findByIdAndEnabledTrue(branchId)
+
+        Branch branch = branchRepository.findByIdAndEnabledTrue(branchId)
                 .orElseThrow(() -> new RuntimeException("Branch not found or disabled"));
 
         // Get latest called tokens (last 2)

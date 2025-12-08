@@ -11,5 +11,6 @@ public class TokenRequest {
     @NotBlank
     private String branchId;
     private String civilId;
+    private String counterId;
     private Integer priority = 100;
 }

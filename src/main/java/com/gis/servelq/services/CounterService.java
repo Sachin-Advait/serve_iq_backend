@@ -6,6 +6,7 @@ import com.gis.servelq.dto.CounterResponse;
 import com.gis.servelq.dto.ServiceResponseDTO;
 import com.gis.servelq.models.Branch;
 import com.gis.servelq.models.Counter;
+import com.gis.servelq.models.CounterStatus;
 import com.gis.servelq.models.ServiceModel;
 import com.gis.servelq.repository.BranchRepository;
 import com.gis.servelq.repository.CounterRepository;
@@ -104,7 +105,7 @@ public class CounterService {
         counter.setBranch(branch);
         counter.setEnabled(request.getEnabled() != null ? request.getEnabled() : true);
         counter.setPaused(request.getPaused() != null ? request.getPaused() : false);
-        counter.setStatus(request.getStatus() != null ? request.getStatus() : "IDLE");
+        counter.setStatus(request.getStatus() != null ? request.getStatus() : CounterStatus.IDLE);
 
         // Add services if provided
         if (request.getServiceIds() != null && !request.getServiceIds().isEmpty()) {
@@ -231,7 +232,7 @@ public class CounterService {
 
     // Update counter status
     @Transactional
-    public CounterResponse updateCounterStatus(String counterId, String status) {
+    public CounterResponse updateCounterStatus(String counterId, CounterStatus status) {
         Counter counter = counterRepository.findById(counterId)
                 .orElseThrow(() -> new RuntimeException("Counter not found with id: " + counterId));
         counter.setStatus(status);
