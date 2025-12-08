@@ -15,10 +15,8 @@ public class ServiceResponseDTO {
     private String name;
     private String arabicName;
     private String parentId;
-
-    private List<String> childrenIds = List.of(); // ← Always non-null
-
-    private Integer slaSec;
+    private List<String> childrenIds = List.of();
+    private List<String> counterIds = List.of();
     private Boolean enabled;
     private String branchId;
     private LocalDateTime createdAt;
@@ -35,7 +33,9 @@ public class ServiceResponseDTO {
         if (service.getChildren() != null && !service.getChildren().isEmpty()) {
             dto.setChildrenIds(service.getChildren());
         }
-
+        if (service.getCounterIds() != null && !service.getCounterIds().isEmpty()) {
+            dto.setCounterIds(service.getCounterIds());
+        }
         dto.setEnabled(service.getEnabled());
         dto.setBranchId(service.getBranchId());
         dto.setCreatedAt(service.getCreatedAt());

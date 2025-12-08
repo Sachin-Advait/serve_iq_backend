@@ -87,8 +87,6 @@ public class CounterService {
         response.setCode(branch.getCode());
         response.setName(branch.getName());
         response.setEnabled(branch.getEnabled());
-        response.setCreatedAt(branch.getCreatedAt());
-        response.setUpdatedAt(branch.getUpdatedAt());
         return response;
     }
 

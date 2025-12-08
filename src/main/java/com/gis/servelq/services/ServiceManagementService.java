@@ -18,26 +18,39 @@ public class ServiceManagementService {
     private final ServiceRepository serviceRepository;
     private final BranchRepository branchRepository;
 
-    // CREATE
     public Services createService(ServiceRequest request) {
-
         serviceRepository.findByCodeAndBranchId(request.getCode(), request.getBranchId())
                 .ifPresent(s -> {
                     throw new RuntimeException("Service code already exists");
                 });
 
-        if (request.getParentId() != null) {
-            serviceRepository.findById(request.getParentId())
-                    .orElseThrow(() -> new RuntimeException("Parent service does not exist"));
-        }
-
         branchRepository.findById(request.getBranchId())
                 .orElseThrow(() -> new RuntimeException("Branch does not exist"));
 
-        Services serviceModel = new Services();
-        copyRequestToEntity(serviceModel, request);
+        Services parent = null;
+        if (request.getParentId() != null) {
+            parent = serviceRepository.findById(request.getParentId())
+                    .orElseThrow(() -> new RuntimeException("Parent service does not exist"));
+        }
 
-        return serviceRepository.save(serviceModel);
+        Services newService = new Services();
+        copyRequestToEntity(newService, request);
+
+        newService = serviceRepository.save(newService);
+
+        if (parent != null) {
+            List<String> childList = parent.getChildren();
+
+            if (childList == null || childList.isEmpty()) {
+                childList = new java.util.ArrayList<>();
+            }
+
+            childList.add(newService.getId());
+            parent.setChildren(childList);
+
+            serviceRepository.save(parent);
+        }
+        return newService;
     }
 
     // READ: Get by ID
@@ -108,5 +121,6 @@ public class ServiceManagementService {
         entity.setParentId(req.getParentId());
         entity.setEnabled(req.getEnabled());
         entity.setBranchId(req.getBranchId());
+        entity.setCounterIds(req.getCounterIds());
     }
 }

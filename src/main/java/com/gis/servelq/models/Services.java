@@ -34,7 +34,6 @@ public class Services {
     @NotNull
     private Boolean enabled = true;
 
-    @NotNull
     @Column(name = "counter_ids")
     @Convert(converter = StringListConverter.class)
     private List<String> counterIds;
