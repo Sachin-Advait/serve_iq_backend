@@ -186,8 +186,25 @@ public class AgentService {
         Counter toCounter = counterRepository.findById(request.getToCounterId())
                 .orElseThrow(() -> new RuntimeException("Target counter not found"));
 
+        String fromCounterId = token.getAssignedCounterId();
+
         token.setIsTransfer(true);
-        token.setTransferFrom(token.getAssignedCounterId());
+        token.setTransferFrom(fromCounterId);
+
+        // -----------------------------------------
+        // REMOVE OLD COUNTER FROM counterIds LIST
+        // -----------------------------------------
+        if (token.getCounterIds() != null && fromCounterId != null) {
+            token.getCounterIds().remove(fromCounterId);
+        }
+        // -----------------------------------------
+
+        // ADD NEW COUNTER IF YOU WANT (optional)
+        if (token.getCounterIds() != null) {
+            token.getCounterIds().add(toCounter.getId());
+        }
+
+        // Set the assigned counter to new one
         token.setAssignedCounterId(toCounter.getId());
         token.setAssignedCounterName(toCounter.getName());
 

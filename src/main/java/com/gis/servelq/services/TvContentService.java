@@ -12,6 +12,7 @@ import java.util.List;
 public class TvContentService {
 
     private final TvContentRepository repo;
+    private final SocketService socketService;
 
     public List<TvContent> getByBranch(String branchId) {
         return repo.findByBranchId(branchId);
@@ -50,6 +51,7 @@ public class TvContentService {
         TvContent selected = repo.findById(id)
                 .orElseThrow(() -> new RuntimeException("Content not found"));
         selected.setActive(true);
+        socketService.tvSocket(branchId);
         return repo.save(selected);
     }
 }
