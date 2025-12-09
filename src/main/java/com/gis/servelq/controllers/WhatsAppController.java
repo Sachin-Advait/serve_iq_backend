@@ -1,25 +1,22 @@
 package com.gis.servelq.controllers;
 
+import com.gis.servelq.dto.WhatsAppRequest;
 import com.gis.servelq.services.WhatsAppService;
 import lombok.AllArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
 
 @RestController
 @RequestMapping("/serveiq/api/whatsapp")
 @AllArgsConstructor
 public class WhatsAppController {
 
-    final private WhatsAppService service;
+    private final WhatsAppService service;
 
-    @GetMapping("/send")
-    public String send(@RequestParam String to, @RequestParam String msg) {
-        return service.sendMessage(to, msg);
+    @PostMapping("/send")
+    public String send(@RequestBody WhatsAppRequest request) {
+        return service.sendMessage(request.getTo(), request.getMsg());
     }
 }
-
-
-//curl -X GET "http://localhost:8085/serveiq/api/whatsapp/send?to=+919717453667&msg=Hello+from+SpringBoot"
