@@ -38,7 +38,8 @@ public class Counter {
 
     @Column(name = "service_id")
     private String serviceId;
-
+    
+    @Enumerated(EnumType.STRING)
     private CounterStatus status = CounterStatus.IDLE;
 
     @CreationTimestamp
