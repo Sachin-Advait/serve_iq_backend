@@ -45,8 +45,7 @@ public class AgentService {
         Services service = serviceRepository.findById(counter.getServiceId())
                 .orElseThrow(() -> new RuntimeException("Service not found"));
 
-        Optional<Token> optionalToken =
-                tokenRepository.findNextToken(service.getId(), TokenStatus.WAITING, counterId);
+        Optional<Token> optionalToken = tokenRepository.findNextToken(counterId);
 
         if (optionalToken.isEmpty()) {
             throw new RuntimeException("No tokens available");

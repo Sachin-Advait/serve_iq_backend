@@ -18,27 +18,25 @@ public interface TokenRepository extends JpaRepository<Token, String> {
 
     List<Token> findByStatusAndAssignedCounterId(TokenStatus status, String assignedCounterId);
 
-    @Query("""
-                SELECT t
-                FROM Token t
-                WHERE t.serviceId = :serviceId
-                  AND t.status = :status
-                  AND (
-                        t.counterIds LIKE CONCAT(:counterId, ',%')
-                        OR t.counterIds LIKE CONCAT('%,', :counterId, ',%')
-                        OR t.counterIds LIKE CONCAT('%,', :counterId)
-                        OR t.counterIds = :counterId
-                  )
-                ORDER BY
-                    t.priority DESC,
-                    t.isTransfer DESC,
-                    t.createdAt ASC
-            """)
-    Optional<Token> findNextToken(
-            String serviceId,
-            TokenStatus status,
-            String counterId
-    );
+    @Query(value = """
+            SELECT *
+            FROM tokens t
+            WHERE t.status = 'WAITING'
+              AND (
+                    t.counter_ids IS NULL
+                    OR t.counter_ids = ''
+                    OR t.counter_ids = :counterId
+                    OR t.counter_ids LIKE CONCAT(:counterId, ',%')
+                    OR t.counter_ids LIKE CONCAT('%,', :counterId)
+                    OR t.counter_ids LIKE CONCAT('%,', :counterId, ',%')
+                )
+            ORDER BY
+                t.priority DESC,
+                t.is_transfer DESC,
+                t.created_at ASC
+            LIMIT 1
+            """, nativeQuery = true)
+    Optional<Token> findNextToken(@Param("counterId") String counterId);
 
 
     Optional<Token> findFirstByAssignedCounterIdAndStatus(String assignedCounterId, TokenStatus status);
