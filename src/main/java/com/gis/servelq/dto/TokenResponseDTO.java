@@ -24,6 +24,9 @@ public class TokenResponseDTO {
     private String counterId;
     private String counterName;
 
+    private String transferCounterName;
+    private Boolean isTransfer;
+
     // Reporting Fields
     private String generatedTime;
     private String startTime;
@@ -38,28 +41,20 @@ public class TokenResponseDTO {
         dto.setToken(token.getToken());
         dto.setServiceId(token.getServiceId());
         dto.setServiceName(token.getServiceName());
+        dto.setMobileNumber(token.getMobileNumber());
         dto.setStatus(token.getStatus());
+
+        dto.setTransferCounterName(token.getTransferFrom());
+        dto.setIsTransfer(token.getIsTransfer());
+
         dto.setCounterId(token.getAssignedCounterId());
         dto.setCounterName(token.getAssignedCounterName());
-        dto.setMobileNumber(token.getMobileNumber());
 
-        // Optional date/time fields → format only if not null
-        if (token.getCreatedAt() != null)
-            dto.setGeneratedTime(token.getCreatedAt().toString());
-
-        if (token.getStartAt() != null)
-            dto.setStartTime(token.getStartAt().toString());
-
-        if (token.getEndAt() != null)
-            dto.setEndTime(token.getEndAt().toString());
-
-        // waitTime = startTime - generatedTime
-        if (token.getStartAt() != null && token.getCreatedAt() != null)
-            dto.setWaitTime(calculateDuration(token.getCreatedAt(), token.getStartAt()));
-
-        // servingDuration = endTime - startTime
-        if (token.getStartAt() != null && token.getEndAt() != null)
-            dto.setServingDuration(calculateDuration(token.getStartAt(), token.getEndAt()));
+        dto.setGeneratedTime(token.getCreatedAt().toString());
+        dto.setStartTime(token.getStartAt().toString());
+        dto.setEndTime(token.getEndAt().toString());
+        dto.setWaitTime(calculateDuration(token.getCreatedAt(), token.getStartAt()));
+        dto.setServingDuration(calculateDuration(token.getStartAt(), token.getEndAt()));
 
         return dto;
     }
