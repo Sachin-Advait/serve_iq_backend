@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/serveiq/api/feedback")
@@ -27,5 +28,9 @@ public class FeedbackController {
     @DeleteMapping("/{id}")
     public void deleteFeedback(@PathVariable String id) {
         service.delete(id);
+    }
+    @GetMapping("/summary")
+    public Map<String, Long> getSummary() {
+        return service.getFeedbackSummary();
     }
 }
