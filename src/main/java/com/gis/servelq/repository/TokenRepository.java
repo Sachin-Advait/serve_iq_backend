@@ -18,6 +18,8 @@ public interface TokenRepository extends JpaRepository<Token, String> {
 
     List<Token> findByStatusAndAssignedCounterId(TokenStatus status, String assignedCounterId);
 
+    long countByBranchIdAndStatus(String branchId, TokenStatus status);
+
     @Query(value = """
             SELECT *
             FROM tokens t

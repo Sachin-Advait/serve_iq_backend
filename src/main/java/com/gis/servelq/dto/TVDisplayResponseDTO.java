@@ -11,6 +11,11 @@ public class TVDisplayResponseDTO {
     private List<String> upcomingTokens;
     private String branchName;
 
+    private long waiting;
+    private long serving;
+    private long noShow;
+    private long servedToday;
+
     @Data
     public static class DisplayToken {
         private String token;
