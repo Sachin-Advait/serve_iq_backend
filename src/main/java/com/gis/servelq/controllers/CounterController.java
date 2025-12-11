@@ -2,7 +2,6 @@ package com.gis.servelq.controllers;
 
 import com.gis.servelq.dto.CounterRequest;
 import com.gis.servelq.dto.CounterResponseDTO;
-import com.gis.servelq.models.CounterStatus;
 import com.gis.servelq.services.CounterService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +17,6 @@ import java.util.List;
 public class CounterController {
     private final CounterService counterService;
 
-    // Create a new counter
     @PostMapping
     public ResponseEntity<?> createCounter(@Valid @RequestBody CounterRequest request) {
         try {
@@ -29,28 +27,24 @@ public class CounterController {
         }
     }
 
-    // Get all counters
     @GetMapping
     public ResponseEntity<List<CounterResponseDTO>> getAllCounters() {
         List<CounterResponseDTO> counters = counterService.getAllCounters();
         return ResponseEntity.ok(counters);
     }
 
-    // Get counters by branch
     @GetMapping("/branch/{branchId}")
     public ResponseEntity<List<CounterResponseDTO>> getCountersByBranch(@PathVariable String branchId) {
         List<CounterResponseDTO> counters = counterService.getCountersByBranch(branchId);
         return ResponseEntity.ok(counters);
     }
 
-    // Get counter by ID
     @GetMapping("/{counterId}")
     public ResponseEntity<CounterResponseDTO> getCounterById(@PathVariable String counterId) {
         CounterResponseDTO counter = counterService.getCounterById(counterId);
         return ResponseEntity.ok(counter);
     }
 
-    // Update counter
     @PutMapping("/{counterId}")
     public ResponseEntity<?> updateCounter(
             @PathVariable String counterId,
@@ -74,58 +68,35 @@ public class CounterController {
         }
     }
 
-    // Enable counter
-    @PatchMapping("/{counterId}/enable")
-    public ResponseEntity<?> enableCounter(@PathVariable String counterId) {
-        try {
-            CounterResponseDTO counter = counterService.toggleCounter(counterId, true);
-            return ResponseEntity.ok(counter);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
-    }
-
-    // Disable counter
-    @PatchMapping("/{counterId}/disable")
-    public ResponseEntity<?> disableCounter(@PathVariable String counterId) {
-        try {
-            CounterResponseDTO counter = counterService.toggleCounter(counterId, false);
-            return ResponseEntity.ok(counter);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
-    }
-
-    // Pause counter
-    @PatchMapping("/{counterId}/pause")
-    public ResponseEntity<?> pauseCounter(@PathVariable String counterId) {
-        try {
-            CounterResponseDTO counter = counterService.togglePauseCounter(counterId, true);
-            return ResponseEntity.ok(counter);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
-    }
-
-    // Resume counter
-    @PatchMapping("/{counterId}/resume")
-    public ResponseEntity<?> resumeCounter(@PathVariable String counterId) {
-        try {
-            CounterResponseDTO counter = counterService.togglePauseCounter(counterId, false);
-            return ResponseEntity.ok(counter);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
-    }
-
-    // Update counter status
-    @PatchMapping("/{counterId}/status")
-    public ResponseEntity<?> updateCounterStatus(
+    @PatchMapping("/enabled/{counterId}/{value}")
+    public ResponseEntity<?> toggleEnabled(
             @PathVariable String counterId,
-            @RequestParam CounterStatus status) {
+            @PathVariable boolean value) {
         try {
-            CounterResponseDTO counter = counterService.updateCounterStatus(counterId, status);
+            CounterResponseDTO counter = counterService.toggleCounter(counterId, value);
             return ResponseEntity.ok(counter);
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @PatchMapping("/paused/{counterId}/{value}")
+    public ResponseEntity<?> togglePaused(
+            @PathVariable String counterId,
+            @PathVariable boolean value) {
+        try {
+            CounterResponseDTO counter = counterService.togglePauseCounter(counterId, value);
+            return ResponseEntity.ok(counter);
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    // Get full counter status with token info
+    @GetMapping("/status/details/{counterId}")
+    public ResponseEntity<?> getCounterStatusDetails(@PathVariable String counterId) {
+        try {
+            return ResponseEntity.ok(counterService.getCounterStatusDetails(counterId));
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }

@@ -1,17 +1,10 @@
 package com.gis.servelq.services;
 
-import com.gis.servelq.dto.BranchResponseDTO;
 import com.gis.servelq.dto.CounterRequest;
 import com.gis.servelq.dto.CounterResponseDTO;
-import com.gis.servelq.dto.ServiceResponseDTO;
-import com.gis.servelq.models.Branch;
-import com.gis.servelq.models.Counter;
-import com.gis.servelq.models.CounterStatus;
-import com.gis.servelq.models.Services;
-import com.gis.servelq.repository.BranchRepository;
-import com.gis.servelq.repository.CounterRepository;
-import com.gis.servelq.repository.ServiceRepository;
-import com.gis.servelq.repository.UserRepository;
+import com.gis.servelq.dto.CounterStatusResponseDTO;
+import com.gis.servelq.models.*;
+import com.gis.servelq.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +20,8 @@ public class CounterService {
     private final BranchRepository branchRepository;
     private final ServiceRepository serviceRepository;
     private final UserRepository userRepository;
+    private final TokenRepository tokenRepository;
+    private final SocketService socketService;
 
     private static Counter getCounter(CounterRequest request) {
         Counter counter = new Counter();
@@ -47,58 +42,22 @@ public class CounterService {
         return counter;
     }
 
-    // Convert Entity to Response DTO
     private CounterResponseDTO convertToResponse(Counter counter) {
         Branch branch = branchRepository.findById(counter.getBranchId())
-                .orElseThrow(() -> new RuntimeException("Branch not found with id: " + counter.getBranchId()));
+                .orElseThrow(() -> new RuntimeException("Branch not found"));
 
-        CounterResponseDTO response = new CounterResponseDTO();
-
-        response.setId(counter.getId());
-        response.setCode(counter.getCode());
-        response.setName(counter.getName());
-        response.setEnabled(counter.getEnabled());
-        response.setPaused(counter.getPaused());
-        response.setUserId(counter.getUserId());
-        response.setStatus(counter.getStatus());
-        response.setCreatedAt(counter.getCreatedAt());
-        response.setUpdatedAt(counter.getUpdatedAt());
-
-        // Set branch
-        response.setBranch(convertBranchToResponse(branch));
-
-        // Set username from user table (optional)
-        userRepository.findById(counter.getUserId()).ifPresent(user ->
-                response.setUsername(user.getName())
-        );
-
+        String username = null;
+        if (counter.getUserId() != null) {
+            username = userRepository.findById(counter.getUserId())
+                    .map(User::getName)
+                    .orElse(null);
+        }
+        Services service = null;
         if (counter.getServiceId() != null) {
-            serviceRepository.findById(counter.getServiceId()).ifPresent(service ->
-                    response.setService(convertServiceToResponse(service))
-            );
+            service = serviceRepository.findById(counter.getServiceId()).orElse(null);
         }
 
-        return response;
-    }
-
-    private BranchResponseDTO convertBranchToResponse(Branch branch) {
-        BranchResponseDTO response = new BranchResponseDTO();
-        response.setId(branch.getId());
-        response.setCode(branch.getCode());
-        response.setName(branch.getName());
-        response.setEnabled(branch.getEnabled());
-        return response;
-    }
-
-    private ServiceResponseDTO convertServiceToResponse(Services service) {
-        ServiceResponseDTO response = new ServiceResponseDTO();
-        response.setId(service.getId());
-        response.setCode(service.getCode());
-        response.setName(service.getName());
-        response.setEnabled(service.getEnabled());
-        response.setCreatedAt(service.getCreatedAt());
-        response.setUpdatedAt(service.getUpdatedAt());
-        return response;
+        return CounterResponseDTO.fromEntity(counter, branch, username, service);
     }
 
     // Create a new counter
@@ -140,20 +99,18 @@ public class CounterService {
         return convertToResponse(counter);
     }
 
-    // Update counter
+    // Update counter (now includes status update logic also)
     @Transactional
     public CounterResponseDTO updateCounter(String counterId, CounterRequest request) {
 
         Counter counter = counterRepository.findById(counterId)
                 .orElseThrow(() -> new RuntimeException("Counter not found"));
 
-        // Prevent duplicate code
         if (request.getCode() != null &&
                 !request.getCode().equals(counter.getCode()) &&
                 counterRepository.findByCodeAndBranchId(request.getCode(), counter.getBranchId()).isPresent()) {
-            throw new RuntimeException("Counter code already exists in branch");
+            throw new RuntimeException("Counter code already exists in this branch");
         }
-
         if (request.getCode() != null) counter.setCode(request.getCode());
         if (request.getName() != null) counter.setName(request.getName());
         if (request.getEnabled() != null) counter.setEnabled(request.getEnabled());
@@ -161,7 +118,6 @@ public class CounterService {
         if (request.getStatus() != null) counter.setStatus(request.getStatus());
         if (request.getUserId() != null) counter.setUserId(request.getUserId());
 
-        // Update branch if changed
         if (request.getBranchId() != null && !request.getBranchId().equals(counter.getBranchId())) {
             branchRepository.findById(request.getBranchId())
                     .orElseThrow(() -> new RuntimeException("Branch not found"));
@@ -170,7 +126,33 @@ public class CounterService {
         if (request.getServiceId() != null) counter.setServiceId(request.getServiceId());
 
         Counter updated = counterRepository.save(counter);
+        notifyCounterDisplay(counterId);
+
         return convertToResponse(updated);
+    }
+
+    // Enable/disable counter
+    @Transactional
+    public CounterResponseDTO toggleCounter(String counterId, boolean enabled) {
+        Counter counter = counterRepository.findById(counterId)
+                .orElseThrow(() -> new RuntimeException("Counter not found"));
+        counter.setEnabled(enabled);
+        Counter saved = counterRepository.save(counter);
+
+        notifyCounterDisplay(counterId);
+        return convertToResponse(saved);
+    }
+
+    // Pause/resume counter
+    @Transactional
+    public CounterResponseDTO togglePauseCounter(String counterId, boolean paused) {
+        Counter counter = counterRepository.findById(counterId)
+                .orElseThrow(() -> new RuntimeException("Counter not found"));
+        counter.setPaused(paused);
+        Counter saved = counterRepository.save(counter);
+
+        notifyCounterDisplay(counterId);
+        return convertToResponse(saved);
     }
 
     // Delete counter
@@ -182,30 +164,45 @@ public class CounterService {
         counterRepository.deleteById(counterId);
     }
 
-    // Enable/disable counter
-    @Transactional
-    public CounterResponseDTO toggleCounter(String counterId, boolean enabled) {
+    @Transactional(readOnly = true)
+    public CounterStatusResponseDTO getCounterStatusDetails(String counterId) {
         Counter counter = counterRepository.findById(counterId)
                 .orElseThrow(() -> new RuntimeException("Counter not found"));
-        counter.setEnabled(enabled);
-        return convertToResponse(counterRepository.save(counter));
+
+        CounterStatusResponseDTO response = new CounterStatusResponseDTO();
+        response.setCounterId(counter.getId());
+        response.setCode(counter.getCode());
+        response.setName(counter.getName());
+        response.setEnabled(counter.getEnabled());
+        response.setPaused(counter.getPaused());
+        response.setStatus(counter.getStatus().name());
+
+        // Fetch currently serving token
+        if (counter.getStatus() == CounterStatus.SERVING || counter.getStatus() == CounterStatus.CALLING) {
+            var token = tokenRepository
+                    .findByStatusInAndAssignedCounterId(
+                            List.of(TokenStatus.SERVING, TokenStatus.CALLING),
+                            counterId
+                    )
+                    .orElse(null);
+
+            if (token != null) {
+                response.setTokenId(token.getId());
+                response.setTokenNumber(token.getToken());
+                response.setServiceId(token.getServiceId());
+                serviceRepository.findById(token.getServiceId()).ifPresent(service ->
+                        response.setServiceName(service.getName())
+                );
+            } else {
+                response.clearTokenDetails();
+            }
+        }
+
+        return response;
     }
 
-    // Pause/resume counter
-    @Transactional
-    public CounterResponseDTO togglePauseCounter(String counterId, boolean paused) {
-        Counter counter = counterRepository.findById(counterId)
-                .orElseThrow(() -> new RuntimeException("Counter not found"));
-        counter.setPaused(paused);
-        return convertToResponse(counterRepository.save(counter));
-    }
-
-    // Update status manually
-    @Transactional
-    public CounterResponseDTO updateCounterStatus(String counterId, CounterStatus status) {
-        Counter counter = counterRepository.findById(counterId)
-                .orElseThrow(() -> new RuntimeException("Counter not found"));
-        counter.setStatus(status);
-        return convertToResponse(counterRepository.save(counter));
+    public void notifyCounterDisplay(String counterId) {
+        CounterStatusResponseDTO data = getCounterStatusDetails(counterId);
+        socketService.broadcast("/topic/counter/" + counterId, data);
     }
 }

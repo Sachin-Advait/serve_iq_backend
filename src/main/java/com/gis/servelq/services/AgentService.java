@@ -1,9 +1,6 @@
 package com.gis.servelq.services;
 
-import com.gis.servelq.dto.AgentCallResponseDTO;
-import com.gis.servelq.dto.RecentServiceDTO;
-import com.gis.servelq.dto.TokenResponseDTO;
-import com.gis.servelq.dto.TokenTransferRequest;
+import com.gis.servelq.dto.*;
 import com.gis.servelq.models.*;
 import com.gis.servelq.repository.CounterRepository;
 import com.gis.servelq.repository.ServiceRepository;
@@ -25,6 +22,7 @@ public class AgentService {
     private final CounterRepository counterRepository;
     private final ServiceRepository serviceRepository;
     private final SocketService socketService;
+    private final CounterService counterService;
 
     public List<TokenResponseDTO> getUpcomingTokensForCounter(String counterId) {
         return tokenRepository.findUpcomingTokensForCounter(counterId)
@@ -251,5 +249,8 @@ public class AgentService {
     public void notifyAgentUpcoming(String counterId) {
         List<TokenResponseDTO> data = getUpcomingTokensForCounter(counterId);
         socketService.broadcast("/topic/agent-upcoming/" + counterId, data);
+
+        CounterStatusResponseDTO counterData = counterService.getCounterStatusDetails(counterId);
+        socketService.broadcast("/topic/counter-display/" + counterId, counterData);
     }
 }

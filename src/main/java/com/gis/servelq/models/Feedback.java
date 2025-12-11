@@ -19,9 +19,16 @@ public class Feedback {
     private String counterCode;
     private String agentName;
 
-    private int rating; // 1–5
+    @Enumerated(EnumType.STRING)
+    private MoodRating rating;
     private String review;
 
     @CreationTimestamp
     private LocalDateTime createdAt;
+
+    public enum MoodRating {
+        SAD,
+        NEUTRAL,
+        HAPPY
+    }
 }
