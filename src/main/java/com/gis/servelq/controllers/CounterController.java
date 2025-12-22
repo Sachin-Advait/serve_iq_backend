@@ -2,6 +2,7 @@ package com.gis.servelq.controllers;
 
 import com.gis.servelq.dto.CounterRequest;
 import com.gis.servelq.dto.CounterResponseDTO;
+import com.gis.servelq.dto.CounterUpdateRequest;
 import com.gis.servelq.services.CounterService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -48,7 +49,7 @@ public class CounterController {
     @PutMapping("/{counterId}")
     public ResponseEntity<?> updateCounter(
             @PathVariable String counterId,
-            @Valid @RequestBody CounterRequest request) {
+            @RequestBody CounterUpdateRequest request) {
         try {
             CounterResponseDTO counter = counterService.updateCounter(counterId, request);
             return ResponseEntity.ok(counter);

@@ -2,6 +2,7 @@ package com.gis.servelq.services;
 
 import com.gis.servelq.dto.BranchRequest;
 import com.gis.servelq.dto.BranchResponseDTO;
+import com.gis.servelq.dto.BranchUpdateRequest;
 import com.gis.servelq.models.Branch;
 import com.gis.servelq.repository.BranchRepository;
 import lombok.RequiredArgsConstructor;
@@ -78,30 +79,19 @@ public class BranchService {
                 .map(this::convertToResponse);
     }
 
-    // Update branch
     @Transactional
-    public BranchResponseDTO updateBranch(String id, BranchRequest branchDetails) {
+    public BranchResponseDTO updateBranch(String id, BranchUpdateRequest branchDetails) {
         Branch existingBranch = branchRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Branch not found with id: " + id));
 
-        // Check if the new code conflicts with other branches
         if (!existingBranch.getCode().equals(branchDetails.getCode()) &&
                 branchRepository.findByCode(branchDetails.getCode()).isPresent()) {
             throw new RuntimeException("Branch with code " + branchDetails.getCode() + " already exists");
         }
 
-        // Update fields
-        if (branchDetails.getCode() != null) {
-            existingBranch.setCode(branchDetails.getCode());
-        }
-        if (branchDetails.getName() != null) {
-            existingBranch.setName(branchDetails.getName());
-        }
-
-        // Only update enabled if provided (not null)
-        if (branchDetails.getEnabled() != null) {
-            existingBranch.setEnabled(branchDetails.getEnabled());
-        }
+        if (branchDetails.getCode() != null) existingBranch.setCode(branchDetails.getCode());
+        if (branchDetails.getName() != null) existingBranch.setName(branchDetails.getName());
+        if (branchDetails.getEnabled() != null) existingBranch.setEnabled(branchDetails.getEnabled());
 
         Branch updatedBranch = branchRepository.save(existingBranch);
         return convertToResponse(updatedBranch);
@@ -114,27 +104,5 @@ public class BranchService {
             throw new RuntimeException("Branch not found with id: " + id);
         }
         branchRepository.deleteById(id);
-    }
-
-    // Soft delete (disable) branch
-    @Transactional
-    public BranchResponseDTO disableBranch(String id) {
-        Branch branch = branchRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Branch not found with id: " + id));
-
-        branch.setEnabled(false);
-        Branch updatedBranch = branchRepository.save(branch);
-        return convertToResponse(updatedBranch);
-    }
-
-    // Enable branch
-    @Transactional
-    public BranchResponseDTO enableBranch(String id) {
-        Branch branch = branchRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Branch not found with id: " + id));
-
-        branch.setEnabled(true);
-        Branch updatedBranch = branchRepository.save(branch);
-        return convertToResponse(updatedBranch);
     }
 }

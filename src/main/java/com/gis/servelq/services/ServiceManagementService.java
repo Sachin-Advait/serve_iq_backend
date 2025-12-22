@@ -2,6 +2,7 @@ package com.gis.servelq.services;
 
 import com.gis.servelq.dto.ServiceRequest;
 import com.gis.servelq.dto.ServiceResponseDTO;
+import com.gis.servelq.dto.ServiceUpdateRequest;
 import com.gis.servelq.models.Services;
 import com.gis.servelq.repository.BranchRepository;
 import com.gis.servelq.repository.ServiceRepository;
@@ -34,7 +35,14 @@ public class ServiceManagementService {
         }
 
         Services newService = new Services();
-        copyRequestToEntity(newService, request);
+
+        newService.setCode(request.getCode());
+        newService.setName(request.getName());
+        newService.setArabicName(request.getArabicName());
+        newService.setParentId(request.getParentId());
+        newService.setEnabled(request.getEnabled());
+        newService.setBranchId(request.getBranchId());
+        newService.setCounterIds(request.getCounterIds());
 
         newService = serviceRepository.save(newService);
 
@@ -78,20 +86,32 @@ public class ServiceManagementService {
                 .stream().map(ServiceResponseDTO::fromEntity).collect(Collectors.toList());
     }
 
-    // UPDATE
-    public Services updateService(String id, ServiceRequest request) {
+    public Services updateService(String id, ServiceUpdateRequest request) {
 
         Services service = serviceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Service not found"));
 
-        if (!service.getCode().equals(request.getCode())) {
-            serviceRepository.findByCodeAndBranchId(request.getCode(), request.getBranchId())
-                    .ifPresent(s -> {
-                        throw new RuntimeException("Service code already exists");
-                    });
+        // Null-safe code uniqueness check
+        if (request.getCode() != null &&
+                !request.getCode().equals(service.getCode())) {
+
+            serviceRepository.findByCodeAndBranchId(
+                    request.getCode(),
+                    request.getBranchId()
+            ).ifPresent(s -> {
+                throw new RuntimeException("Service code already exists");
+            });
+
+            service.setCode(request.getCode());
         }
 
-        copyRequestToEntity(service, request);
+        // Update only non-null fields
+        if (request.getName() != null) service.setName(request.getName());
+        if (request.getArabicName() != null) service.setArabicName(request.getArabicName());
+        if (request.getParentId() != null) service.setParentId(request.getParentId());
+        if (request.getCounterIds() != null) service.setCounterIds(request.getCounterIds());
+        if (request.getEnabled() != null) service.setEnabled(request.getEnabled());
+        if (request.getBranchId() != null) service.setBranchId(request.getBranchId());
 
         return serviceRepository.save(service);
     }
@@ -110,17 +130,5 @@ public class ServiceManagementService {
             throw new RuntimeException("Service not found");
         }
         serviceRepository.deleteById(id);
-    }
-
-
-    // Helper method
-    private void copyRequestToEntity(Services entity, ServiceRequest req) {
-        entity.setCode(req.getCode());
-        entity.setName(req.getName());
-        entity.setArabicName(req.getArabicName());
-        entity.setParentId(req.getParentId());
-        entity.setEnabled(req.getEnabled());
-        entity.setBranchId(req.getBranchId());
-        entity.setCounterIds(req.getCounterIds());
     }
 }

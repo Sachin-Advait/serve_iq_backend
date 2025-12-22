@@ -2,6 +2,7 @@ package com.gis.servelq.controllers;
 
 import com.gis.servelq.dto.ServiceRequest;
 import com.gis.servelq.dto.ServiceResponseDTO;
+import com.gis.servelq.dto.ServiceUpdateRequest;
 import com.gis.servelq.models.Services;
 import com.gis.servelq.services.ServiceManagementService;
 import jakarta.validation.Valid;
@@ -52,7 +53,7 @@ public class ServiceController {
     @PutMapping("/{id}")
     public ResponseEntity<Services> updateService(
             @PathVariable String id,
-            @Valid @RequestBody ServiceRequest request
+            @RequestBody ServiceUpdateRequest request
     ) {
         return ResponseEntity.ok(serviceManagementService.updateService(id, request));
     }

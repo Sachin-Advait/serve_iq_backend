@@ -2,6 +2,7 @@ package com.gis.servelq.controllers;
 
 import com.gis.servelq.dto.BranchRequest;
 import com.gis.servelq.dto.BranchResponseDTO;
+import com.gis.servelq.dto.BranchUpdateRequest;
 import com.gis.servelq.services.BranchService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -55,7 +56,7 @@ public class BranchController {
 
     // Update branch
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateBranch(@PathVariable String id, @Valid @RequestBody BranchRequest branchDetails) {
+    public ResponseEntity<?> updateBranch(@PathVariable String id, @RequestBody BranchUpdateRequest branchDetails) {
         try {
             BranchResponseDTO updatedBranch = branchService.updateBranch(id, branchDetails);
             return ResponseEntity.ok(updatedBranch);
@@ -70,28 +71,6 @@ public class BranchController {
         try {
             branchService.deleteBranch(id);
             return ResponseEntity.ok().body("Branch deleted successfully");
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
-    }
-
-    // Disable branch
-    @PatchMapping("/{id}/disable")
-    public ResponseEntity<?> disableBranch(@PathVariable String id) {
-        try {
-            BranchResponseDTO disabledBranch = branchService.disableBranch(id);
-            return ResponseEntity.ok(disabledBranch);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
-    }
-
-    // Enable branch
-    @PatchMapping("/{id}/enable")
-    public ResponseEntity<?> enableBranch(@PathVariable String id) {
-        try {
-            BranchResponseDTO enabledBranch = branchService.enableBranch(id);
-            return ResponseEntity.ok(enabledBranch);
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }

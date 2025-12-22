@@ -3,6 +3,7 @@ package com.gis.servelq.services;
 import com.gis.servelq.dto.CounterRequest;
 import com.gis.servelq.dto.CounterResponseDTO;
 import com.gis.servelq.dto.CounterStatusResponseDTO;
+import com.gis.servelq.dto.CounterUpdateRequest;
 import com.gis.servelq.models.*;
 import com.gis.servelq.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -111,7 +112,7 @@ public class CounterService {
 
     // Update counter (now includes status update logic also)
     @Transactional
-    public CounterResponseDTO updateCounter(String counterId, CounterRequest request) {
+    public CounterResponseDTO updateCounter(String counterId, CounterUpdateRequest request) {
 
         Counter counter = counterRepository.findById(counterId)
                 .orElseThrow(() -> new RuntimeException("Counter not found"));
