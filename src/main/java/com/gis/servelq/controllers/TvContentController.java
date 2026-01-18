@@ -20,7 +20,7 @@ public class TvContentController {
 
     @GetMapping("/{branchId}")
     public List<TvContent> getContent(@PathVariable String branchId) {
-        return service.getByBranch(branchId);
+        return service.getContentByBranch(branchId);
     }
 
     @PostMapping("/url")
@@ -39,9 +39,9 @@ public class TvContentController {
         return service.addVideo(req.get("branchId"), req.get("name"));
     }
 
-    @PatchMapping("/activate")
+    @PatchMapping("/activateVideo")
     public TvContent activate(@RequestBody Map<String, String> req) {
-        return service.activate(req.get("branchId"), req.get("id"));
+        return service.activateVideo(req.get("branchId"), req.get("id"));
     }
 
     @PostMapping("/image/upload")

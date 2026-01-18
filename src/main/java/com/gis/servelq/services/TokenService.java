@@ -2,6 +2,9 @@ package com.gis.servelq.services;
 
 import com.gis.servelq.dto.TokenRequest;
 import com.gis.servelq.dto.TokenResponseDTO;
+import com.gis.servelq.events.TokenEvent;
+import com.gis.servelq.events.TokenEventPublisher;
+import com.gis.servelq.events.TokenEventType;
 import com.gis.servelq.models.Branch;
 import com.gis.servelq.models.Services;
 import com.gis.servelq.models.Token;
@@ -14,6 +17,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
 
 @Service
@@ -24,9 +28,8 @@ public class TokenService {
     private final ServiceRepository serviceRepository;
     private final BranchRepository branchRepository;
     private final WhatsAppService whatsAppService;
-    private final AgentService agentService;
     private final CategoryService categoryService;
-    private final SocketService socketService;
+    private final TokenEventPublisher tokenEventPublisher;
 
     @Transactional
     public TokenResponseDTO generateToken(TokenRequest request) {
@@ -82,12 +85,32 @@ public class TokenService {
         if (request.getGreenToken() == true) {
             sendWhatsAppNotification(request.getMobileNumber(), savedToken.getToken());
         }
+
+        // Publish token created
+        tokenEventPublisher.publish(new TokenEvent(
+                TokenEventType.TOKEN_CREATED,
+                branch.getId(),
+                savedToken.getId(),
+                savedToken.getToken(),
+                null,
+                Instant.now()
+        ));
+
+        // Publish agent queue updates
         if (service.getCounterIds() != null) {
             for (String counterId : service.getCounterIds()) {
-                agentService.notifyBothAgentAndDisplay(counterId);
+                tokenEventPublisher.publish(new TokenEvent(
+                        TokenEventType.AGENT_QUEUE_CHANGED,
+                        branch.getId(),
+                        null,
+                        null,
+                        counterId,
+                        Instant.now()
+                ));
             }
         }
-        socketService.tvSocket(branch.getId());
+
+
         return TokenResponseDTO.fromEntity(savedToken);
     }
 

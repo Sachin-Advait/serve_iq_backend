@@ -1,6 +1,14 @@
 package com.gis.servelq.services;
 
-import com.gis.servelq.dto.*;
+import com.gis.servelq.Exceptions.BusinessException;
+import com.gis.servelq.Exceptions.ResourceNotFoundException;
+import com.gis.servelq.dto.AgentCallResponseDTO;
+import com.gis.servelq.dto.RecentServiceDTO;
+import com.gis.servelq.dto.TokenResponseDTO;
+import com.gis.servelq.dto.TokenTransferRequest;
+import com.gis.servelq.events.TokenEvent;
+import com.gis.servelq.events.TokenEventPublisher;
+import com.gis.servelq.events.TokenEventType;
 import com.gis.servelq.models.Counter;
 import com.gis.servelq.models.CounterStatus;
 import com.gis.servelq.models.Token;
@@ -8,10 +16,13 @@ import com.gis.servelq.models.TokenStatus;
 import com.gis.servelq.repository.CounterRepository;
 import com.gis.servelq.repository.ServiceRepository;
 import com.gis.servelq.repository.TokenRepository;
+import jakarta.persistence.LockTimeoutException;
+import jakarta.persistence.PessimisticLockException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -24,8 +35,8 @@ public class AgentService {
     private final TokenRepository tokenRepository;
     private final CounterRepository counterRepository;
     private final ServiceRepository serviceRepository;
-    private final SocketService socketService;
     private final CounterService counterService;
+    private final TokenEventPublisher tokenEventPublisher;
 
     public List<TokenResponseDTO> getUpcomingTokensForCounter(String counterId) {
         return tokenRepository.findUpcomingTokensForCounter(counterId)
@@ -36,50 +47,74 @@ public class AgentService {
 
     @Transactional
     public AgentCallResponseDTO callNextToken(String counterId) {
-        Counter counter = counterRepository.findById(counterId)
-                .orElseThrow(() -> new RuntimeException("Counter not found"));
+        try {
+            Counter counter = counterRepository.findById(counterId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Counter not found"));
 
-        if (counter.getPaused()) {
-            throw new RuntimeException("Counter is paused");
-        }
-        serviceRepository.findById(counter.getServiceId())
-                .orElseThrow(() -> new RuntimeException("Service not found"));
-
-        Optional<Token> optionalToken = tokenRepository.findNextToken(counterId);
-
-        if (optionalToken.isEmpty()) {
-            throw new RuntimeException("No tokens available");
-        }
-
-        Token nextToken = optionalToken.get();
-
-        nextToken.setStatus(TokenStatus.CALLING);
-        nextToken.setAssignedCounterId(counterId);
-        nextToken.setAssignedCounterName(counter.getName());
-        tokenRepository.save(nextToken);
-
-        counter.setStatus(CounterStatus.CALLING);
-        counterRepository.save(counter);
-
-        socketService.tvSocket(nextToken.getBranchId());
-        notifyCounterDisplay(counterId);
-        if (nextToken.getCounterIds() != null) {
-            for (String id : nextToken.getCounterIds()) {
-                notifyAgentQueue(id);
+            if (counter.getPaused()) {
+                throw new BusinessException("Counter is paused");
             }
-        }
 
-        return AgentCallResponseDTO.fromEntity(nextToken);
+            serviceRepository.findById(counter.getServiceId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Service not found"));
+
+            Optional<Token> optionalToken = tokenRepository.findNextToken(counterId);
+
+            if (optionalToken.isEmpty()) {
+                throw new ResourceNotFoundException("No tokens available");
+            }
+
+            Token nextToken = optionalToken.get();
+
+            nextToken.setStatus(TokenStatus.CALLING);
+            nextToken.setAssignedCounterId(counterId);
+            nextToken.setAssignedCounterName(counter.getName());
+            tokenRepository.save(nextToken);
+
+            counter.setStatus(CounterStatus.CALLING);
+            counterRepository.save(counter);
+
+            tokenEventPublisher.publish(new TokenEvent(
+                    TokenEventType.TOKEN_CALLED,
+                    nextToken.getBranchId(),
+                    nextToken.getId(),
+                    nextToken.getToken(),
+                    counterId,
+                    Instant.now()
+            ));
+
+            if (nextToken.getCounterIds() != null) {
+                for (String id : nextToken.getCounterIds()) {
+                    tokenEventPublisher.publish(new TokenEvent(
+                            TokenEventType.AGENT_QUEUE_CHANGED,
+                            nextToken.getBranchId(),
+                            null,
+                            null,
+                            id,
+                            Instant.now()
+                    ));
+                }
+            }
+
+            return AgentCallResponseDTO.fromEntity(nextToken);
+
+        } catch (PessimisticLockException | LockTimeoutException ex) {
+            throw new BusinessException(
+                    "Token is being acquired by another counter. Please try again."
+            );
+        }
     }
 
     @Transactional
     public AgentCallResponseDTO callHoldToken(String tokenId) {
-        Token token = tokenRepository.findById(tokenId).orElseThrow(() -> new RuntimeException("Token not found"));
+        Token token = tokenRepository.findById(tokenId).orElseThrow(() ->
+                new ResourceNotFoundException("Token not found"));
 
-        Counter counter = counterRepository.findById(token.getAssignedCounterId()).orElseThrow(() -> new RuntimeException("Counter not found"));
+        Counter counter = counterRepository.findById(token.getAssignedCounterId())
+                .orElseThrow(() -> new ResourceNotFoundException("Counter not found"));
 
         if (token.getStatus() != TokenStatus.HOLD) {
-            throw new RuntimeException("Token cannot be called from status: " + token.getStatus());
+            throw new BusinessException("Token cannot be called from status: " + token.getStatus());
         }
 
         token.setStatus(TokenStatus.CALLING);
@@ -88,16 +123,24 @@ public class AgentService {
         counter.setStatus(CounterStatus.CALLING);
         counterRepository.save(counter);
 
-        socketService.tvSocket(token.getBranchId());
-        notifyBothAgentAndDisplay(counter.getId());
+        tokenEventPublisher.publish(new TokenEvent(
+                TokenEventType.TOKEN_HELD,
+                token.getBranchId(),
+                token.getId(),
+                token.getToken(),
+                counter.getId(),
+                Instant.now()
+        ));
 
         return AgentCallResponseDTO.fromEntity(token);
     }
 
     @Transactional
-    public void startServingToken(String tokenId) {
+    public void startServingToken(String tokenId) throws Exception {
         Token token = tokenRepository.findById(tokenId)
-                .orElseThrow(() -> new RuntimeException("Token not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Token not found"));
+
+        if (token.getAssignedCounterId() == null) throw new Exception("Token not assigned yet");
 
         if (token.getStatus() != TokenStatus.CALLING) return;
 
@@ -105,37 +148,48 @@ public class AgentService {
         token.setStartAt(LocalDateTime.now());
         tokenRepository.save(token);
 
-        if (token.getAssignedCounterId() != null) {
-            Counter counter = counterRepository.findById(token.getAssignedCounterId())
-                    .orElseThrow(() -> new RuntimeException("Counter not found"));
-            counter.setStatus(CounterStatus.SERVING);
-            counterRepository.save(counter);
 
-            notifyBothAgentAndDisplay(counter.getId());
-        }
+        Counter counter = counterRepository.findById(token.getAssignedCounterId())
+                .orElseThrow(() -> new ResourceNotFoundException("Counter not found"));
+        counter.setStatus(CounterStatus.SERVING);
+        counterRepository.save(counter);
 
-        socketService.tvSocket(token.getBranchId());
+        tokenEventPublisher.publish(new TokenEvent(
+                TokenEventType.TOKEN_SERVING_STARTED,
+                token.getBranchId(),
+                token.getId(),
+                token.getToken(),
+                counter.getId(),
+                Instant.now()
+        ));
     }
 
     @Transactional
-    public void completeToken(String tokenId) {
+    public void completeToken(String tokenId) throws Exception {
         Token token = tokenRepository.findById(tokenId)
-                .orElseThrow(() -> new RuntimeException("Token not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Token not found"));
+
+        if (token.getAssignedCounterId() == null) throw new Exception("Token not assigned yet");
+
+        Counter counter = counterRepository.findById(token.getAssignedCounterId())
+                .orElseThrow(() -> new ResourceNotFoundException("Counter not found"));
 
         token.setStatus(TokenStatus.REVIEW);
         token.setEndAt(LocalDateTime.now());
         tokenRepository.save(token);
 
-        if (token.getAssignedCounterId() != null) {
-            Counter counter = counterRepository.findById(token.getAssignedCounterId())
-                    .orElseThrow(() -> new RuntimeException("Counter not found"));
-            counter.setStatus(CounterStatus.COMPLETE);
-            counterRepository.save(counter);
 
-            notifyBothAgentAndDisplay(counter.getId());
-        }
+        counter.setStatus(CounterStatus.COMPLETE);
+        counterRepository.save(counter);
 
-        socketService.tvSocket(token.getBranchId());
+        tokenEventPublisher.publish(new TokenEvent(
+                TokenEventType.TOKEN_COMPLETED,
+                token.getBranchId(),
+                token.getId(),
+                token.getToken(),
+                counter.getId(),
+                Instant.now()
+        ));
     }
 
     public List<RecentServiceDTO> getRecentServices(String counterId) {
@@ -150,20 +204,29 @@ public class AgentService {
     }
 
     @Transactional
-    public AgentCallResponseDTO recallToken(String tokenId) {
+    public AgentCallResponseDTO recallToken(String tokenId) throws Exception {
         Token token = tokenRepository.findById(tokenId)
-                .orElseThrow(() -> new RuntimeException("Token not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Token not found"));
+
+        if (token.getAssignedCounterId() == null) throw new Exception("Token not assigned yet");
+
+        Counter counter = counterRepository.findById(token.getAssignedCounterId())
+                .orElseThrow(() -> new ResourceNotFoundException("Counter not found"));
 
         token.setStatus(TokenStatus.CALLING);
         tokenRepository.save(token);
 
-        Counter counter = counterRepository.findById(token.getAssignedCounterId())
-                .orElseThrow(() -> new RuntimeException("Counter not found"));
         counter.setStatus(CounterStatus.CALLING);
         counterRepository.save(counter);
 
-        notifyCounterDisplay(counter.getId());
-        socketService.tvSocket(token.getBranchId());
+        tokenEventPublisher.publish(new TokenEvent(
+                TokenEventType.TOKEN_CALLED,
+                token.getBranchId(),
+                token.getId(),
+                token.getToken(),
+                counter.getId(),
+                Instant.now()
+        ));
 
         return AgentCallResponseDTO.fromEntity(token);
     }
@@ -171,14 +234,14 @@ public class AgentService {
     @Transactional
     public Token transferToken(TokenTransferRequest request) {
         Token token = tokenRepository.findById(request.getTokenId())
-                .orElseThrow(() -> new RuntimeException("Token not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Token not found"));
 
         if (token.getStatus() == TokenStatus.SERVING || token.getStatus() == TokenStatus.CALLING) {
             Counter toCounter = counterRepository.findById(request.getToCounterId())
-                    .orElseThrow(() -> new RuntimeException("Target counter not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("Target counter not found"));
 
             Counter fromCounter = counterRepository.findById(token.getAssignedCounterId())
-                    .orElseThrow(() -> new RuntimeException("Target counter not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("Target counter not found"));
 
             fromCounter.setStatus(CounterStatus.IDLE);
             counterRepository.save(fromCounter);
@@ -211,26 +274,39 @@ public class AgentService {
             token.setEndAt(null);
 
             Token updated = tokenRepository.save(token);
-
-            socketService.tvSocket(token.getBranchId());
-            notifyBothAgentAndDisplay(toCounter.getId());
+            tokenEventPublisher.publish(new TokenEvent(
+                    TokenEventType.TOKEN_TRANSFERRED,
+                    token.getBranchId(),
+                    token.getId(),
+                    token.getToken(),
+                    fromCounter.getId(),
+                    Instant.now()
+            ));
+            tokenEventPublisher.publish(new TokenEvent(
+                    TokenEventType.AGENT_QUEUE_CHANGED,
+                    token.getBranchId(),
+                    token.getId(),
+                    token.getToken(),
+                    toCounter.getId(),
+                    Instant.now()
+            ));
 
             return updated;
         } else {
-            throw new RuntimeException("Token cannot be transferred from status: " + token.getStatus());
+            throw new ResourceNotFoundException("Token cannot be transferred from status: " + token.getStatus());
         }
     }
 
     @Transactional
     public Token holdToken(String tokenId) {
-        Token token = tokenRepository.findById(tokenId).orElseThrow(() -> new RuntimeException("Token not found"));
+        Token token = tokenRepository.findById(tokenId).orElseThrow(() -> new ResourceNotFoundException("Token not found"));
 
         if (token.getStatus() != TokenStatus.SERVING) {
-            throw new RuntimeException("Token cannot be Hold from status: " + token.getStatus());
+            throw new ResourceNotFoundException("Token cannot be Hold from status: " + token.getStatus());
         }
 
         Counter counter = counterRepository.findById(token.getAssignedCounterId())
-                .orElseThrow(() -> new RuntimeException("Target counter not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Target counter not found"));
 
         counter.setStatus(CounterStatus.IDLE);
         counterRepository.save(counter);
@@ -238,22 +314,28 @@ public class AgentService {
         token.setStatus(TokenStatus.HOLD);
         Token updated = tokenRepository.save(token);
 
-        socketService.tvSocket(token.getBranchId());
-        notifyBothAgentAndDisplay(counter.getId());
+        tokenEventPublisher.publish(new TokenEvent(
+                TokenEventType.TOKEN_HELD,
+                token.getBranchId(),
+                token.getId(),
+                token.getToken(),
+                counter.getId(),
+                Instant.now()
+        ));
 
         return updated;
     }
 
 
     public Token noShow(String tokenId) {
-        Token token = tokenRepository.findById(tokenId).orElseThrow(() -> new RuntimeException("Token not found"));
+        Token token = tokenRepository.findById(tokenId).orElseThrow(() -> new ResourceNotFoundException("Token not found"));
 
         if (token.getStatus() != TokenStatus.SERVING) {
-            throw new RuntimeException("Token cannot be Hold from status: " + token.getStatus());
+            throw new ResourceNotFoundException("Token cannot be Hold from status: " + token.getStatus());
         }
 
         Counter counter = counterRepository.findById(token.getAssignedCounterId())
-                .orElseThrow(() -> new RuntimeException("Target counter not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Target counter not found"));
 
         counter.setStatus(CounterStatus.IDLE);
         counterRepository.save(counter);
@@ -261,8 +343,14 @@ public class AgentService {
         token.setStatus(TokenStatus.NO_SHOW);
         Token updated = tokenRepository.save(token);
 
-        socketService.tvSocket(token.getBranchId());
-        notifyCounterDisplay(counter.getId());
+        tokenEventPublisher.publish(new TokenEvent(
+                TokenEventType.TOKEN_NO_SHOW,
+                token.getBranchId(),
+                token.getId(),
+                token.getToken(),
+                counter.getId(),
+                Instant.now()
+        ));
 
         return updated;
     }
@@ -274,25 +362,10 @@ public class AgentService {
                 .findFirstByAssignedCounterIdAndStatus(counterId, TokenStatus.CALLING);
 
         Token token = serving.or(() -> calling).orElseThrow(
-                () -> new RuntimeException("No serving or calling token found")
+                () -> new ResourceNotFoundException("No serving or calling token found")
         );
 
-        counterRepository.findById(counterId).orElseThrow(() -> new RuntimeException("Counter not found"));
+        counterRepository.findById(counterId).orElseThrow(() -> new ResourceNotFoundException("Counter not found"));
         return AgentCallResponseDTO.fromEntity(token);
-    }
-
-    public void notifyBothAgentAndDisplay(String counterId) {
-        notifyAgentQueue(counterId);
-        notifyCounterDisplay(counterId);
-    }
-
-    public void notifyAgentQueue(String counterId) {
-        List<TokenResponseDTO> data = getUpcomingTokensForCounter(counterId);
-        socketService.broadcast("/topic/agent-upcoming/" + counterId, data);
-    }
-
-    public void notifyCounterDisplay(String counterId) {
-        CounterStatusResponseDTO counterData = counterService.getCounterStatusDetails(counterId);
-        socketService.broadcast("/topic/counter-display/" + counterId, counterData);
     }
 }

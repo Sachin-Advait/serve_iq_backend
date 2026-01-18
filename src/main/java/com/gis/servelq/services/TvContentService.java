@@ -1,16 +1,22 @@
 package com.gis.servelq.services;
 
+import com.gis.servelq.Exceptions.ResourceNotFoundException;
+import com.gis.servelq.events.TokenEvent;
+import com.gis.servelq.events.TokenEventPublisher;
+import com.gis.servelq.events.TokenEventType;
 import com.gis.servelq.models.TvContent;
 import com.gis.servelq.repository.TvContentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -19,12 +25,12 @@ import java.util.UUID;
 public class TvContentService {
 
     private final TvContentRepository tvContentRepository;
-    private final SocketService socketService;
+    private final TokenEventPublisher tokenEventPublisher;
 
     @Value("${image.upload.dir}")
     private String uploadDir;
 
-    public List<TvContent> getByBranch(String branchId) {
+    public List<TvContent> getContentByBranch(String branchId) {
         List<String> allowedTypes = List.of("URL", "VIDEO");
         return tvContentRepository.findByBranchIdAndTypeIn(branchId, allowedTypes);
     }
@@ -52,20 +58,30 @@ public class TvContentService {
         tvContentRepository.deleteById(id);
     }
 
-    public TvContent activate(String branchId, String id) {
+    @Transactional
+    public TvContent activateVideo(String branchId, String id) {
         List<String> allowedTypes = List.of("URL", "VIDEO");
-        // Deactivate all for branch
+
         List<TvContent> all = tvContentRepository.findByBranchIdAndTypeIn(branchId, allowedTypes);
         all.forEach(c -> c.setActive(false));
         tvContentRepository.saveAll(all);
 
-        // Activate required one
         TvContent selected = tvContentRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Content not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Content not found"));
+
         selected.setActive(true);
-        List<TvContent> data = getByBranch(branchId);
-        socketService.tvMediaSocket(data, branchId);
-        return tvContentRepository.save(selected);
+        TvContent saved = tvContentRepository.save(selected);
+
+        tokenEventPublisher.publish(new TokenEvent(
+                TokenEventType.TV_MEDIA_CHANGED,
+                branchId,
+                null,
+                null,
+                null,
+                Instant.now()
+        ));
+
+        return saved;
     }
 
     public TvContent uploadImage(String branchId, MultipartFile file) throws IOException {
@@ -94,14 +110,23 @@ public class TvContentService {
         return tvContentRepository.findByBranchIdAndTypeAndActive(branchId, "IMAGE", true);
     }
 
+    @Transactional
     public TvContent toggleImageStatus(String branchId, String id) {
-        TvContent image = tvContentRepository.findById(id).orElseThrow(() -> new RuntimeException("Image not found"));
+        TvContent image = tvContentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Image not found"));
 
         image.setActive(!image.getActive());
         TvContent savedImage = tvContentRepository.save(image);
 
-        List<TvContent> activeImages = getActiveImages(branchId);
-        socketService.broadcast("/topic/counter-display/image/" + branchId, activeImages);
+        tokenEventPublisher.publish(new TokenEvent(
+                TokenEventType.COUNTER_DISPLAY_IMAGE_CHANGED,
+                branchId,
+                null,
+                null,
+                null,
+                Instant.now()
+        ));
+
         return savedImage;
     }
 

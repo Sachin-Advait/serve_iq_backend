@@ -1,5 +1,9 @@
 package com.gis.servelq.services;
 
+import com.gis.servelq.Exceptions.ResourceNotFoundException;
+import com.gis.servelq.events.TokenEvent;
+import com.gis.servelq.events.TokenEventPublisher;
+import com.gis.servelq.events.TokenEventType;
 import com.gis.servelq.models.*;
 import com.gis.servelq.repository.CounterRepository;
 import com.gis.servelq.repository.FeedbackRepository;
@@ -8,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,16 +24,16 @@ public class FeedbackService {
     private final FeedbackRepository feedbackRepository;
     private final CounterRepository counterRepository;
     private final TokenRepository tokenRepository;
-    private final AgentService agentService;
-    private final CounterService counterService;
+    private final TokenEventPublisher tokenEventPublisher;
+
 
     @Transactional
     public Feedback createFeedback(Feedback feedback) {
         Counter counter = counterRepository.findByCode(feedback.getCounterCode())
-                .orElseThrow(() -> new RuntimeException("Counter not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Counter not found"));
 
         Token token = tokenRepository.findById(feedback.getTokenId())
-                .orElseThrow(() -> new RuntimeException("Token not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Token not found"));
 
         token.setStatus(TokenStatus.DONE);
         tokenRepository.save(token);
@@ -36,10 +41,17 @@ public class FeedbackService {
         counter.setStatus(CounterStatus.IDLE);
         counterRepository.save(counter);
 
-        agentService.notifyCounterDisplay(counter.getId());
-        counterService.notifyCounter(counter.getId());
+        Feedback saved = feedbackRepository.save(feedback);
 
-        return feedbackRepository.save(feedback);
+        tokenEventPublisher.publish(new TokenEvent(
+                TokenEventType.FEEDBACK_SUBMITTED,
+                token.getBranchId(),
+                token.getId(),
+                token.getToken(),
+                counter.getId(),
+                Instant.now()
+        ));
+        return saved;
     }
 
     public List<Feedback> getAll() {
