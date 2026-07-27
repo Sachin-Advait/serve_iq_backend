@@ -10,6 +10,7 @@ import com.gis.servelq.repository.TrainingAssignmentRepository;
 import com.gis.servelq.repository.TrainingMaterialRepository;
 import com.gis.servelq.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -17,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class TrainingService {
@@ -33,7 +35,6 @@ public class TrainingService {
     public TrainingMaterial uploadAndAssign(TrainingUploadAssignDTO request) {
 
         // ✅ BUILD material from FLAT DTO
-        System.out.println("MATERIAL->>>>>>>>>>>>>>>>" +request);
         TrainingMaterial material = TrainingMaterial.builder()
                 .title(request.getTitle())
                 .type(request.getType())
