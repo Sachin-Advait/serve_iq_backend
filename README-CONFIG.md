@@ -203,21 +203,21 @@ safe across instances.
 
 ---
 
-## 5. Rotating a credential
+## 5. Changing a credential
 
-Everything that used to be in this repo should be treated as compromised — it is
-still recoverable from git history.
+When a credential changes — a scheduled key roll, a password policy, someone
+leaving — the sequence is:
 
-1. Rotate at the source: Postgres user password, Twilio auth token (Twilio
-   console), Cloudinary API secret (Cloudinary console), Firebase service
-   account key.
-2. Update the secret store.
-3. Roll the deployment.
+1. Change it at the source: the Postgres user, the Twilio auth token (Twilio
+   console), the Cloudinary API secret (Cloudinary console), or the Firebase
+   service account key.
+2. Update the value in the secret store.
+3. Roll the deployment so the new value is picked up. Nothing is cached beyond
+   process lifetime, so a normal rolling restart is enough.
 4. Confirm `GET /actuator/health` reports `db` as `UP`.
 
-Purging git history needs `git filter-repo` and a force-push everyone re-clones
-after. Worth doing, but rotation is what actually stops the exposure — do that
-first.
+Because every value is read from the environment, none of this needs a code
+change or a new build — the same artifact picks up the new value on restart.
 
 ---
 

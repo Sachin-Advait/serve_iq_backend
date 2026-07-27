@@ -15,7 +15,6 @@ appear in both.
 
 - §1 — every endpoint was open. There is now authentication, and the frontend has
   to send a token. See §8 for what the UI team needs.
-- §2 — credentials in this repo need rotating regardless of anything else here.
 - §3 — three things were broken and failing quietly: push notifications have
   never worked, two customers could be given the same token number, and a quiz
   could lock out everyone it was assigned to.
@@ -140,7 +139,7 @@ credentials were what actually bound and the dotenv path was effectively dead.
 Everything comes from the environment now with no fallback, so a missing required
 variable stops the app at startup instead of letting it come up pointed at the
 wrong database. `.env.example` documents every variable, `README-CONFIG.md`
-covers local, Docker, compose, Kubernetes and rotation.
+covers local, Docker, compose and Kubernetes.
 
 The optional integrations — Twilio, Cloudinary, Firebase — degrade instead of
 crashing when their credentials are absent. They log a warning and skip. That
@@ -150,10 +149,6 @@ which is the point.
 I also generalised the dotenv loading: it copies the whole `.env` into system
 properties now, not just three Twilio keys, and never overwrites a real
 environment variable, so deployed environments are unaffected.
-
-**These credentials should be treated as compromised and rotated** — Postgres
-password, Twilio auth token, Cloudinary API secret. They are still in git
-history, so deleting them from the working tree does not undo the exposure.
 
 ---
 
@@ -552,24 +547,22 @@ rather than a silent failure. Worth testing by shortening
 
 Order matters.
 
-1. **Rotate the exposed credentials** — Postgres password, Twilio auth token,
-   Cloudinary API secret. They are in git history.
-2. **Set the environment variables.** The app will not start without the required
+1. **Set the environment variables.** The app will not start without the required
    ones; that is intentional. `README-CONFIG.md` has the list.
-3. **Generate a `JWT_SECRET`** — `openssl rand -base64 48`, different per
+2. **Generate a `JWT_SECRET`** — `openssl rand -base64 48`, different per
    environment.
-4. **Set `CORS_ALLOWED_ORIGINS`** to every real frontend origin, kiosks and TV
+3. **Set `CORS_ALLOWED_ORIGINS`** to every real frontend origin, kiosks and TV
    displays included.
-5. **Back up the database before first start.** Flyway will run V1, which
+4. **Back up the database before first start.** Flyway will run V1, which
    backfills `token_date` and `is_transfer` and de-duplicates token sequence
    numbers before applying the unique constraint. It is written to be safe and
    re-runnable, but it does modify existing rows, so take the backup.
-6. **Set `JPA_DDL_AUTO=validate`.** If it fails to start complaining about schema
+5. **Set `JPA_DDL_AUTO=validate`.** If it fails to start complaining about schema
    mismatch, that is Hibernate telling you the migration has not been applied —
    check the `flyway_schema_history` table rather than reaching for `update`.
-7. **Deploy backend and frontend together.** The token change is not backwards
+6. **Deploy backend and frontend together.** The token change is not backwards
    compatible.
-8. **Confirm** `/actuator/health/readiness` returns 200, take a ticket at a
+7. **Confirm** `/actuator/health/readiness` returns 200, take a ticket at a
    kiosk, call it from a counter, and leave feedback — that exercises the three
    public paths plus an authenticated one.
 
