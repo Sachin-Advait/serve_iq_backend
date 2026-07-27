@@ -1,12 +1,18 @@
 package com.gis.servelq.controllers;
 
+import com.gis.servelq.dto.ChangePasswordRequest;
+import com.gis.servelq.dto.ChangeRoleRequest;
 import com.gis.servelq.dto.UpdateFCMTokenRequest;
 import com.gis.servelq.dto.UserResponseDTO;
 import com.gis.servelq.models.User;
 import com.gis.servelq.models.UserRole;
+import com.gis.servelq.security.AuthenticatedUser;
 import com.gis.servelq.services.UserService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -32,13 +38,28 @@ public class UserController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    /** Profile and assignment fields. Role and password are handled separately. */
     @PutMapping("/{id}")
     public ResponseEntity<UserResponseDTO> updateUser(@PathVariable String id, @RequestBody User user) {
-        User updatedUser = userService.updateUser(id, user);
-        if (updatedUser != null) {
-            return ResponseEntity.ok(new UserResponseDTO(updatedUser));
-        }
-        return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(new UserResponseDTO(userService.updateUser(id, user)));
+    }
+
+    @PutMapping("/{id}/role")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<UserResponseDTO> changeRole(@PathVariable String id,
+                                                      @Valid @RequestBody ChangeRoleRequest request) {
+        return ResponseEntity.ok(new UserResponseDTO(userService.changeRole(id, request.getRole())));
+    }
+
+    /**
+     * A user changes their own password and must supply the current one. Note
+     * this is under /me so it cannot be pointed at somebody else's account.
+     */
+    @PostMapping("/me/password")
+    public ResponseEntity<Void> changeOwnPassword(@AuthenticationPrincipal AuthenticatedUser caller,
+                                                  @Valid @RequestBody ChangePasswordRequest request) {
+        userService.changePassword(caller.id(), request.getCurrentPassword(), request.getNewPassword());
+        return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/{id}")
