@@ -54,16 +54,22 @@ public class ResponseService {
             throw new IllegalStateException("Survey already submitted");
         }
 
-        // Quiz: respect max retake
+        // Quiz: respect max retake. This is a per-user limit, so it is checked
+        // against this user's own attempt count.
+        //
+        // There used to be a "quiz.setMaxRetake(getMaxRetake() - 1)" plus a save
+        // right after this check. maxRetake is a single column on the shared
+        // quiz row, so every submission by anyone decremented the same counter:
+        // with maxRetake=3 and 100 targeted staff, the first 3 submissions in
+        // total took it to 0 and locked out all 97 people who had not started.
+        // It also rewrote both large jsonb columns on every submit just to
+        // change one integer. The per-user check below is the whole rule.
         if ("quiz".equalsIgnoreCase(quiz.getType())
                 && quiz.getMaxRetake() != null
                 && existing.size() >= quiz.getMaxRetake()) {
             throw new IllegalStateException("Max quiz attempts exceeded");
         }
-        if (quiz.getMaxRetake() != null) {
-            quiz.setMaxRetake(quiz.getMaxRetake() - 1);
-            quizSurveyRepo.save(quiz);
-        }
+
         return handleQuizResponse(quiz, request, user);
     }
 
