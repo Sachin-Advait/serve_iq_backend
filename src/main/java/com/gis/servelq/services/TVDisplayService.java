@@ -7,14 +7,22 @@ import com.gis.servelq.models.TokenStatus;
 import com.gis.servelq.repository.BranchRepository;
 import com.gis.servelq.repository.TokenRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
+import java.util.EnumMap;
+import java.util.Map;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class TVDisplayService {
+
+    /** How many rows the board shows per list. */
+    private static final int MAX_LIST = 10;
+    private static final int MAX_SERVING = 20;
+
     private final TokenRepository tokenRepository;
     private final BranchRepository branchRepository;
 
@@ -23,24 +31,34 @@ public class TVDisplayService {
         Branch branch = branchRepository.findByIdAndEnabledTrue(branchId)
                 .orElseThrow(() -> new RuntimeException("Branch not found or disabled"));
 
-        List<Token> latestCalled = tokenRepository.findLatestCalledTokens(branchId)
-                .stream().limit(4).toList();
+        // This whole snapshot is rebuilt and broadcast on every token event -
+        // created, called, serving, completed, transferred, held, no-show - so
+        // it is the busiest read in the system. It used to be nine round trips:
+        // the branch, the called list, three unbounded status lists that were
+        // then trimmed in Java, and four separate COUNT queries. It is now the
+        // branch, the lists with the limits pushed into the database, and one
+        // grouped count.
+        List<Token> latestCalled = tokenRepository.findLatestCalledTokens(
+                branchId, PageRequest.of(0, 4));
 
         List<Token> nowServing = tokenRepository.findByBranchIdAndStatusOrderByPriorityAscCreatedAtAsc(
-                branchId, TokenStatus.SERVING);
+                branchId, TokenStatus.SERVING, PageRequest.of(0, MAX_SERVING));
 
         List<Token> upcoming = tokenRepository.findByBranchIdAndStatusOrderByPriorityAscCreatedAtAsc(
-                        branchId, TokenStatus.WAITING)
-                .stream().limit(10).toList();
+                branchId, TokenStatus.WAITING, PageRequest.of(0, MAX_LIST));
 
         List<Token> hold = tokenRepository.findByBranchIdAndStatusOrderByPriorityAscCreatedAtAsc(
-                        branchId, TokenStatus.HOLD)
-                .stream().limit(10).toList();
+                branchId, TokenStatus.HOLD, PageRequest.of(0, MAX_LIST));
 
-        long waitingCount = tokenRepository.countByBranchIdAndStatus(branchId, TokenStatus.WAITING);
-        long servingCount = tokenRepository.countByBranchIdAndStatus(branchId, TokenStatus.SERVING);
-        long noShowCount = tokenRepository.countByBranchIdAndStatus(branchId, TokenStatus.NO_SHOW);
-        long completedCount = tokenRepository.countByBranchIdAndStatus(branchId, TokenStatus.DONE);
+        Map<TokenStatus, Long> counts = new EnumMap<>(TokenStatus.class);
+        for (Object[] row : tokenRepository.countByStatusForBranch(branchId)) {
+            counts.put((TokenStatus) row[0], (Long) row[1]);
+        }
+
+        long waitingCount = counts.getOrDefault(TokenStatus.WAITING, 0L);
+        long servingCount = counts.getOrDefault(TokenStatus.SERVING, 0L);
+        long noShowCount = counts.getOrDefault(TokenStatus.NO_SHOW, 0L);
+        long completedCount = counts.getOrDefault(TokenStatus.DONE, 0L);
 
         TVDisplayResponseDTO response = new TVDisplayResponseDTO();
         response.setBranchName(branch.getName());

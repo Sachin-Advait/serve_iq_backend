@@ -4,6 +4,10 @@ import com.gis.servelq.dto.FeedbackRequestDto;
 import com.gis.servelq.models.Feedback;
 import com.gis.servelq.services.FeedbackService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -30,8 +34,10 @@ public class FeedbackController {
     }
 
     @GetMapping
-    public List<Feedback> getAllFeedback() {
-        return service.getAll();
+    public Page<Feedback> getAllFeedback(
+            @PageableDefault(size = 50, sort = "createdAt", direction = Sort.Direction.DESC)
+            Pageable pageable) {
+        return service.getAll(pageable);
     }
 
     @DeleteMapping("/{id}")

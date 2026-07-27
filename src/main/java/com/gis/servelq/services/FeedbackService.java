@@ -9,10 +9,13 @@ import com.gis.servelq.repository.CounterRepository;
 import com.gis.servelq.repository.FeedbackRepository;
 import com.gis.servelq.repository.TokenRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,34 +57,30 @@ public class FeedbackService {
         return saved;
     }
 
-    public List<Feedback> getAll() {
-        return feedbackRepository.findAll();
+    /** Paged - this returned the entire table, newest first is what the UI wants. */
+    public Page<Feedback> getAll(Pageable pageable) {
+        return feedbackRepository.findAllByOrderByCreatedAtDesc(pageable);
     }
 
     public void delete(String id) {
         feedbackRepository.deleteById(id);
     }
 
+    /**
+     * Was findAll() into memory followed by three separate stream passes to
+     * count three values, so the cost grew with every piece of feedback ever
+     * left. One GROUP BY does the same work in the database.
+     */
     public Map<String, Long> getFeedbackSummary() {
-        List<Feedback> all = feedbackRepository.findAll();
-
-        long happy = all.stream()
-                .filter(f -> f.getRating() == Feedback.MoodRating.HAPPY)
-                .count();
-
-        long neutral = all.stream()
-                .filter(f -> f.getRating() == Feedback.MoodRating.NEUTRAL)
-                .count();
-
-        long sad = all.stream()
-                .filter(f -> f.getRating() == Feedback.MoodRating.SAD)
-                .count();
+        Map<Feedback.MoodRating, Long> counts = new EnumMap<>(Feedback.MoodRating.class);
+        for (Object[] row : feedbackRepository.countByRating()) {
+            counts.put((Feedback.MoodRating) row[0], (Long) row[1]);
+        }
 
         Map<String, Long> summary = new HashMap<>();
-        summary.put("totalHappy", happy);
-        summary.put("totalNeutral", neutral);
-        summary.put("totalSad", sad);
-
+        summary.put("totalHappy", counts.getOrDefault(Feedback.MoodRating.HAPPY, 0L));
+        summary.put("totalNeutral", counts.getOrDefault(Feedback.MoodRating.NEUTRAL, 0L));
+        summary.put("totalSad", counts.getOrDefault(Feedback.MoodRating.SAD, 0L));
         return summary;
     }
 }

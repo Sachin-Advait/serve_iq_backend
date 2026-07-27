@@ -6,6 +6,7 @@ import jakarta.persistence.LockModeType;
 import jakarta.persistence.QueryHint;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
@@ -20,6 +21,24 @@ public interface TokenRepository extends JpaRepository<Token, String> {
     List<Token> findByBranchId(String branchId);
 
     List<Token> findByBranchIdAndStatusOrderByPriorityAscCreatedAtAsc(String branchId, TokenStatus status);
+
+    /**
+     * Same ordering but with the row limit applied by the database.
+     *
+     * The TV display asked for every WAITING/HOLD token for the branch and then
+     * did .stream().limit(10) in Java, so Postgres shipped and Hibernate
+     * hydrated the entire queue to show ten of them.
+     */
+    List<Token> findByBranchIdAndStatusOrderByPriorityAscCreatedAtAsc(
+            String branchId, TokenStatus status, Pageable pageable);
+
+    /**
+     * Counts for every status the board shows, in one round trip instead of the
+     * four separate COUNT queries it used to run. Statuses with no rows are
+     * absent from the result, so the caller defaults them to zero.
+     */
+    @Query("SELECT t.status, COUNT(t) FROM Token t WHERE t.branchId = :branchId GROUP BY t.status")
+    List<Object[]> countByStatusForBranch(@Param("branchId") String branchId);
 
     List<Token> findTop20ByStatusAndAssignedCounterIdOrderByEndAtDesc(TokenStatus status, String assignedCounterId);
 
@@ -61,7 +80,7 @@ public interface TokenRepository extends JpaRepository<Token, String> {
               AND t.status = com.gis.servelq.models.TokenStatus.CALLING
             ORDER BY t.startAt DESC
             """)
-    List<Token> findLatestCalledTokens(@Param("branchId") String branchId);
+    List<Token> findLatestCalledTokens(@Param("branchId") String branchId, Pageable pageable);
 
 
     @Query(value = """
