@@ -15,6 +15,8 @@ import java.util.Optional;
 public interface TokenRepository extends JpaRepository<Token, String> {
     List<Token> findByBranchId(String branchId);
 
+    long countByBranchId(String branchId);
+
     List<Token> findByBranchIdAndStatusOrderByPriorityAscCreatedAtAsc(String branchId, TokenStatus status);
 
     List<Token> findTop20ByStatusAndAssignedCounterIdOrderByEndAtDesc(TokenStatus status, String assignedCounterId);
@@ -43,7 +45,6 @@ public interface TokenRepository extends JpaRepository<Token, String> {
             """, nativeQuery = true)
     Optional<Token> findNextToken(@Param("counterId") String counterId);
 
-
     Optional<Token> findFirstByAssignedCounterIdAndStatus(String assignedCounterId, TokenStatus status);
 
     @Query("""
@@ -54,33 +55,32 @@ public interface TokenRepository extends JpaRepository<Token, String> {
             """)
     List<Token> findLatestCalledTokens(@Param("branchId") String branchId);
 
-
-    @Query(value = """
-                SELECT t FROM Token t
-                WHERE (t.status = com.gis.servelq.models.TokenStatus.WAITING
-                       OR t.status = com.gis.servelq.models.TokenStatus.HOLD)
-                  AND (
-                        t.counterIds IS NULL
-                        OR t.counterIds = ''
-                        OR t.counterIds LIKE CONCAT(:counterId)
-                        OR t.counterIds LIKE CONCAT(:counterId, ',%')
-                        OR t.counterIds LIKE CONCAT('%,', :counterId)
-                        OR t.counterIds LIKE CONCAT('%,', :counterId, ',%')
-                      )
-                ORDER BY
-                    t.priority DESC,
-                    CASE WHEN t.isTransfer = true THEN 0 ELSE 1 END ASC,
-                    t.createdAt ASC
+    @Query("""
+            SELECT t FROM Token t
+            WHERE (t.status = com.gis.servelq.models.TokenStatus.WAITING
+                   OR t.status = com.gis.servelq.models.TokenStatus.HOLD)
+              AND (
+                    t.counterIds IS NULL
+                    OR t.counterIds = ''
+                    OR t.counterIds LIKE CONCAT(:counterId)
+                    OR t.counterIds LIKE CONCAT(:counterId, ',%')
+                    OR t.counterIds LIKE CONCAT('%,', :counterId)
+                    OR t.counterIds LIKE CONCAT('%,', :counterId, ',%')
+                  )
+            ORDER BY
+                t.priority DESC,
+                CASE WHEN t.isTransfer = true THEN 0 ELSE 1 END ASC,
+                t.createdAt ASC
             """)
     List<Token> findUpcomingTokensForCounter(@Param("counterId") String counterId);
 
     @Query("""
-                SELECT MAX(t.tokenSeq)
-                FROM Token t
-                WHERE t.branchId = :branchId
-                  AND t.priority = :priority
-                  AND t.createdAt >= :startOfDay
-                  AND t.createdAt < :startOfNextDay
+            SELECT MAX(t.tokenSeq)
+            FROM Token t
+            WHERE t.branchId = :branchId
+              AND t.priority = :priority
+              AND t.createdAt >= :startOfDay
+              AND t.createdAt < :startOfNextDay
             """)
     Optional<Integer> findLastSeqForPriorityToday(
             @Param("branchId") String branchId,
@@ -89,14 +89,29 @@ public interface TokenRepository extends JpaRepository<Token, String> {
             @Param("startOfNextDay") LocalDateTime startOfNextDay
     );
 
-
     @Query("""
-               SELECT AVG(TIMESTAMPDIFF(SECOND, t.startAt, t.endAt))
-               FROM Token t
-               WHERE t.assignedCounterId = :counterId
-               AND t.startAt IS NOT NULL
-               AND t.endAt IS NOT NULL
-               AND t.status = 'DONE'
+            SELECT AVG(TIMESTAMPDIFF(SECOND, t.startAt, t.endAt))
+            FROM Token t
+            WHERE t.assignedCounterId = :counterId
+              AND t.startAt IS NOT NULL
+              AND t.endAt IS NOT NULL
+              AND t.status = 'DONE'
             """)
     Double getAvgServiceTimeSecondsByCounter(@Param("counterId") String counterId);
+
+    long countByBranchIdAndCreatedAtBetween(String branchId, LocalDateTime start, LocalDateTime end);
+
+    List<Token> findByBranchIdAndCreatedAtBetween(String branchId, LocalDateTime start, LocalDateTime end);
+
+    @Query("SELECT COUNT(t) FROM Token t WHERE t.serviceId = :serviceId AND t.status = :status")
+    long countByServiceIdAndStatus(@Param("serviceId") String serviceId, @Param("status") TokenStatus status);
+
+    @Query("SELECT COUNT(t) FROM Token t WHERE t.assignedCounterId = :counterId AND t.status = :status")
+    long countByAssignedCounterIdAndStatus(@Param("counterId") String counterId, @Param("status") TokenStatus status);
+
+    @Query("SELECT t FROM Token t WHERE t.branchId = :branchId " +
+            "AND t.status = 'DONE' AND t.createdAt BETWEEN :start AND :end")
+    List<Token> findCompletedTokensByDate(@Param("branchId") String branchId,
+                                          @Param("start") LocalDateTime start,
+                                          @Param("end") LocalDateTime end);
 }

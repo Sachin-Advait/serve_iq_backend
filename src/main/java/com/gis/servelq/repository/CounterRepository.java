@@ -14,4 +14,6 @@ public interface CounterRepository extends JpaRepository<Counter, String> {
     Optional<Counter> findByCode(String code);
 
     List<Counter> findByBranchIdOrderByCreatedAtAsc(String branchId);
+
+    List<Counter> findByBranchId(String branchId);
 }
