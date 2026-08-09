@@ -1,9 +1,14 @@
 package com.gis.servelq.services;
 
+import com.gis.servelq.Exceptions.BusinessException;
+import com.gis.servelq.Exceptions.ResourceNotFoundException;
 import com.gis.servelq.dto.CounterRequest;
 import com.gis.servelq.dto.CounterResponseDTO;
 import com.gis.servelq.dto.CounterStatusResponseDTO;
 import com.gis.servelq.dto.CounterUpdateRequest;
+import com.gis.servelq.events.TokenEvent;
+import com.gis.servelq.events.TokenEventPublisher;
+import com.gis.servelq.events.TokenEventType;
 import com.gis.servelq.models.Counter;
 import com.gis.servelq.models.CounterStatus;
 import com.gis.servelq.models.TokenStatus;
@@ -13,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -26,7 +32,7 @@ public class CounterService {
     private final ServiceRepository serviceRepository;
     private final UserRepository userRepository;
     private final TokenRepository tokenRepository;
-    private final SocketService socketService;
+    private final TokenEventPublisher tokenEventPublisher;
 
     private static Counter getCounter(CounterRequest request) {
         Counter counter = new Counter();
@@ -112,12 +118,12 @@ public class CounterService {
     public CounterResponseDTO updateCounter(String counterId, CounterUpdateRequest request) {
 
         Counter counter = counterRepository.findById(counterId)
-                .orElseThrow(() -> new RuntimeException("Counter not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Counter not found"));
 
         if (request.getCode() != null &&
                 !request.getCode().equals(counter.getCode()) &&
                 counterRepository.findByCodeAndBranchId(request.getCode(), counter.getBranchId()).isPresent()) {
-            throw new RuntimeException("Counter code already exists in this branch");
+            throw new BusinessException("Counter code already exists in this branch");
         }
         if (request.getCode() != null) counter.setCode(request.getCode());
         if (request.getName() != null) counter.setName(request.getName());
@@ -127,7 +133,7 @@ public class CounterService {
 
         if (request.getBranchId() != null && !request.getBranchId().equals(counter.getBranchId())) {
             branchRepository.findById(request.getBranchId())
-                    .orElseThrow(() -> new RuntimeException("Branch not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("Branch not found"));
             counter.setBranchId(request.getBranchId());
         }
         if (request.getServiceId() != null) counter.setServiceId(request.getServiceId());
@@ -135,13 +141,20 @@ public class CounterService {
             counter.setUserId(request.getUserId());
 
             User user = userRepository.findById(request.getUserId())
-                    .orElseThrow(() -> new RuntimeException("User not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found"));
             user.setCounterId(counterId);
             userRepository.save(user);
         }
 
         Counter updated = counterRepository.save(counter);
-        notifyCounter(counterId);
+        tokenEventPublisher.publish(new TokenEvent(
+                TokenEventType.COUNTER_STATUS_CHANGED,
+                updated.getBranchId(),
+                null,
+                null,
+                counterId,
+                Instant.now()
+        ));
 
         return convertToResponse(updated);
     }
@@ -154,7 +167,14 @@ public class CounterService {
         counter.setEnabled(enabled);
         Counter saved = counterRepository.save(counter);
 
-        notifyCounter(counterId);
+        tokenEventPublisher.publish(new TokenEvent(
+                TokenEventType.COUNTER_STATUS_CHANGED,
+                saved.getBranchId(),
+                null,
+                null,
+                counterId,
+                Instant.now()
+        ));
         return convertToResponse(saved);
     }
 
@@ -166,7 +186,14 @@ public class CounterService {
         counter.setPaused(paused);
         Counter saved = counterRepository.save(counter);
 
-        notifyCounter(counterId);
+        tokenEventPublisher.publish(new TokenEvent(
+                TokenEventType.COUNTER_STATUS_CHANGED,
+                saved.getBranchId(),
+                null,
+                null,
+                counterId,
+                Instant.now()
+        ));
         return convertToResponse(saved);
     }
 
@@ -216,10 +243,5 @@ public class CounterService {
         }
 
         return response;
-    }
-
-    public void notifyCounter(String counterId) {
-        CounterStatusResponseDTO data = getCounterStatusDetails(counterId);
-        socketService.broadcast("/topic/counter/" + counterId, data);
     }
 }

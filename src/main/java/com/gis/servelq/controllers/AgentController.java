@@ -31,13 +31,13 @@ public class AgentController {
     }
 
     @PostMapping("/token/start-serving/{tokenId}")
-    public ResponseEntity<Void> startServingToken(@PathVariable String tokenId) {
+    public ResponseEntity<Void> startServingToken(@PathVariable String tokenId) throws Exception {
         agentService.startServingToken(tokenId);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/token/complete/{tokenId}")
-    public ResponseEntity<Void> completeToken(@PathVariable String tokenId) {
+    public ResponseEntity<Void> completeToken(@PathVariable String tokenId) throws Exception {
         agentService.completeToken(tokenId);
         return ResponseEntity.ok().build();
     }
@@ -56,7 +56,7 @@ public class AgentController {
     }
 
     @PostMapping("/token/recall/{tokenId}")
-    public ResponseEntity<AgentCallResponseDTO> recallToken(@PathVariable String tokenId) {
+    public ResponseEntity<AgentCallResponseDTO> recallToken(@PathVariable String tokenId) throws Exception {
         AgentCallResponseDTO response = agentService.recallToken(tokenId);
         return ResponseEntity.ok(response);
     }

@@ -1,7 +1,7 @@
 package com.gis.servelq.services;
 
 import com.gis.servelq.dto.TVDisplayResponseDTO;
-import com.gis.servelq.models.TvContent;
+import com.gis.servelq.dto.TokenResponseDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -23,12 +23,28 @@ public class SocketService {
         messagingTemplate.convertAndSend(destination, payload);
     }
 
-    public void tvSocket(String branchId) {
+    public void notifyCounterDisplayImage(String branchId, Object payload) {
+        broadcast("/topic/counter-display/image/" + branchId, payload);
+    }
+
+    public void notifyCounterDisplay(String counterId, Object payload) {
+        broadcast("/topic/counter-display/" + counterId, payload);
+    }
+
+    public void notifyCounter(String counterId, Object payload) {
+        broadcast("/topic/counter/" + counterId, payload);
+    }
+
+    public void notifyBranchTV(String branchId) {
         TVDisplayResponseDTO data = tvDisplayService.getTVDisplayData(branchId);
         broadcast("/topic/tv/" + branchId, data);
     }
 
-    public void tvMediaSocket(List<TvContent> data, String branchId) {
-        broadcast("/topic/tv-media/" + branchId, data);
+    public void notifyBranchTVMedia(String branchId, Object payload) {
+        broadcast("/topic/tv-media/" + branchId, payload);
+    }
+
+    public void notifyAgentQueue(String counterId, List<TokenResponseDTO> payload) {
+        broadcast("/topic/agent-upcoming/" + counterId, payload);
     }
 }
