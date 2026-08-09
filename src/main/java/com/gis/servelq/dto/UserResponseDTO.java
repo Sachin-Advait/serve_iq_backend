@@ -1,5 +1,6 @@
 package com.gis.servelq.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.gis.servelq.models.User;
 import com.gis.servelq.models.UserRole;
 import lombok.Data;
@@ -15,6 +16,10 @@ public class UserResponseDTO {
     private UserRole role;
     private String branchId;
     private String counterId;
+    // Device push token. Written from the login/patch payloads but not sent back
+    // out - GET /users returned it for every user, which is enough to push
+    // notifications to someone else's device.
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String fcmToken;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

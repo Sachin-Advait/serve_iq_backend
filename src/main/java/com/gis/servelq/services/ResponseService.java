@@ -54,16 +54,22 @@ public class ResponseService {
             throw new IllegalStateException("Survey already submitted");
         }
 
-        // Quiz: respect max retake
+        // Quiz: respect max retake. This is a per-user limit, so it is checked
+        // against this user's own attempt count.
+        //
+        // There used to be a "quiz.setMaxRetake(getMaxRetake() - 1)" plus a save
+        // right after this check. maxRetake is a single column on the shared
+        // quiz row, so every submission by anyone decremented the same counter:
+        // with maxRetake=3 and 100 targeted staff, the first 3 submissions in
+        // total took it to 0 and locked out all 97 people who had not started.
+        // It also rewrote both large jsonb columns on every submit just to
+        // change one integer. The per-user check below is the whole rule.
         if ("quiz".equalsIgnoreCase(quiz.getType())
                 && quiz.getMaxRetake() != null
                 && existing.size() >= quiz.getMaxRetake()) {
             throw new IllegalStateException("Max quiz attempts exceeded");
         }
-        if (quiz.getMaxRetake() != null) {
-            quiz.setMaxRetake(quiz.getMaxRetake() - 1);
-            quizSurveyRepo.save(quiz);
-        }
+
         return handleQuizResponse(quiz, request, user);
     }
 
@@ -186,33 +192,57 @@ public class ResponseService {
        LOW SCORERS (JPA SAFE)
        ===================================================== */
 
+    /**
+     * Users whose average score over the window is below the threshold.
+     *
+     * This used to be responseRepo.findAll() - every response row for every quiz
+     * ever recorded, each one deserialising its jsonb answers blob that this
+     * report never looks at - filtered by date afterwards in Java. Now the date
+     * filter and the null guards run in the query, and only userId/score/maxScore
+     * come back. The averaging stays in Java so the arithmetic is unchanged: it
+     * is the mean of per-attempt percentages, not total score over total max.
+     */
     public List<LowScoringUserDTO> getLowScoringUsers(int weeks, double thresholdPercent) {
 
-        Instant fromDate =
-                Instant.now().minus(weeks * 7L, ChronoUnit.DAYS);
+        Instant fromDate = Instant.now().minus(weeks * 7L, ChronoUnit.DAYS);
 
-        return responseRepo.findAll().stream().filter(r -> r.getScore() != null &&
-                        r.getMaxScore() != null &&
-                        r.getSubmittedAt().isAfter(fromDate)
-                )
-                .collect(Collectors.groupingBy(ResponseModel::getUserId)).values().stream()
-                .map(responseModels -> {
-                    double avg =
-                            responseModels.stream().mapToDouble(
-                                            r -> (r.getScore() * 100.0) / r.getMaxScore())
-                                    .average()
-                                    .orElse(0);
+        Map<String, List<double[]>> byUser = new LinkedHashMap<>();
+        for (Object[] row : responseRepo.findScoresSince(fromDate)) {
+            String userId = (String) row[0];
+            double score = ((Number) row[1]).doubleValue();
+            double maxScore = ((Number) row[2]).doubleValue();
+            if (maxScore <= 0) {
+                // Would have produced Infinity and silently dropped out of the
+                // comparison below; skip it explicitly instead.
+                continue;
+            }
+            byUser.computeIfAbsent(userId, k -> new ArrayList<>()).add(new double[]{score, maxScore});
+        }
 
-                    if (avg >= thresholdPercent) return null;
+        if (byUser.isEmpty()) {
+            return List.of();
+        }
 
-                    ResponseModel r = responseModels.get(0);
+        Map<String, String> namesById = userRepository.findAllById(byUser.keySet()).stream()
+                .collect(Collectors.toMap(User::getId, User::getName, (a, b) -> a));
 
-                    return LowScoringUserDTO.builder()
-                            .userId(r.getUserId())
-                            .username(r.getUsername())
-                            .avgPercentage(avg)
-                            .attemptCount(responseModels.size())
-                            .build();
-                }).filter(Objects::nonNull).toList();
+        List<LowScoringUserDTO> result = new ArrayList<>();
+        byUser.forEach((userId, attempts) -> {
+            double avg = attempts.stream()
+                    .mapToDouble(a -> (a[0] * 100.0) / a[1])
+                    .average()
+                    .orElse(0);
+
+            if (avg < thresholdPercent) {
+                result.add(LowScoringUserDTO.builder()
+                        .userId(userId)
+                        .username(namesById.get(userId))
+                        .avgPercentage(avg)
+                        .attemptCount(attempts.size())
+                        .build());
+            }
+        });
+
+        return result;
     }
 }

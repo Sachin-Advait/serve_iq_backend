@@ -6,6 +6,8 @@ import com.gis.servelq.dto.ApiResponseDTO;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -83,10 +85,23 @@ public class GlobalExceptionHandler {
                         null
                 ));
     }
-
-    // Handle other RuntimeExceptions (like your own)
-    @ExceptionHandler(RuntimeException.class)
-    public ResponseEntity<ApiResponseDTO<?>> handleRuntimeException(RuntimeException ex) {
-        return ResponseEntity.badRequest().body(new ApiResponseDTO<>(false, ex.getMessage(), null));
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ApiResponseDTO<?>> handleAuthentication(AuthenticationException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(new ApiResponseDTO<>(false, "Authentication required", null));
     }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiResponseDTO<?>> handleAccessDenied(AccessDeniedException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new ApiResponseDTO<>(false, "You do not have permission to do that", null));
+    }
+
+    // There used to be an @ExceptionHandler(RuntimeException.class) here
+    // returning 400 with ex.getMessage(). RuntimeException is more specific than
+    // Exception so it shadowed the 500 handler, meaning every server side
+    // failure was reported to the client as a bad request - and the raw
+    // exception message went out in the body. Unhandled runtime failures now
+    // fall through to the generic handler: full detail in the log, generic
+    // message to the caller.
 }
