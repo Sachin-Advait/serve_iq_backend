@@ -9,7 +9,7 @@ import com.gis.servelq.models.UserRole;
 import com.gis.servelq.security.AuthenticatedUser;
 import com.gis.servelq.services.UserService;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -21,10 +21,10 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/serveiq/api/users")
+@RequiredArgsConstructor
 public class UserController {
 
-    @Autowired
-    private UserService userService;
+    private final UserService userService;
 
     @GetMapping
     public List<UserResponseDTO> getAllUsers() {
@@ -40,15 +40,18 @@ public class UserController {
 
     /** Profile and assignment fields. Role and password are handled separately. */
     @PutMapping("/{id}")
-    public ResponseEntity<UserResponseDTO> updateUser(@PathVariable String id, @RequestBody User user) {
-        return ResponseEntity.ok(new UserResponseDTO(userService.updateUser(id, user)));
+    public ResponseEntity<UserResponseDTO> updateUser(@PathVariable String id,
+                                                      @RequestBody User user,
+                                                      @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ResponseEntity.ok(new UserResponseDTO(userService.updateUser(id, user, currentUser)));
     }
 
     @PutMapping("/{id}/role")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<UserResponseDTO> changeRole(@PathVariable String id,
-                                                      @Valid @RequestBody ChangeRoleRequest request) {
-        return ResponseEntity.ok(new UserResponseDTO(userService.changeRole(id, request.getRole())));
+                                                      @Valid @RequestBody ChangeRoleRequest request,
+                                                      @AuthenticationPrincipal AuthenticatedUser admin) {
+        return ResponseEntity.ok(new UserResponseDTO(userService.changeRole(id, request.getRole(), admin)));
     }
 
     /**
@@ -58,19 +61,21 @@ public class UserController {
     @PostMapping("/me/password")
     public ResponseEntity<Void> changeOwnPassword(@AuthenticationPrincipal AuthenticatedUser caller,
                                                   @Valid @RequestBody ChangePasswordRequest request) {
-        userService.changePassword(caller.id(), request.getCurrentPassword(), request.getNewPassword());
+        userService.changePassword(caller.id(), request.getCurrentPassword(), request.getNewPassword(), caller);
         return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<String> deleteUser(@PathVariable String id) {
-        userService.deleteUser(id);
+    public ResponseEntity<String> deleteUser(@PathVariable String id,
+                                             @AuthenticationPrincipal AuthenticatedUser admin) {
+        userService.deleteUser(id, admin);
         return ResponseEntity.ok("User deleted successfully");
     }
 
     @PatchMapping("/update-fcm-token/{id}")
-    public ResponseEntity<UserResponseDTO> updateFcmToken(@RequestBody UpdateFCMTokenRequest req) {
-        User updatedUser = userService.updateFcmToken(req.getUserId(), req.getFcmToken());
+    public ResponseEntity<UserResponseDTO> updateFcmToken(@PathVariable String id,
+                                                          @RequestBody UpdateFCMTokenRequest req) {
+        User updatedUser = userService.updateFcmToken(id, req.getFcmToken());
         return ResponseEntity.ok(new UserResponseDTO(updatedUser));
     }
 

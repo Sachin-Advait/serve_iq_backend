@@ -2,11 +2,13 @@ package com.gis.servelq.controllers;
 
 import com.gis.servelq.dto.*;
 import com.gis.servelq.models.ResponseModel;
+import com.gis.servelq.security.AuthenticatedUser;
 import com.gis.servelq.services.QuizSurveyService;
 import com.gis.servelq.services.ResponseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -68,9 +70,10 @@ public class QuizSurveyController {
     @PostMapping("/user/submit/{quizSurveyId}")
     public ResponseEntity<ApiResponseDTO<ResponseModel>> submitResponse(
             @PathVariable UUID quizSurveyId,
-            @RequestBody SurveySubmissionRequest request
+            @RequestBody SurveySubmissionRequest request,
+            @AuthenticationPrincipal AuthenticatedUser currentUser
     ) {
-        ResponseModel response = responseService.storeResponse(quizSurveyId, request);
+        ResponseModel response = responseService.storeResponse(quizSurveyId, request, currentUser);
         return ResponseEntity.ok(new ApiResponseDTO<>(true, "Response submitted successfully", response));
     }
 

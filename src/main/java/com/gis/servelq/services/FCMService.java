@@ -1,6 +1,6 @@
 package com.gis.servelq.services;
 
-
+import com.gis.servelq.models.AuditAction;
 import com.gis.servelq.models.QuizSurveyModel;
 import com.gis.servelq.models.User;
 import com.gis.servelq.repository.UserRepository;
@@ -10,7 +10,7 @@ import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.Message;
 import com.google.firebase.messaging.MulticastMessage;
 import com.google.firebase.messaging.Notification;
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -20,13 +20,14 @@ import java.util.List;
 
 @Service
 @Slf4j
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class FCMService {
 
     /** FCM caps sendEachForMulticast at 500 tokens per call. */
     private static final int MULTICAST_BATCH_SIZE = 500;
 
     private final UserRepository userRepository;
+    private final AuditLogService auditLogService;
 
     public void sendNotification(String token, String title, String body, String category, String contentId) {
         if (notConfigured()) {
@@ -55,6 +56,18 @@ public class FCMService {
                 "A new training has been assigned to you. Please complete it before the due date.",
                 "TRAINING",
                 trainingId);
+
+        // Log FCM sent
+        auditLogService.log(
+                AuditAction.FCM_SENT,
+                "FCM",
+                trainingId,
+                "Training",
+                "FCM notification sent for training " + trainingId + " to " + userIds.size() + " users",
+                null,
+                null,
+                null
+        );
     }
 
     /* ================= QUIZ / SURVEY ================= */
@@ -71,6 +84,19 @@ public class FCMService {
                 "A new " + quiz.getType().toLowerCase() + " has been assigned to you: " + quiz.getTitle(),
                 "QUIZ",
                 quiz.getId().toString());
+
+        // Log FCM sent
+        auditLogService.log(
+                AuditAction.FCM_SENT,
+                "FCM",
+                quiz.getId().toString(),
+                quiz.getTitle(),
+                "FCM notification sent for " + quiz.getType() + " to " +
+                        (quiz.getTargetedUsers() != null ? quiz.getTargetedUsers().size() : 0) + " users",
+                null,
+                null,
+                null
+        );
     }
 
     /**

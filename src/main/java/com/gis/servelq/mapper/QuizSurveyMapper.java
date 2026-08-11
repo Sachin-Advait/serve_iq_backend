@@ -9,13 +9,14 @@ import com.gis.servelq.repository.ResponseRepo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.HashSet;
+
 @Component
 @RequiredArgsConstructor
 
 public class QuizSurveyMapper {
 
     private final ResponseRepo responseRepo;
-
     public QuizzesSurveysDTO mapToDtoWithoutUser(QuizSurveyModel quiz) {
         return QuizzesSurveysDTO.builder()
                 .id(quiz.getId())
@@ -27,7 +28,8 @@ public class QuizSurveyMapper {
                 .isAnnounced(quiz.getIsAnnounced())
                 .createdAt(quiz.getCreatedAt())
                 .maxRetake(quiz.getMaxRetake())
-                .userDataDisplayFields(quiz.getUserDataDisplayFields())
+                .userDataDisplayFields(quiz.getUserDataDisplayFields() != null ?
+                        new HashSet<>(quiz.getUserDataDisplayFields()) : new HashSet<>())
                 .visibilityType(quiz.getVisibilityType())
                 .build();
     }
@@ -53,7 +55,8 @@ public class QuizSurveyMapper {
                 .isParticipated(isParticipated)
                 .isMandatory(isMandatory)
                 .maxRetake(quiz.getMaxRetake())
-                .userDataDisplayFields(quiz.getUserDataDisplayFields())
+                .userDataDisplayFields(quiz.getUserDataDisplayFields() != null ?
+                        new HashSet<>(quiz.getUserDataDisplayFields()) : new HashSet<>())
                 .visibilityType(quiz.getVisibilityType())
                 .build();
     }

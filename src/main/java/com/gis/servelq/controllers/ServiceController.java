@@ -4,10 +4,12 @@ import com.gis.servelq.dto.ServiceRequest;
 import com.gis.servelq.dto.ServiceResponseDTO;
 import com.gis.servelq.dto.ServiceUpdateRequest;
 import com.gis.servelq.models.Services;
+import com.gis.servelq.security.AuthenticatedUser;
 import com.gis.servelq.services.ServiceManagementService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -21,8 +23,9 @@ public class ServiceController {
 
     // CREATE
     @PostMapping
-    public ResponseEntity<Services> createService(@Valid @RequestBody ServiceRequest request) {
-        return ResponseEntity.ok(serviceManagementService.createService(request));
+    public ResponseEntity<Services> createService(@Valid @RequestBody ServiceRequest request,
+                                                  @AuthenticationPrincipal AuthenticatedUser user) {
+        return ResponseEntity.ok(serviceManagementService.createService(request, user));
     }
 
     // READ: Get service by ID
@@ -51,21 +54,25 @@ public class ServiceController {
 
     // UPDATE
     @PutMapping("/{id}")
-    public ResponseEntity<Services> updateService(@PathVariable String id, @RequestBody ServiceUpdateRequest request) {
-        return ResponseEntity.ok(serviceManagementService.updateService(id, request));
+    public ResponseEntity<Services> updateService(@PathVariable String id,
+                                                  @RequestBody ServiceUpdateRequest request,
+                                                  @AuthenticationPrincipal AuthenticatedUser user) {
+        return ResponseEntity.ok(serviceManagementService.updateService(id, request, user));
     }
 
     // DELETE (soft delete)
     @PatchMapping("/{id}/disable")
-    public ResponseEntity<String> disableService(@PathVariable String id) {
-        serviceManagementService.disableService(id);
+    public ResponseEntity<String> disableService(@PathVariable String id,
+                                                 @AuthenticationPrincipal AuthenticatedUser user) {
+        serviceManagementService.disableService(id, user);
         return ResponseEntity.ok("Service disabled successfully");
     }
 
     // DELETE (hard delete)
     @DeleteMapping("/{id}")
-    public ResponseEntity<String> deleteService(@PathVariable String id) {
-        serviceManagementService.deleteService(id);
+    public ResponseEntity<String> deleteService(@PathVariable String id,
+                                                @AuthenticationPrincipal AuthenticatedUser user) {
+        serviceManagementService.deleteService(id, user);
         return ResponseEntity.ok("Service deleted permanently");
     }
 }

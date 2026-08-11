@@ -3,11 +3,13 @@ package com.gis.servelq.controllers;
 import com.gis.servelq.dto.CounterRequest;
 import com.gis.servelq.dto.CounterResponseDTO;
 import com.gis.servelq.dto.CounterUpdateRequest;
+import com.gis.servelq.security.AuthenticatedUser;
 import com.gis.servelq.services.CounterService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,9 +21,10 @@ public class CounterController {
     private final CounterService counterService;
 
     @PostMapping
-    public ResponseEntity<?> createCounter(@Valid @RequestBody CounterRequest request) {
+    public ResponseEntity<?> createCounter(@Valid @RequestBody CounterRequest request,
+                                           @AuthenticationPrincipal AuthenticatedUser user) {
         try {
-            CounterResponseDTO counter = counterService.createCounter(request);
+            CounterResponseDTO counter = counterService.createCounter(request, user);
             return ResponseEntity.status(HttpStatus.CREATED).body(counter);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -47,9 +50,11 @@ public class CounterController {
     }
 
     @PutMapping("/{counterId}")
-    public ResponseEntity<?> updateCounter(@PathVariable String counterId, @RequestBody CounterUpdateRequest request) {
+    public ResponseEntity<?> updateCounter(@PathVariable String counterId,
+                                           @RequestBody CounterUpdateRequest request,
+                                           @AuthenticationPrincipal AuthenticatedUser user) {
         try {
-            CounterResponseDTO counter = counterService.updateCounter(counterId, request);
+            CounterResponseDTO counter = counterService.updateCounter(counterId, request, user);
             return ResponseEntity.ok(counter);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -58,9 +63,10 @@ public class CounterController {
 
     // Delete counter
     @DeleteMapping("/{counterId}")
-    public ResponseEntity<?> deleteCounter(@PathVariable String counterId) {
+    public ResponseEntity<?> deleteCounter(@PathVariable String counterId,
+                                           @AuthenticationPrincipal AuthenticatedUser user) {
         try {
-            counterService.deleteCounter(counterId);
+            counterService.deleteCounter(counterId, user);
             return ResponseEntity.ok().body("Counter deleted successfully");
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
@@ -68,9 +74,11 @@ public class CounterController {
     }
 
     @PatchMapping("/enabled/{counterId}/{value}")
-    public ResponseEntity<?> toggleEnabled(@PathVariable String counterId, @PathVariable boolean value) {
+    public ResponseEntity<?> toggleEnabled(@PathVariable String counterId,
+                                           @PathVariable boolean value,
+                                           @AuthenticationPrincipal AuthenticatedUser user) {
         try {
-            CounterResponseDTO counter = counterService.toggleCounter(counterId, value);
+            CounterResponseDTO counter = counterService.toggleCounter(counterId, value, user);
             return ResponseEntity.ok(counter);
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
@@ -78,9 +86,11 @@ public class CounterController {
     }
 
     @PatchMapping("/paused/{counterId}/{value}")
-    public ResponseEntity<?> togglePaused(@PathVariable String counterId, @PathVariable boolean value) {
+    public ResponseEntity<?> togglePaused(@PathVariable String counterId,
+                                          @PathVariable boolean value,
+                                          @AuthenticationPrincipal AuthenticatedUser user) {
         try {
-            CounterResponseDTO counter = counterService.togglePauseCounter(counterId, value);
+            CounterResponseDTO counter = counterService.togglePauseCounter(counterId, value, user);
             return ResponseEntity.ok(counter);
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();

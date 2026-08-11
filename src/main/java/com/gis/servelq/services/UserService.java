@@ -3,10 +3,13 @@ package com.gis.servelq.services;
 import com.gis.servelq.Exceptions.BusinessException;
 import com.gis.servelq.Exceptions.ResourceNotFoundException;
 import com.gis.servelq.dto.RegisterRequest;
+import com.gis.servelq.models.AuditAction;
 import com.gis.servelq.models.User;
 import com.gis.servelq.models.UserRole;
 import com.gis.servelq.repository.UserRepository;
-import lombok.AllArgsConstructor;
+import com.gis.servelq.security.AuthenticatedUser;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -14,13 +17,15 @@ import java.util.List;
 import java.util.Optional;
 
 @Service
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class UserService {
 
     private final PasswordEncoder passwordEncoder;
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
+    private final AuditLogService auditLogService;
+    private final HttpServletRequest request;
 
-    public User registerUser(RegisterRequest dto) {
+    public User registerUser(RegisterRequest dto, AuthenticatedUser admin) {
         if (userRepository.existsByEmail(dto.getEmail())) {
             throw new BusinessException("Email already exists");
         }
@@ -36,7 +41,21 @@ public class UserService {
         user.setFcmToken(dto.getFcmToken());
         user.setCounterId(dto.getCounterId());
 
-        return userRepository.save(user);
+        // Fixed: Save first, then audit with saved user
+        User savedUser = userRepository.save(user);
+
+        auditLogService.log(
+                AuditAction.USER_CREATED,
+                "User",
+                savedUser.getId(),
+                savedUser.getName(),
+                "User account created: " + savedUser.getName() + " with role " + savedUser.getRole(),
+                admin,
+                savedUser.getBranchId(),
+                request
+        );
+
+        return savedUser;
     }
 
     public Optional<User> findByEmail(String email) {
@@ -63,25 +82,57 @@ public class UserService {
      * password - account takeover with no credentials. Those two now go through
      * changeRole and changePassword.
      */
-    public User updateUser(String id, User userDetails) {
+    public User updateUser(String id, User userDetails, AuthenticatedUser currentUser) {
         return userRepository.findById(id).map(user -> {
+            User oldUser = cloneUser(user); // Save old state for audit
+
             if (userDetails.getName() != null) user.setName(userDetails.getName());
             if (userDetails.getBranchId() != null) user.setBranchId(userDetails.getBranchId());
             if (userDetails.getCounterId() != null) user.setCounterId(userDetails.getCounterId());
 
-            return userRepository.save(user);
+            User updatedUser = userRepository.save(user);
+
+            auditLogService.logWithChanges(
+                    AuditAction.USER_UPDATED,
+                    "User",
+                    updatedUser.getId(),
+                    updatedUser.getName(),
+                    "User profile updated: " + updatedUser.getName(),
+                    oldUser,
+                    updatedUser,
+                    currentUser,
+                    updatedUser.getBranchId(),
+                    request
+            );
+
+            return updatedUser;
         }).orElseThrow(() -> new ResourceNotFoundException("User not found: " + id));
     }
 
-    public User changeRole(String id, UserRole newRole) {
+    public User changeRole(String id, UserRole newRole, AuthenticatedUser admin) {
         return userRepository.findById(id).map(user -> {
+            UserRole oldRole = user.getRole();
             user.setRole(newRole);
-            return userRepository.save(user);
+            User updatedUser = userRepository.save(user);
+
+            auditLogService.log(
+                    AuditAction.ROLE_CHANGED,
+                    "User",
+                    updatedUser.getId(),
+                    updatedUser.getName(),
+                    "User role changed from " + oldRole + " to " + newRole + " for user: " + updatedUser.getName(),
+                    admin,
+                    updatedUser.getBranchId(),
+                    request
+            );
+
+            return updatedUser;
         }).orElseThrow(() -> new ResourceNotFoundException("User not found: " + id));
     }
 
     /** The caller has to prove they know the current password. */
-    public void changePassword(String id, String currentPassword, String newPassword) {
+    public void changePassword(String id, String currentPassword, String newPassword,
+                               AuthenticatedUser currentUser) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + id));
 
@@ -93,6 +144,17 @@ public class UserService {
         }
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
+
+        auditLogService.log(
+                AuditAction.PASSWORD_CHANGED,
+                "User",
+                id,
+                currentUser.email(),
+                "Password changed for user: " + currentUser.email(),
+                currentUser,
+                currentUser.branchId(),
+                request
+        );
     }
 
     public User updateFcmToken(String id, String fcmToken) {
@@ -102,7 +164,35 @@ public class UserService {
         }).orElseThrow(() -> new RuntimeException("User not found"));
     }
 
-    public void deleteUser(String id) {
+    public void deleteUser(String id, AuthenticatedUser admin) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + id));
+
+        // Log before deletion
+        auditLogService.log(
+                AuditAction.USER_DELETED,
+                "User",
+                user.getId(),
+                user.getName(),
+                "User account deleted: " + user.getName() + " (" + user.getEmail() + ")",
+                admin,
+                user.getBranchId(),
+                request
+        );
+
         userRepository.deleteById(id);
+    }
+
+    // Helper method to clone user for audit comparison
+    private User cloneUser(User original) {
+        User clone = new User();
+        clone.setId(original.getId());
+        clone.setName(original.getName());
+        clone.setEmail(original.getEmail());
+        clone.setRole(original.getRole());
+        clone.setBranchId(original.getBranchId());
+        clone.setCounterId(original.getCounterId());
+        clone.setFcmToken(original.getFcmToken());
+        return clone;
     }
 }

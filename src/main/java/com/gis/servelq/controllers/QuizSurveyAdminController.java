@@ -3,10 +3,12 @@ package com.gis.servelq.controllers;
 import com.gis.servelq.dto.*;
 import com.gis.servelq.models.QuizSurveyModel;
 import com.gis.servelq.models.ResponseModel;
+import com.gis.servelq.security.AuthenticatedUser;
 import com.gis.servelq.services.QuizSurveyAdminService;
 import com.gis.servelq.services.ResultService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,9 +24,11 @@ public class QuizSurveyAdminController {
 
     /* ---------------- CREATE ---------------- */
     @PostMapping
-    public ResponseEntity<ApiResponseDTO<QuizSurveyModel>> create(@RequestBody QuizSurveyModel model) {
+    public ResponseEntity<ApiResponseDTO<QuizSurveyModel>> create(
+            @RequestBody QuizSurveyModel model,
+            @AuthenticationPrincipal AuthenticatedUser admin) {
         return ResponseEntity.ok(new ApiResponseDTO<>(true, "Quiz/Survey created successfully",
-                adminService.create(model))
+                adminService.create(model, admin))
         );
     }
 
@@ -32,17 +36,19 @@ public class QuizSurveyAdminController {
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponseDTO<QuizSurveyModel>> update(
             @PathVariable UUID id,
-            @RequestBody QuizSurveyModel model
-    ) {
+            @RequestBody QuizSurveyModel model,
+            @AuthenticationPrincipal AuthenticatedUser admin) {
         return ResponseEntity.ok(new ApiResponseDTO<>(true, "Quiz/Survey updated successfully",
-                adminService.update(id, model))
+                adminService.update(id, model, admin))
         );
     }
 
     /* ---------------- DELETE ---------------- */
     @DeleteMapping("/{id}")
-    public ResponseEntity<ApiResponseDTO<Void>> delete(@PathVariable UUID id) {
-        adminService.delete(id);
+    public ResponseEntity<ApiResponseDTO<Void>> delete(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal AuthenticatedUser admin) {
+        adminService.delete(id, admin);
         return ResponseEntity.ok(new ApiResponseDTO<>(true, "Quiz/Survey deleted", null));
     }
 
@@ -56,8 +62,10 @@ public class QuizSurveyAdminController {
 
     /* ---------------- MANUAL ANNOUNCE ---------------- */
     @PostMapping("/{id}/announce")
-    public ResponseEntity<ApiResponseDTO<Void>> announce(@PathVariable UUID id) {
-        adminService.manualAnnounce(id);
+    public ResponseEntity<ApiResponseDTO<Void>> announce(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal AuthenticatedUser admin) {
+        adminService.manualAnnounce(id, admin);
         return ResponseEntity.ok(new ApiResponseDTO<>(true, "Announcement sent", null));
     }
 

@@ -7,8 +7,10 @@ import com.gis.servelq.dto.TokenResponseDTO;
 import com.gis.servelq.events.TokenEvent;
 import com.gis.servelq.events.TokenEventPublisher;
 import com.gis.servelq.events.TokenEventType;
+import com.gis.servelq.models.AuditAction;
 import com.gis.servelq.models.Token;
 import com.gis.servelq.repository.TokenRepository;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -28,6 +30,8 @@ public class TokenService {
     private final TokenIssuer tokenIssuer;
     private final WhatsAppService whatsAppService;
     private final TokenEventPublisher tokenEventPublisher;
+    private final AuditLogService auditLogService;
+    private final HttpServletRequest request;
 
     /**
      * Issues a token, retrying if another kiosk grabbed the same sequence number
@@ -61,6 +65,16 @@ public class TokenService {
         }
 
         publishTokenEvents(savedToken);
+        auditLogService.log(
+                AuditAction.TOKEN_GENERATED,
+                "Token",
+                savedToken.getId(),
+                savedToken.getToken(),
+                "Token generated for service: " + savedToken.getServiceName(),
+                null,
+                savedToken.getBranchId(),
+                this.request
+        );
 
         // Sent after the token is committed and off this thread. It used to run
         // inside the transaction, so a pooled DB connection was held open for the
@@ -69,6 +83,7 @@ public class TokenService {
         if (Boolean.TRUE.equals(request.getGreenToken()) && request.getMobileNumber() != null) {
             whatsAppService.sendTokenNotificationAsync(request.getMobileNumber(), savedToken.getToken());
         }
+
 
         return TokenResponseDTO.fromEntity(savedToken);
     }

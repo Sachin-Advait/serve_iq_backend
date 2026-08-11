@@ -69,6 +69,7 @@ public class SecurityConfig {
                         .requestMatchers("/serveiq/api/reports/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/serveiq/api/branches/**").hasAnyRole("ADMIN", "MANAGER")
 
+
                         // Outbound WhatsApp was wide open, so anyone could push
                         // messages through the Twilio account at our cost.
                         .requestMatchers("/serveiq/api/whatsapp/**").hasRole("ADMIN")

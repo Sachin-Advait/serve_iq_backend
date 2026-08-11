@@ -4,10 +4,13 @@ import com.gis.servelq.controllers.QuizSurveySocketController;
 import com.gis.servelq.dto.QuizCompletionStatsDTO;
 import com.gis.servelq.dto.QuizInsightsDTO;
 import com.gis.servelq.models.AnnouncementMode;
+import com.gis.servelq.models.AuditAction;
 import com.gis.servelq.models.QuizSurveyModel;
 import com.gis.servelq.models.ResponseModel;
 import com.gis.servelq.repository.QuizSurveyRepository;
 import com.gis.servelq.repository.ResponseRepo;
+import com.gis.servelq.security.AuthenticatedUser;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -23,14 +26,28 @@ public class QuizSurveyAdminService {
     private final ResponseRepo responseRepo;
     private final QuizSurveySocketController socketController;
     private final FCMService fcmService;
+    private final AuditLogService auditLogService;
+    private final HttpServletRequest request;
 
     /* ---------------- CREATE ---------------- */
-    public QuizSurveyModel create(QuizSurveyModel model) {
+    public QuizSurveyModel create(QuizSurveyModel model, AuthenticatedUser admin) {
         model.setIsAnnounced(
                 model.getAnnouncementMode() == AnnouncementMode.IMMEDIATE
         );
 
         QuizSurveyModel saved = quizSurveyRepo.save(model);
+
+        // Log quiz created
+        auditLogService.log(
+                AuditAction.QUIZ_CREATED,
+                "QuizSurvey",
+                saved.getId().toString(),
+                saved.getTitle(),
+                "Quiz/Survey created: " + saved.getTitle() + " (" + saved.getType() + ")",
+                admin,
+                null,
+                request
+        );
 
         if (saved.getIsAnnounced()) {
             pushNotifications(saved);
@@ -40,7 +57,7 @@ public class QuizSurveyAdminService {
     }
 
     /* ---------------- UPDATE ---------------- */
-    public QuizSurveyModel update(UUID id, QuizSurveyModel updated) {
+    public QuizSurveyModel update(UUID id, QuizSurveyModel updated, AuthenticatedUser admin) {
 
         QuizSurveyModel existing = quizSurveyRepo.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Quiz not found"));
@@ -59,11 +76,40 @@ public class QuizSurveyAdminService {
         if (updated.getScheduledTime() != null) existing.setScheduledTime(updated.getScheduledTime());
         if (updated.getStatus() != null) existing.setStatus(updated.getStatus());
 
-        return quizSurveyRepo.save(existing);
+        QuizSurveyModel saved = quizSurveyRepo.save(existing);
+
+        // Log quiz updated
+        auditLogService.log(
+                AuditAction.QUIZ_UPDATED,
+                "QuizSurvey",
+                saved.getId().toString(),
+                saved.getTitle(),
+                "Quiz/Survey updated: " + saved.getTitle(),
+                admin,
+                null,
+                request
+        );
+
+        return saved;
     }
 
     /* ---------------- DELETE ---------------- */
-    public void delete(UUID id) {
+    public void delete(UUID id, AuthenticatedUser admin) {
+        QuizSurveyModel quiz = quizSurveyRepo.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Quiz not found"));
+
+        // Log before deletion
+        auditLogService.log(
+                AuditAction.QUIZ_DELETED,
+                "QuizSurvey",
+                quiz.getId().toString(),
+                quiz.getTitle(),
+                "Quiz/Survey deleted: " + quiz.getTitle(),
+                admin,
+                null,
+                request
+        );
+
         quizSurveyRepo.deleteById(id);
     }
 
@@ -73,7 +119,7 @@ public class QuizSurveyAdminService {
     }
 
     /* ---------------- MANUAL ANNOUNCE ---------------- */
-    public void manualAnnounce(UUID quizId) {
+    public void manualAnnounce(UUID quizId, AuthenticatedUser admin) {
         QuizSurveyModel quiz = quizSurveyRepo.findById(quizId)
                 .orElseThrow(() -> new IllegalArgumentException("Quiz not found"));
 
@@ -81,6 +127,18 @@ public class QuizSurveyAdminService {
 
         quiz.setIsAnnounced(true);
         quizSurveyRepo.save(quiz);
+
+        // Log manual announcement
+        auditLogService.log(
+                AuditAction.QUIZ_ANNOUNCED,
+                "QuizSurvey",
+                quiz.getId().toString(),
+                quiz.getTitle(),
+                "Quiz/Survey manually announced: " + quiz.getTitle(),
+                admin,
+                null,
+                request
+        );
 
         pushNotifications(quiz);
     }

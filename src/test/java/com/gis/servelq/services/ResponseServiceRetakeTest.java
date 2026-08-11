@@ -8,6 +8,8 @@ import com.gis.servelq.models.User;
 import com.gis.servelq.repository.QuizSurveyRepository;
 import com.gis.servelq.repository.ResponseRepo;
 import com.gis.servelq.repository.UserRepository;
+import com.gis.servelq.security.AuthenticatedUser;
+import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,6 +43,9 @@ class ResponseServiceRetakeTest {
     @Mock private QuizSurveyRepository quizSurveyRepo;
     @Mock private ResponseRepo responseRepo;
     @Mock private UserRepository userRepository;
+    @Mock private AuditLogService auditLogService;
+    @Mock private HttpServletRequest request;
+    @Mock private AuthenticatedUser currentUser;
 
     private ResponseService responseService;
 
@@ -48,18 +53,30 @@ class ResponseServiceRetakeTest {
 
     @BeforeEach
     void setUp() {
-        responseService = new ResponseService(quizSurveyRepo, responseRepo, userRepository);
+        responseService = new ResponseService(
+                quizSurveyRepo,
+                responseRepo,
+                userRepository,
+                auditLogService,
+                request
+        );
 
         quiz = new QuizSurveyModel();
         quiz.setId(QUIZ_ID);
         quiz.setType("quiz");
         quiz.setMaxRetake(2);
+        quiz.setTitle("Test Quiz");
         quiz.setTargetedUsers(new HashSet<>(Set.of("alice", "bob", "carol")));
         quiz.setDefinitionJson(oneQuestionQuiz());
         quiz.setAnswerKey(new HashMap<>(Map.of("q1", "yes")));
 
         when(quizSurveyRepo.findById(QUIZ_ID)).thenReturn(Optional.of(quiz));
         when(responseRepo.save(any(ResponseModel.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Mock audit log service to do nothing (it's @Async, so it won't affect tests)
+        doNothing().when(auditLogService).log(
+                any(), any(), any(), any(), any(), any(), any(), any()
+        );
     }
 
     /** Smallest definition the scorer will accept: one page, one 10 mark question. */
@@ -107,7 +124,7 @@ class ResponseServiceRetakeTest {
         userExists("alice");
         attemptsSoFar("alice", 0);
 
-        assertThat(responseService.storeResponse(QUIZ_ID, submission("alice"))).isNotNull();
+        assertThat(responseService.storeResponse(QUIZ_ID, submission("alice"), currentUser)).isNotNull();
     }
 
     @Test
@@ -115,7 +132,7 @@ class ResponseServiceRetakeTest {
         userExists("alice");
         attemptsSoFar("alice", 1);   // maxRetake is 2, so a second attempt is fine
 
-        assertThat(responseService.storeResponse(QUIZ_ID, submission("alice"))).isNotNull();
+        assertThat(responseService.storeResponse(QUIZ_ID, submission("alice"), currentUser)).isNotNull();
     }
 
     @Test
@@ -123,7 +140,7 @@ class ResponseServiceRetakeTest {
         userExists("alice");
         attemptsSoFar("alice", 2);
 
-        assertThatThrownBy(() -> responseService.storeResponse(QUIZ_ID, submission("alice")))
+        assertThatThrownBy(() -> responseService.storeResponse(QUIZ_ID, submission("alice"), currentUser))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Max quiz attempts exceeded");
     }
@@ -136,17 +153,17 @@ class ResponseServiceRetakeTest {
     void oneUsersSubmissionsDoNotConsumeAnotherUsersAllowance() {
         userExists("bob");
         attemptsSoFar("bob", 0);
-        responseService.storeResponse(QUIZ_ID, submission("bob"));
+        responseService.storeResponse(QUIZ_ID, submission("bob"), currentUser);
 
         userExists("carol");
         attemptsSoFar("carol", 0);
-        responseService.storeResponse(QUIZ_ID, submission("carol"));
+        responseService.storeResponse(QUIZ_ID, submission("carol"), currentUser);
 
         // Alice has not submitted at all yet, so she still gets her full quota.
         userExists("alice");
         attemptsSoFar("alice", 0);
 
-        assertThat(responseService.storeResponse(QUIZ_ID, submission("alice"))).isNotNull();
+        assertThat(responseService.storeResponse(QUIZ_ID, submission("alice"), currentUser)).isNotNull();
     }
 
     /**
@@ -159,7 +176,7 @@ class ResponseServiceRetakeTest {
         userExists("alice");
         attemptsSoFar("alice", 0);
 
-        responseService.storeResponse(QUIZ_ID, submission("alice"));
+        responseService.storeResponse(QUIZ_ID, submission("alice"), currentUser);
 
         assertThat(quiz.getMaxRetake()).isEqualTo(2);
         verify(quizSurveyRepo, never()).save(any(QuizSurveyModel.class));
@@ -169,7 +186,7 @@ class ResponseServiceRetakeTest {
     void userWhoIsNotTargetedCannotSubmit() {
         userExists("dave");
 
-        assertThatThrownBy(() -> responseService.storeResponse(QUIZ_ID, submission("dave")))
+        assertThatThrownBy(() -> responseService.storeResponse(QUIZ_ID, submission("dave"), currentUser))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("not allowed");
     }
@@ -180,7 +197,7 @@ class ResponseServiceRetakeTest {
         userExists("alice");
         attemptsSoFar("alice", 1);
 
-        assertThatThrownBy(() -> responseService.storeResponse(QUIZ_ID, submission("alice")))
+        assertThatThrownBy(() -> responseService.storeResponse(QUIZ_ID, submission("alice"), currentUser))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("already submitted");
     }

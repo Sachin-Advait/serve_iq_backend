@@ -8,6 +8,8 @@ import com.gis.servelq.models.*;
 import com.gis.servelq.repository.CounterRepository;
 import com.gis.servelq.repository.FeedbackRepository;
 import com.gis.servelq.repository.TokenRepository;
+import com.gis.servelq.security.AuthenticatedUser;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -28,10 +30,12 @@ public class FeedbackService {
     private final CounterRepository counterRepository;
     private final TokenRepository tokenRepository;
     private final TokenEventPublisher tokenEventPublisher;
+    private final AuditLogService auditLogService;
+    private final HttpServletRequest request;
 
 
     @Transactional
-    public Feedback createFeedback(Feedback feedback) {
+    public Feedback createFeedback(Feedback feedback, AuthenticatedUser user) {
         Counter counter = counterRepository.findByCode(feedback.getCounterCode())
                 .orElseThrow(() -> new ResourceNotFoundException("Counter not found"));
 
@@ -54,6 +58,19 @@ public class FeedbackService {
                 counter.getId(),
                 Instant.now()
         ));
+
+        // Log feedback submitted
+        auditLogService.log(
+                AuditAction.FEEDBACK_SUBMITTED,
+                "Feedback",
+                saved.getId(),
+                saved.getTokenId(),
+                "Feedback submitted: Rating " + saved.getRating() + " for token " + saved.getTokenId(),
+                user, // May be null for public endpoint
+                counter.getBranchId(),
+                request
+        );
+
         return saved;
     }
 
@@ -62,7 +79,22 @@ public class FeedbackService {
         return feedbackRepository.findAllByOrderByCreatedAtDesc(pageable);
     }
 
-    public void delete(String id) {
+    public void delete(String id, AuthenticatedUser user) {
+        Feedback feedback = feedbackRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Feedback not found"));
+
+        // Log before deletion
+        auditLogService.log(
+                AuditAction.DELETE,
+                "Feedback",
+                feedback.getId(),
+                feedback.getTokenId(),
+                "Feedback deleted: " + feedback.getId(),
+                user,
+                null,
+                request
+        );
+
         feedbackRepository.deleteById(id);
     }
 

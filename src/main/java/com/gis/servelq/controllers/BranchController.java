@@ -3,11 +3,13 @@ package com.gis.servelq.controllers;
 import com.gis.servelq.dto.BranchRequest;
 import com.gis.servelq.dto.BranchResponseDTO;
 import com.gis.servelq.dto.BranchUpdateRequest;
+import com.gis.servelq.security.AuthenticatedUser;
 import com.gis.servelq.services.BranchService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,9 +24,10 @@ public class BranchController {
 
     // Create a new branch
     @PostMapping
-    public ResponseEntity<?> createBranch(@Valid @RequestBody BranchRequest branchRequest) {
+    public ResponseEntity<?> createBranch(@Valid @RequestBody BranchRequest branchRequest,
+                                          @AuthenticationPrincipal AuthenticatedUser user) {
         try {
-            BranchResponseDTO createdBranch = branchService.createBranch(branchRequest);
+            BranchResponseDTO createdBranch = branchService.createBranch(branchRequest, user);
             return ResponseEntity.status(HttpStatus.CREATED).body(createdBranch);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -56,9 +59,11 @@ public class BranchController {
 
     // Update branch
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateBranch(@PathVariable String id, @RequestBody BranchUpdateRequest branchDetails) {
+    public ResponseEntity<?> updateBranch(@PathVariable String id,
+                                          @RequestBody BranchUpdateRequest branchDetails,
+                                          @AuthenticationPrincipal AuthenticatedUser user) {
         try {
-            BranchResponseDTO updatedBranch = branchService.updateBranch(id, branchDetails);
+            BranchResponseDTO updatedBranch = branchService.updateBranch(id, branchDetails, user);
             return ResponseEntity.ok(updatedBranch);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -67,9 +72,10 @@ public class BranchController {
 
     // Delete branch
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteBranch(@PathVariable String id) {
+    public ResponseEntity<?> deleteBranch(@PathVariable String id,
+                                          @AuthenticationPrincipal AuthenticatedUser user) {
         try {
-            branchService.deleteBranch(id);
+            branchService.deleteBranch(id, user);
             return ResponseEntity.ok().body("Branch deleted successfully");
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();

@@ -2,15 +2,16 @@ package com.gis.servelq.controllers;
 
 import com.gis.servelq.dto.FeedbackRequestDto;
 import com.gis.servelq.models.Feedback;
+import com.gis.servelq.security.AuthenticatedUser;
 import com.gis.servelq.services.FeedbackService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -21,8 +22,8 @@ public class FeedbackController {
     private final FeedbackService service;
 
     @PostMapping
-    public Feedback submitFeedback(@RequestBody FeedbackRequestDto dto) {
-
+    public Feedback submitFeedback(@RequestBody FeedbackRequestDto dto,
+                                   @AuthenticationPrincipal AuthenticatedUser user) {
         Feedback f = new Feedback();
         f.setTokenId(dto.getTokenId());
         f.setCounterCode(dto.getCounterCode());
@@ -30,7 +31,7 @@ public class FeedbackController {
         f.setRating(dto.getRating());
         f.setReview(dto.getReview());
 
-        return service.createFeedback(f);
+        return service.createFeedback(f, user);
     }
 
     @GetMapping
@@ -41,8 +42,9 @@ public class FeedbackController {
     }
 
     @DeleteMapping("/{id}")
-    public void deleteFeedback(@PathVariable String id) {
-        service.delete(id);
+    public void deleteFeedback(@PathVariable String id,
+                               @AuthenticationPrincipal AuthenticatedUser user) {
+        service.delete(id, user);
     }
 
     @GetMapping("/summary")

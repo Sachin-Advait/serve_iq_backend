@@ -9,15 +9,13 @@ import com.gis.servelq.dto.TokenTransferRequest;
 import com.gis.servelq.events.TokenEvent;
 import com.gis.servelq.events.TokenEventPublisher;
 import com.gis.servelq.events.TokenEventType;
-import com.gis.servelq.models.Counter;
-import com.gis.servelq.models.CounterStatus;
-import com.gis.servelq.models.Token;
-import com.gis.servelq.models.TokenStatus;
+import com.gis.servelq.models.*;
 import com.gis.servelq.repository.CounterRepository;
 import com.gis.servelq.repository.ServiceRepository;
 import com.gis.servelq.repository.TokenRepository;
 import jakarta.persistence.LockTimeoutException;
 import jakarta.persistence.PessimisticLockException;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +25,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import com.gis.servelq.security.AuthenticatedUser;
 
 @Service
 @RequiredArgsConstructor
@@ -37,6 +38,8 @@ public class AgentService {
     private final ServiceRepository serviceRepository;
     private final CounterService counterService;
     private final TokenEventPublisher tokenEventPublisher;
+    private final AuditLogService auditLogService;
+    private final HttpServletRequest request;
 
     public List<TokenResponseDTO> getUpcomingTokensForCounter(String counterId) {
         return tokenRepository.findUpcomingTokensForCounter(counterId)
@@ -95,9 +98,21 @@ public class AgentService {
                     ));
                 }
             }
+            AgentCallResponseDTO response = AgentCallResponseDTO.fromEntity(nextToken);
 
-            return AgentCallResponseDTO.fromEntity(nextToken);
+            // Log token called
+            auditLogService.log(
+                    AuditAction.TOKEN_CALLED,
+                    "Token",
+                    nextToken.getId(),
+                    nextToken.getToken(),
+                    "Token called to counter: " + counter.getName(),
+                    getCurrentUser(),
+                    nextToken.getBranchId(),
+                    request
+            );
 
+            return response;
         } catch (PessimisticLockException | LockTimeoutException ex) {
             throw new BusinessException(
                     "Token is being acquired by another counter. Please try again."
@@ -190,6 +205,16 @@ public class AgentService {
                 counter.getId(),
                 Instant.now()
         ));
+        auditLogService.log(
+                AuditAction.TOKEN_COMPLETED,
+                "Token",
+                token.getId(),
+                token.getToken(),
+                "Token completed at counter: " + counter.getName(),
+                getCurrentUser(),
+                token.getBranchId(),
+                request
+        );
     }
 
     public List<RecentServiceDTO> getRecentServices(String counterId) {
@@ -290,7 +315,16 @@ public class AgentService {
                     toCounter.getId(),
                     Instant.now()
             ));
-
+            auditLogService.log(
+                    AuditAction.TOKEN_TRANSFERRED,
+                    "Token",
+                    updated.getId(),
+                    updated.getToken(),
+                    "Token transferred from counter " + fromCounter.getName() + " to " + toCounter.getName(),
+                    getCurrentUser(),
+                    updated.getBranchId(),
+                    this.request
+            );
             return updated;
         } else {
             throw new ResourceNotFoundException("Token cannot be transferred from status: " + token.getStatus());
@@ -322,7 +356,16 @@ public class AgentService {
                 counter.getId(),
                 Instant.now()
         ));
-
+        auditLogService.log(
+                AuditAction.TOKEN_HELD,
+                "Token",
+                updated.getId(),
+                updated.getToken(),
+                "Token put on hold",
+                getCurrentUser(),
+                updated.getBranchId(),
+                request
+        );
         return updated;
     }
 
@@ -351,6 +394,16 @@ public class AgentService {
                 counter.getId(),
                 Instant.now()
         ));
+        auditLogService.log(
+                AuditAction.TOKEN_NO_SHOW,
+                "Token",
+                updated.getId(),
+                updated.getToken(),
+                "Customer no-show for token",
+                getCurrentUser(),
+                updated.getBranchId(),
+                request
+        );
 
         return updated;
     }
@@ -367,5 +420,13 @@ public class AgentService {
 
         counterRepository.findById(counterId).orElseThrow(() -> new ResourceNotFoundException("Counter not found"));
         return AgentCallResponseDTO.fromEntity(token);
+    }
+
+    private AuthenticatedUser getCurrentUser() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof AuthenticatedUser) {
+            return (AuthenticatedUser) auth.getPrincipal();
+        }
+        return null;
     }
 }

@@ -9,11 +9,10 @@ import com.gis.servelq.dto.CounterUpdateRequest;
 import com.gis.servelq.events.TokenEvent;
 import com.gis.servelq.events.TokenEventPublisher;
 import com.gis.servelq.events.TokenEventType;
-import com.gis.servelq.models.Counter;
-import com.gis.servelq.models.CounterStatus;
-import com.gis.servelq.models.TokenStatus;
-import com.gis.servelq.models.User;
+import com.gis.servelq.models.*;
 import com.gis.servelq.repository.*;
+import com.gis.servelq.security.AuthenticatedUser;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +32,8 @@ public class CounterService {
     private final UserRepository userRepository;
     private final TokenRepository tokenRepository;
     private final TokenEventPublisher tokenEventPublisher;
+    private final AuditLogService auditLogService;
+    private final HttpServletRequest request;
 
     private static Counter getCounter(CounterRequest request) {
         Counter counter = new Counter();
@@ -76,7 +77,7 @@ public class CounterService {
 
     // Create a new counter
     @Transactional
-    public CounterResponseDTO createCounter(CounterRequest request) {
+    public CounterResponseDTO createCounter(CounterRequest request, AuthenticatedUser currentUser) {
         if (counterRepository.findByCodeAndBranchId(request.getCode(), request.getBranchId()).isPresent()) {
             throw new RuntimeException("Counter with code " + request.getCode() + " already exists in this branch");
         }
@@ -87,11 +88,22 @@ public class CounterService {
         Counter counter = getCounter(request);
         Counter saved = counterRepository.save(counter);
 
-        User user = userRepository.findById(request.getUserId())
+        // Fixed: Renamed 'user' to 'assignedUser' to avoid conflict
+        User assignedUser = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        user.setCounterId(saved.getId());
-        userRepository.save(user);
+        assignedUser.setCounterId(saved.getId());
+        userRepository.save(assignedUser);
 
+        auditLogService.log(
+                AuditAction.COUNTER_CREATED,
+                "Counter",
+                saved.getId(),
+                saved.getName(),
+                "Counter created: " + saved.getName() + " in branch " + saved.getBranchId(),
+                currentUser,
+                saved.getBranchId(),
+                this.request
+        );
         return convertToResponse(saved);
     }
 
@@ -114,39 +126,58 @@ public class CounterService {
     }
 
     // Update counter (now includes status update logic also)
+    // Update counter (now includes status update logic also)
     @Transactional
-    public CounterResponseDTO updateCounter(String counterId, CounterUpdateRequest request) {
+    public CounterResponseDTO updateCounter(String counterId, CounterUpdateRequest counterRequest,
+                                            AuthenticatedUser user) {
 
         Counter counter = counterRepository.findById(counterId)
                 .orElseThrow(() -> new ResourceNotFoundException("Counter not found"));
 
-        if (request.getCode() != null &&
-                !request.getCode().equals(counter.getCode()) &&
-                counterRepository.findByCodeAndBranchId(request.getCode(), counter.getBranchId()).isPresent()) {
+        // Clone the old counter state for audit
+        Counter oldCounter = cloneCounter(counter);
+
+        if (counterRequest.getCode() != null &&
+                !counterRequest.getCode().equals(counter.getCode()) &&
+                counterRepository.findByCodeAndBranchId(counterRequest.getCode(), counter.getBranchId()).isPresent()) {
             throw new BusinessException("Counter code already exists in this branch");
         }
-        if (request.getCode() != null) counter.setCode(request.getCode());
-        if (request.getName() != null) counter.setName(request.getName());
-        if (request.getEnabled() != null) counter.setEnabled(request.getEnabled());
-        if (request.getPaused() != null) counter.setPaused(request.getPaused());
-        if (request.getStatus() != null) counter.setStatus(request.getStatus());
+        if (counterRequest.getCode() != null) counter.setCode(counterRequest.getCode());
+        if (counterRequest.getName() != null) counter.setName(counterRequest.getName());
+        if (counterRequest.getEnabled() != null) counter.setEnabled(counterRequest.getEnabled());
+        if (counterRequest.getPaused() != null) counter.setPaused(counterRequest.getPaused());
+        if (counterRequest.getStatus() != null) counter.setStatus(counterRequest.getStatus());
 
-        if (request.getBranchId() != null && !request.getBranchId().equals(counter.getBranchId())) {
-            branchRepository.findById(request.getBranchId())
+        if (counterRequest.getBranchId() != null && !counterRequest.getBranchId().equals(counter.getBranchId())) {
+            branchRepository.findById(counterRequest.getBranchId())
                     .orElseThrow(() -> new ResourceNotFoundException("Branch not found"));
-            counter.setBranchId(request.getBranchId());
+            counter.setBranchId(counterRequest.getBranchId());
         }
-        if (request.getServiceId() != null) counter.setServiceId(request.getServiceId());
-        if (request.getUserId() != null && !Objects.equals(counter.getUserId(), request.getUserId())) {
-            counter.setUserId(request.getUserId());
+        if (counterRequest.getServiceId() != null) counter.setServiceId(counterRequest.getServiceId());
+        if (counterRequest.getUserId() != null && !Objects.equals(counter.getUserId(), counterRequest.getUserId())) {
+            counter.setUserId(counterRequest.getUserId());
 
-            User user = userRepository.findById(request.getUserId())
+            User assignedUser = userRepository.findById(counterRequest.getUserId())
                     .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-            user.setCounterId(counterId);
-            userRepository.save(user);
+            assignedUser.setCounterId(counterId);
+            userRepository.save(assignedUser);
         }
 
         Counter updated = counterRepository.save(counter);
+
+        auditLogService.logWithChanges(
+                AuditAction.COUNTER_UPDATED,
+                "Counter",
+                updated.getId(),
+                updated.getName(),
+                "Counter updated: " + updated.getName(),
+                oldCounter,
+                updated,
+                user,
+                updated.getBranchId(),
+                this.request  // Fixed: Use this.request to access HttpServletRequest
+        );
+
         tokenEventPublisher.publish(new TokenEvent(
                 TokenEventType.COUNTER_STATUS_CHANGED,
                 updated.getBranchId(),
@@ -161,11 +192,22 @@ public class CounterService {
 
     // Enable/disable counter
     @Transactional
-    public CounterResponseDTO toggleCounter(String counterId, boolean enabled) {
+    public CounterResponseDTO toggleCounter(String counterId, boolean enabled, AuthenticatedUser user) {
         Counter counter = counterRepository.findById(counterId)
                 .orElseThrow(() -> new RuntimeException("Counter not found"));
         counter.setEnabled(enabled);
         Counter saved = counterRepository.save(counter);
+
+        auditLogService.log(
+                AuditAction.COUNTER_STATUS_CHANGED,
+                "Counter",
+                saved.getId(),
+                saved.getName(),
+                "Counter " + (enabled ? "enabled" : "disabled") + ": " + saved.getName(),
+                user,
+                saved.getBranchId(),
+                request
+        );
 
         tokenEventPublisher.publish(new TokenEvent(
                 TokenEventType.COUNTER_STATUS_CHANGED,
@@ -175,16 +217,29 @@ public class CounterService {
                 counterId,
                 Instant.now()
         ));
+
         return convertToResponse(saved);
     }
 
     // Pause/resume counter
     @Transactional
-    public CounterResponseDTO togglePauseCounter(String counterId, boolean paused) {
+    public CounterResponseDTO togglePauseCounter(String counterId, boolean paused, AuthenticatedUser user) {
         Counter counter = counterRepository.findById(counterId)
                 .orElseThrow(() -> new RuntimeException("Counter not found"));
         counter.setPaused(paused);
         Counter saved = counterRepository.save(counter);
+
+        // Fixed: Added audit logging
+        auditLogService.log(
+                AuditAction.COUNTER_STATUS_CHANGED,
+                "Counter",
+                saved.getId(),
+                saved.getName(),
+                "Counter " + (paused ? "paused" : "resumed") + ": " + saved.getName(),
+                user,
+                saved.getBranchId(),
+                request
+        );
 
         tokenEventPublisher.publish(new TokenEvent(
                 TokenEventType.COUNTER_STATUS_CHANGED,
@@ -199,12 +254,24 @@ public class CounterService {
 
     // Delete counter
     @Transactional
-    public void deleteCounter(String counterId) {
+    public void deleteCounter(String counterId, AuthenticatedUser user) {
         Counter counter = counterRepository.findById(counterId)
                 .orElseThrow(() -> new RuntimeException("Counter not found"));
 
+        // Fixed: Added audit logging before deletion
+        auditLogService.log(
+                AuditAction.COUNTER_DELETED,
+                "Counter",
+                counter.getId(),
+                counter.getName(),
+                "Counter deleted: " + counter.getName(),
+                user,
+                counter.getBranchId(),
+                request
+        );
+
         if (counter.getUserId() != null && !counter.getUserId().isBlank()) {
-            userRepository.findById(counter.getUserId()).ifPresent(user -> user.setCounterId(null));
+            userRepository.findById(counter.getUserId()).ifPresent(u -> u.setCounterId(null));
         }
         counterRepository.deleteById(counterId);
     }
@@ -243,5 +310,20 @@ public class CounterService {
         }
 
         return response;
+    }
+
+    // Helper method to clone counter for audit comparison
+    private Counter cloneCounter(Counter original) {
+        Counter clone = new Counter();
+        clone.setId(original.getId());
+        clone.setCode(original.getCode());
+        clone.setName(original.getName());
+        clone.setEnabled(original.getEnabled());
+        clone.setPaused(original.getPaused());
+        clone.setBranchId(original.getBranchId());
+        clone.setUserId(original.getUserId());
+        clone.setServiceId(original.getServiceId());
+        clone.setStatus(original.getStatus());
+        return clone;
     }
 }

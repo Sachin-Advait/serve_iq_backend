@@ -4,13 +4,16 @@ import com.gis.servelq.dto.LowScoringUserDTO;
 import com.gis.servelq.dto.ResponseReceivedDTO;
 import com.gis.servelq.dto.SurveySubmissionRequest;
 import com.gis.servelq.dto.UserResponseDTO;
+import com.gis.servelq.models.AuditAction;
 import com.gis.servelq.models.QuizSurveyModel;
 import com.gis.servelq.models.ResponseModel;
 import com.gis.servelq.models.User;
 import com.gis.servelq.repository.QuizSurveyRepository;
 import com.gis.servelq.repository.ResponseRepo;
 import com.gis.servelq.repository.UserRepository;
+import com.gis.servelq.security.AuthenticatedUser;
 import com.gis.servelq.utils.ScoringUtil;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -26,14 +29,17 @@ public class ResponseService {
     private final QuizSurveyRepository quizSurveyRepo;
     private final ResponseRepo responseRepo;
     private final UserRepository userRepository;
+    private final AuditLogService auditLogService;
+    private final HttpServletRequest request;
 
     /* =====================================================
        SUBMIT RESPONSE
        ===================================================== */
-    public ResponseModel storeResponse(UUID quizSurveyId, SurveySubmissionRequest request) {
+    public ResponseModel storeResponse(UUID quizSurveyId, SurveySubmissionRequest submissionRequest,
+                                       AuthenticatedUser currentUser) {
 
         User user =
-                userRepository.findById(request.getUserId())
+                userRepository.findById(submissionRequest.getUserId())
                         .orElseThrow(() -> new RuntimeException("Invalid userId"));
 
         QuizSurveyModel quiz =
@@ -54,23 +60,28 @@ public class ResponseService {
             throw new IllegalStateException("Survey already submitted");
         }
 
-        // Quiz: respect max retake. This is a per-user limit, so it is checked
-        // against this user's own attempt count.
-        //
-        // There used to be a "quiz.setMaxRetake(getMaxRetake() - 1)" plus a save
-        // right after this check. maxRetake is a single column on the shared
-        // quiz row, so every submission by anyone decremented the same counter:
-        // with maxRetake=3 and 100 targeted staff, the first 3 submissions in
-        // total took it to 0 and locked out all 97 people who had not started.
-        // It also rewrote both large jsonb columns on every submit just to
-        // change one integer. The per-user check below is the whole rule.
+        // Quiz: respect max retake
         if ("quiz".equalsIgnoreCase(quiz.getType())
                 && quiz.getMaxRetake() != null
                 && existing.size() >= quiz.getMaxRetake()) {
             throw new IllegalStateException("Max quiz attempts exceeded");
         }
 
-        return handleQuizResponse(quiz, request, user);
+        ResponseModel response = handleQuizResponse(quiz, submissionRequest, user);
+
+        // Log survey/quiz submitted
+        auditLogService.log(
+                AuditAction.SURVEY_SUBMITTED,
+                "QuizSurvey",
+                quizSurveyId.toString(),
+                quiz.getTitle(),
+                (currentUser != null ? currentUser.email() : user.getName()) + " submitted " + quiz.getType() + ": " + quiz.getTitle(),
+                currentUser,
+                null,
+                this.request
+        );
+
+        return response;
     }
 
     /* =====================================================
@@ -194,13 +205,6 @@ public class ResponseService {
 
     /**
      * Users whose average score over the window is below the threshold.
-     *
-     * This used to be responseRepo.findAll() - every response row for every quiz
-     * ever recorded, each one deserialising its jsonb answers blob that this
-     * report never looks at - filtered by date afterwards in Java. Now the date
-     * filter and the null guards run in the query, and only userId/score/maxScore
-     * come back. The averaging stays in Java so the arithmetic is unchanged: it
-     * is the mean of per-attempt percentages, not total score over total max.
      */
     public List<LowScoringUserDTO> getLowScoringUsers(int weeks, double thresholdPercent) {
 
@@ -212,8 +216,6 @@ public class ResponseService {
             double score = ((Number) row[1]).doubleValue();
             double maxScore = ((Number) row[2]).doubleValue();
             if (maxScore <= 0) {
-                // Would have produced Infinity and silently dropped out of the
-                // comparison below; skip it explicitly instead.
                 continue;
             }
             byUser.computeIfAbsent(userId, k -> new ArrayList<>()).add(new double[]{score, maxScore});

@@ -3,8 +3,11 @@ package com.gis.servelq.services;
 import com.gis.servelq.dto.BranchRequest;
 import com.gis.servelq.dto.BranchResponseDTO;
 import com.gis.servelq.dto.BranchUpdateRequest;
+import com.gis.servelq.models.AuditAction;
 import com.gis.servelq.models.Branch;
 import com.gis.servelq.repository.BranchRepository;
+import com.gis.servelq.security.AuthenticatedUser;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +20,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class BranchService {
 
+    private final AuditLogService auditLogService;
+    private final HttpServletRequest request;
     private final BranchRepository branchRepository;
 
     // Convert Entity to Response DTO
@@ -42,7 +47,7 @@ public class BranchService {
 
     // Create a new branch
     @Transactional
-    public BranchResponseDTO createBranch(BranchRequest branchRequest) {
+    public BranchResponseDTO createBranch(BranchRequest branchRequest, AuthenticatedUser user) {
         // Check if branch code already exists
         if (branchRepository.findByCode(branchRequest.getCode()).isPresent()) {
             throw new RuntimeException("Branch with code " + branchRequest.getCode() + " already exists");
@@ -56,6 +61,16 @@ public class BranchService {
         }
 
         Branch savedBranch = branchRepository.save(branch);
+        auditLogService.log(
+                AuditAction.BRANCH_CREATED,
+                "Branch",
+                savedBranch.getId(),
+                savedBranch.getName(),
+                "Branch created: " + savedBranch.getName() + " (" + savedBranch.getCode() + ")",
+                user,
+                savedBranch.getId(),
+                request
+        );
         return convertToResponse(savedBranch);
     }
 
@@ -80,7 +95,7 @@ public class BranchService {
     }
 
     @Transactional
-    public BranchResponseDTO updateBranch(String id, BranchUpdateRequest branchDetails) {
+    public BranchResponseDTO updateBranch(String id, BranchUpdateRequest branchDetails , AuthenticatedUser user) {
         Branch existingBranch = branchRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Branch not found with id: " + id));
 
@@ -94,15 +109,37 @@ public class BranchService {
         if (branchDetails.getEnabled() != null) existingBranch.setEnabled(branchDetails.getEnabled());
 
         Branch updatedBranch = branchRepository.save(existingBranch);
+
+        auditLogService.logWithChanges(
+                AuditAction.BRANCH_UPDATED,
+                "Branch",
+                updatedBranch.getId(),
+                updatedBranch.getName(),
+                "Branch updated: " + updatedBranch.getName(),
+                existingBranch,
+                updatedBranch,
+                user,
+                updatedBranch.getId(),
+                request
+        );
         return convertToResponse(updatedBranch);
     }
 
     // Delete branch
     @Transactional
-    public void deleteBranch(String id) {
-        if (!branchRepository.existsById(id)) {
-            throw new RuntimeException("Branch not found with id: " + id);
-        }
+    public void deleteBranch(String id, AuthenticatedUser user) {
+        Branch branch = branchRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Branch not found with id: " + id));
+        auditLogService.log(
+                AuditAction.BRANCH_DELETED,
+                "Branch",
+                branch.getId(),
+                branch.getName(),
+                "Branch deleted: " + branch.getName(),
+                user,
+                branch.getId(),
+                request
+        );
         branchRepository.deleteById(id);
     }
 }

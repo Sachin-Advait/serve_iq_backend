@@ -76,6 +76,6 @@ CREATE INDEX IF NOT EXISTS ix_tokens_waiting_order
 CREATE INDEX IF NOT EXISTS ix_counters_branch ON counters (branch_id);
 CREATE INDEX IF NOT EXISTS ix_counters_code ON counters (code);
 CREATE INDEX IF NOT EXISTS ix_services_branch ON services (branch_id);
-CREATE INDEX IF NOT EXISTS ix_feedback_counter ON feedback (counter_id);
+CREATE INDEX IF NOT EXISTS ix_feedback_counter_code ON feedback (counter_code);
 CREATE INDEX IF NOT EXISTS ix_feedback_created ON feedback (created_at);
 CREATE INDEX IF NOT EXISTS ix_responses_submitted_at ON responses (submitted_at);

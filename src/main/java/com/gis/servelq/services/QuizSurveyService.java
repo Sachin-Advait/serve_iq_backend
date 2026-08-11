@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -94,6 +95,7 @@ public class QuizSurveyService {
     /* -------------------------------------------------
        FIND WITH FILTERS (JPA ONLY)
     ------------------------------------------------- */
+    @Transactional(readOnly = true)
     public Page<QuizSurveyModel> findWithFilters(
             String userId,
             String status,
@@ -137,6 +139,7 @@ public class QuizSurveyService {
     /* -------------------------------------------------
        MAIN LIST API
     ------------------------------------------------- */
+    @Transactional(readOnly = true)
     public PageResponseDTO<QuizzesSurveysDTO> getQuizzesSurveys(
             String userId,
             String status,
@@ -227,6 +230,7 @@ public class QuizSurveyService {
         );
     }
 
+    @Transactional(readOnly = true)
     public List<QuizzesSurveysDTO> getQuizzesByTargetUser(String userId) {
         userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("Invalid user id"));
         return quizSurveyRepo.findByTargetedUser(userId).stream()

@@ -1,9 +1,12 @@
 package com.gis.servelq.services;
 
+import com.gis.servelq.models.AuditAction;
 import com.twilio.Twilio;
 import com.twilio.rest.api.v2010.account.Message;
 import com.twilio.type.PhoneNumber;
 import jakarta.annotation.PostConstruct;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
@@ -11,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 @Log4j2
 @Service
+@RequiredArgsConstructor
 public class WhatsAppService {
 
     @Value("${twilio.sid:}")
@@ -23,6 +27,9 @@ public class WhatsAppService {
     private String from;
 
     private boolean enabled;
+
+    private final AuditLogService auditLogService;
+    private final HttpServletRequest request;
 
     @PostConstruct
     public void init() {
@@ -69,6 +76,19 @@ public class WhatsAppService {
             ).create();
 
             log.info("WhatsApp message sent, SID: {}", msg.getSid());
+
+            // Log WhatsApp sent
+            auditLogService.log(
+                    AuditAction.WHATSAPP_SENT,
+                    "WhatsApp",
+                    msg.getSid(),
+                    to,
+                    "WhatsApp message sent to: " + to,
+                    null,
+                    null,
+                    request
+            );
+
             return msg.getSid();
 
         } catch (Exception e) {

@@ -3,12 +3,15 @@ package com.gis.servelq.services;
 import com.gis.servelq.dto.TrainingEngagementDTO;
 import com.gis.servelq.dto.TrainingUploadAssignDTO;
 import com.gis.servelq.dto.UserTrainingDTO;
+import com.gis.servelq.models.AuditAction;
 import com.gis.servelq.models.TrainingAssignment;
 import com.gis.servelq.models.TrainingMaterial;
 import com.gis.servelq.models.User;
 import com.gis.servelq.repository.TrainingAssignmentRepository;
 import com.gis.servelq.repository.TrainingMaterialRepository;
 import com.gis.servelq.repository.UserRepository;
+import com.gis.servelq.security.AuthenticatedUser;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,22 +30,24 @@ public class TrainingService {
     private final TrainingAssignmentRepository assignmentRepo;
     private final UserRepository userRepo;
     private final FCMService fcmService;
+    private final AuditLogService auditLogService;
+    private final HttpServletRequest request;
 
     /* ======================================================
        ADMIN
        ====================================================== */
 
-    public TrainingMaterial uploadAndAssign(TrainingUploadAssignDTO request) {
+    public TrainingMaterial uploadAndAssign(TrainingUploadAssignDTO trainingRequest, AuthenticatedUser admin) {
 
-        // ✅ BUILD material from FLAT DTO
+        // BUILD material from FLAT DTO
         TrainingMaterial material = TrainingMaterial.builder()
-                .title(request.getTitle())
-                .type(request.getType())
-                .duration(request.getDuration())
-                .cloudinaryPublicId(request.getCloudinaryPublicId())
-                .cloudinaryUrl(request.getCloudinaryUrl())
-                .cloudinaryResourceType(request.getCloudinaryResourceType())
-                .cloudinaryFormat(request.getCloudinaryFormat())
+                .title(trainingRequest.getTitle())
+                .type(trainingRequest.getType())
+                .duration(trainingRequest.getDuration())
+                .cloudinaryPublicId(trainingRequest.getCloudinaryPublicId())
+                .cloudinaryUrl(trainingRequest.getCloudinaryUrl())
+                .cloudinaryResourceType(trainingRequest.getCloudinaryResourceType())
+                .cloudinaryFormat(trainingRequest.getCloudinaryFormat())
                 .assignedTo(0)
                 .completionRate(0)
                 .views(0)
@@ -52,9 +57,21 @@ public class TrainingService {
 
         TrainingMaterial savedMaterial = materialRepo.save(material);
 
-        if (request.getUserIds() != null && !request.getUserIds().isEmpty()) {
+        // Log training created
+        auditLogService.log(
+                AuditAction.TRAINING_CREATED,
+                "Training",
+                savedMaterial.getId().toString(),
+                savedMaterial.getTitle(),
+                "Training material uploaded: " + savedMaterial.getTitle(),
+                admin,
+                null,
+                this.request
+        );
 
-            for (String userId : request.getUserIds()) {
+        if (trainingRequest.getUserIds() != null && !trainingRequest.getUserIds().isEmpty()) {
+
+            for (String userId : trainingRequest.getUserIds()) {
 
                 boolean alreadyAssigned =
                         assignmentRepo.findByUserIdAndTrainingId(userId, savedMaterial.getId())
@@ -67,11 +84,23 @@ public class TrainingService {
                         .trainingId(savedMaterial.getId())
                         .progress(0)
                         .status("not-started")
-                        .dueDate(request.getDueDate())
+                        .dueDate(trainingRequest.getDueDate())
                         .assignedAt(Instant.now())
                         .build();
 
                 assignmentRepo.save(assignment);
+
+                // Log training assigned
+                auditLogService.log(
+                        AuditAction.TRAINING_ASSIGNED,
+                        "Training",
+                        savedMaterial.getId().toString(),
+                        savedMaterial.getTitle(),
+                        "Training assigned to user: " + userId,
+                        admin,
+                        null,
+                        this.request
+                );
             }
 
             long totalAssigned = assignmentRepo.countByTrainingId(savedMaterial.getId());
@@ -86,9 +115,7 @@ public class TrainingService {
         return materialRepo.findAllByActiveTrue();
     }
 
-
-
-    public void assignTraining(Long trainingId, List<String> userIds, Instant dueDate) {
+    public void assignTraining(Long trainingId, List<String> userIds, Instant dueDate, AuthenticatedUser admin) {
 
         TrainingMaterial material = materialRepo.findByIdAndActiveTrue(trainingId)
                 .orElseThrow(() -> new RuntimeException("Training not found"));
@@ -113,6 +140,18 @@ public class TrainingService {
 
             assignmentRepo.save(assignment);
             newlyAssigned.add(userId);
+
+            // Log training assigned
+            auditLogService.log(
+                    AuditAction.TRAINING_ASSIGNED,
+                    "Training",
+                    trainingId.toString(),
+                    material.getTitle(),
+                    "Training assigned to user: " + userId,
+                    admin,
+                    null,
+                    request
+            );
         }
 
         material.setAssignedTo((int) assignmentRepo.countByTrainingId(trainingId));
@@ -160,7 +199,8 @@ public class TrainingService {
                 .toList();
     }
 
-    public TrainingAssignment updateProgress(String userId, Long trainingId, int progress) {
+    public TrainingAssignment updateProgress(String userId, Long trainingId, int progress,
+                                             AuthenticatedUser currentUser) {
 
         TrainingAssignment assignment =
                 assignmentRepo.findByUserIdAndTrainingId(userId, trainingId)
@@ -187,6 +227,18 @@ public class TrainingService {
                 material.setCompletionRate(rate);
                 materialRepo.save(material);
             });
+
+            // Log training completed
+            auditLogService.log(
+                    AuditAction.TRAINING_COMPLETED,
+                    "Training",
+                    trainingId.toString(),
+                    null,
+                    "Training completed by user: " + userId,
+                    currentUser,
+                    null,
+                    request
+            );
         }
 
         return assignment;
@@ -224,28 +276,41 @@ public class TrainingService {
        UPDATE / DELETE
        ====================================================== */
 
-    public TrainingMaterial updateTraining(Long trainingId, TrainingUploadAssignDTO request) {
+    public TrainingMaterial updateTraining(Long trainingId, TrainingUploadAssignDTO updateRequest,
+                                           AuthenticatedUser admin) {
 
         TrainingMaterial material =
                 materialRepo.findByIdAndActiveTrue(trainingId)
                         .orElseThrow(() -> new RuntimeException("Training not found"));
 
-        if (request.getTitle() != null) material.setTitle(request.getTitle());
-        if (request.getType() != null) material.setType(request.getType());
-        if (request.getDuration() != null) material.setDuration(request.getDuration());
+        if (updateRequest.getTitle() != null) material.setTitle(updateRequest.getTitle());
+        if (updateRequest.getType() != null) material.setType(updateRequest.getType());
+        if (updateRequest.getDuration() != null) material.setDuration(updateRequest.getDuration());
 
-        if (request.getCloudinaryUrl() != null) {
-            material.setCloudinaryUrl(request.getCloudinaryUrl());
-            material.setCloudinaryPublicId(request.getCloudinaryPublicId());
-            material.setCloudinaryResourceType(request.getCloudinaryResourceType());
-            material.setCloudinaryFormat(request.getCloudinaryFormat());
+        if (updateRequest.getCloudinaryUrl() != null) {
+            material.setCloudinaryUrl(updateRequest.getCloudinaryUrl());
+            material.setCloudinaryPublicId(updateRequest.getCloudinaryPublicId());
+            material.setCloudinaryResourceType(updateRequest.getCloudinaryResourceType());
+            material.setCloudinaryFormat(updateRequest.getCloudinaryFormat());
         }
 
         materialRepo.save(material);
 
+        // Log training updated
+        auditLogService.log(
+                AuditAction.TRAINING_UPDATED,
+                "Training",
+                material.getId().toString(),
+                material.getTitle(),
+                "Training updated: " + material.getTitle(),
+                admin,
+                null,
+                request
+        );
+
         /* ===== Assignment sync ===== */
 
-        List<String> newUserIds = request.getUserIds() != null ? request.getUserIds() : List.of();
+        List<String> newUserIds = updateRequest.getUserIds() != null ? updateRequest.getUserIds() : List.of();
         List<TrainingAssignment> existing = assignmentRepo.findByTrainingId(trainingId);
 
         List<String> existingUserIds =
@@ -261,19 +326,31 @@ public class TrainingService {
                     .trainingId(trainingId)
                     .progress(0)
                     .status("not-started")
-                    .dueDate(request.getDueDate())
+                    .dueDate(updateRequest.getDueDate())
                     .assignedAt(Instant.now())
                     .build();
 
             assignmentRepo.save(assignment);
             newlyAssigned.add(userId);
+
+            // Log training assigned
+            auditLogService.log(
+                    AuditAction.TRAINING_ASSIGNED,
+                    "Training",
+                    trainingId.toString(),
+                    material.getTitle(),
+                    "Training assigned to user: " + userId,
+                    admin,
+                    null,
+                    request
+            );
         }
 
         for (TrainingAssignment a : existing) {
             if (!newUserIds.contains(a.getUserId())) {
                 assignmentRepo.delete(a);
             } else {
-                a.setDueDate(request.getDueDate());
+                a.setDueDate(updateRequest.getDueDate());
                 assignmentRepo.save(a);
             }
         }
@@ -288,11 +365,23 @@ public class TrainingService {
         return material;
     }
 
-    public void deleteTraining(Long trainingId) {
+    public void deleteTraining(Long trainingId, AuthenticatedUser admin) {
 
         TrainingMaterial material =
                 materialRepo.findByIdAndActiveTrue(trainingId)
                         .orElseThrow(() -> new RuntimeException("Training not found"));
+
+        // Log before deletion
+        auditLogService.log(
+                AuditAction.TRAINING_DELETED,
+                "Training",
+                material.getId().toString(),
+                material.getTitle(),
+                "Training deleted: " + material.getTitle(),
+                admin,
+                null,
+                request
+        );
 
         material.setActive(false);
         material.setDeletedAt(Instant.now());
