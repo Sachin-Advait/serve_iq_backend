@@ -17,7 +17,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/serveiq/api/admin/audit-logs")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
 public class AuditLogController {
 
     private final AuditLogService auditLogService;

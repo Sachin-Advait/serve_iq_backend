@@ -1,9 +1,6 @@
 package com.gis.servelq.controllers;
 
-import com.gis.servelq.dto.ChangePasswordRequest;
-import com.gis.servelq.dto.ChangeRoleRequest;
-import com.gis.servelq.dto.UpdateFCMTokenRequest;
-import com.gis.servelq.dto.UserResponseDTO;
+import com.gis.servelq.dto.*;
 import com.gis.servelq.models.User;
 import com.gis.servelq.models.UserRole;
 import com.gis.servelq.security.AuthenticatedUser;
@@ -15,6 +12,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -47,11 +45,20 @@ public class UserController {
     }
 
     @PutMapping("/{id}/role")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
     public ResponseEntity<UserResponseDTO> changeRole(@PathVariable String id,
                                                       @Valid @RequestBody ChangeRoleRequest request,
                                                       @AuthenticationPrincipal AuthenticatedUser admin) {
         return ResponseEntity.ok(new UserResponseDTO(userService.changeRole(id, request.getRole(), admin)));
+    }
+
+    @PostMapping("/{id}/reset-password")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> resetUserPassword(@PathVariable String id,
+                                                  @Valid @RequestBody ResetPasswordRequest request,
+                                                  @AuthenticationPrincipal AuthenticatedUser admin) {
+        userService.resetPassword(id, request.getNewPassword(), admin);
+        return ResponseEntity.noContent().build();
     }
 
     /**
@@ -78,6 +85,13 @@ public class UserController {
         User updatedUser = userService.updateFcmToken(id, req.getFcmToken());
         return ResponseEntity.ok(new UserResponseDTO(updatedUser));
     }
+    @GetMapping("/roles")
+    public ResponseEntity<List<String>> getAllRoles() {
+        List<String> roles = Arrays.stream(UserRole.values())
+                .map(Enum::name)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(roles);
+    }
 
     @GetMapping("/role/{role}")
     public ResponseEntity<List<UserResponseDTO>> getUsersByRole(@PathVariable UserRole role) {
@@ -86,4 +100,6 @@ public class UserController {
                 .collect(Collectors.toList());
         return ResponseEntity.ok(usersDto);
     }
+
+
 }

@@ -64,8 +64,8 @@ public class SecurityConfig {
                         // be open and honoured the role from the body, so anyone
                         // could POST {"role":"ADMIN"} and become one.
                         .requestMatchers("/serveiq/api/auth/register").hasRole("ADMIN")
-                        .requestMatchers("/serveiq/api/users/**").hasRole("ADMIN")
-                        .requestMatchers("/api/admin/**", "/serveiq/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/serveiq/api/users/**").hasAnyRole("ADMIN","MANAGER")
+                        .requestMatchers("/api/admin/**", "/serveiq/api/admin/**").hasAnyRole("ADMIN","MANAGER")
                         .requestMatchers("/serveiq/api/reports/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/serveiq/api/branches/**").hasAnyRole("ADMIN", "MANAGER")
 

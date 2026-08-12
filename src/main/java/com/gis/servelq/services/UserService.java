@@ -195,4 +195,26 @@ public class UserService {
         clone.setFcmToken(original.getFcmToken());
         return clone;
     }
+
+    public void resetPassword(String id, String newPassword, AuthenticatedUser admin) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + id));
+
+        if (newPassword == null || newPassword.length() < 8) {
+            throw new BusinessException("New password must be at least 8 characters");
+        }
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        auditLogService.log(
+                AuditAction.PASSWORD_CHANGED,
+                "User",
+                id,
+                user.getName(),
+                "Password reset by admin: " + admin.email() + " for user: " + user.getName(),
+                admin,
+                user.getBranchId(),
+                request
+        );
+    }
 }
