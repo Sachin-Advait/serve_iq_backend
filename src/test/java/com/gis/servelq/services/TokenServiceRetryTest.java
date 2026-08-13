@@ -8,6 +8,7 @@ import com.gis.servelq.events.TokenEventType;
 import com.gis.servelq.models.Token;
 import com.gis.servelq.models.TokenStatus;
 import com.gis.servelq.repository.TokenRepository;
+import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,6 +23,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 /**
@@ -44,13 +46,20 @@ class TokenServiceRetryTest {
     @Mock private TokenIssuer tokenIssuer;
     @Mock private WhatsAppService whatsAppService;
     @Mock private TokenEventPublisher tokenEventPublisher;
+    @Mock private AuditLogService auditLogService;
+    @Mock private HttpServletRequest request;
 
     private TokenService tokenService;
 
     @BeforeEach
     void setUp() {
         tokenService = new TokenService(tokenRepository, tokenIssuer, whatsAppService,
-                tokenEventPublisher);
+                tokenEventPublisher, auditLogService, request);
+
+        // Mock audit log service to do nothing (it's @Async)
+        doNothing().when(auditLogService).log(
+                any(), any(), any(), any(), any(), any(), any(), any()
+        );
     }
 
     private TokenRequest request(boolean greenToken) {
