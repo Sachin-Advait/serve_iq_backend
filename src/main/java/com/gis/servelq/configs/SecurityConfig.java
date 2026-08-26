@@ -53,13 +53,19 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
                         .requestMatchers("/serveiq/ws/**").permitAll()
 
+                        // Public: TV content streaming (HLS + direct stream + images)
+                        .requestMatchers(HttpMethod.GET, "/serveiq/api/tv-content/stream/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/serveiq/api/tv-content/hls/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/images/**").permitAll()
+
                         // Walk-up kiosk: a visitor takes a ticket without an
                         // account and rates the service afterwards. The lobby TV
                         // also has no login.
                         .requestMatchers(HttpMethod.POST, "/serveiq/api/tokens/generate").permitAll()
                         .requestMatchers(HttpMethod.POST, "/serveiq/api/feedback").permitAll()
                         .requestMatchers(HttpMethod.GET, "/serveiq/api/tv-display/**").permitAll()
-
+                        .requestMatchers(HttpMethod.GET, "/serveiq/api/news/breaking-news").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/serveiq/api/news/images/**").permitAll()
                         // Creating accounts is an admin job. Registration used to
                         // be open and honoured the role from the body, so anyone
                         // could POST {"role":"ADMIN"} and become one.
@@ -69,16 +75,15 @@ public class SecurityConfig {
                         .requestMatchers("/serveiq/api/reports/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/serveiq/api/branches/**").hasAnyRole("ADMIN", "MANAGER")
 
-
                         // Outbound WhatsApp was wide open, so anyone could push
                         // messages through the Twilio account at our cost.
                         .requestMatchers("/serveiq/api/whatsapp/**").hasRole("ADMIN")
 
                         // Serving customers
                         .requestMatchers("/serveiq/api/agent/**")
-                            .hasAnyRole("ADMIN", "MANAGER", "USER", "RECEPTIONIST")
+                        .hasAnyRole("ADMIN", "MANAGER", "USER", "RECEPTIONIST")
                         .requestMatchers("/serveiq/api/counters/**")
-                            .hasAnyRole("ADMIN", "MANAGER", "USER", "RECEPTIONIST", "DISPLAY")
+                        .hasAnyRole("ADMIN", "MANAGER", "USER", "RECEPTIONIST", "DISPLAY")
 
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

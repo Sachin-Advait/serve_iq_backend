@@ -10,6 +10,7 @@ import com.gis.servelq.models.UserRole;
 import com.gis.servelq.repository.UserRepository;
 import com.gis.servelq.security.AuthenticatedUser;
 import com.gis.servelq.security.JwtService;
+import com.gis.servelq.services.AdAuthService;
 import com.gis.servelq.services.AuditLogService;
 import com.gis.servelq.services.UserService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,8 +25,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Optional;
-
 @RestController
 @RequestMapping("/serveiq/api/auth")
 @RequiredArgsConstructor
@@ -37,6 +36,7 @@ public class AuthController {
     private final JwtService jwtService;
     private final AuditLogService auditLogService;
     private final HttpServletRequest request;
+    private final AdAuthService adAuthService;
 
     /** Admin only - see SecurityConfig. */
     @PostMapping("/register")
@@ -47,14 +47,11 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponseDTO> login(@Valid @RequestBody LoginRequest dto) {
-        Optional<User> found = userService.findByEmail(dto.getEmail());
 
-        // Same response for "no such account" and "wrong password". These used
-        // to throw different messages, which made login an account enumeration
-        // endpoint.
-        if (found.isEmpty()
-                || !passwordEncoder.matches(dto.getPassword(), found.get().getPassword())) {
+        // Try AD first, then PostgreSQL fallback
+        AdAuthService.AuthResult authResult = adAuthService.authenticate(dto.getEmail(), dto.getPassword());
 
+        if (!authResult.isSuccess()) {
             // Log failed login attempt
             auditLogService.log(
                     AuditAction.LOGIN_FAILED,
@@ -66,11 +63,12 @@ public class AuthController {
                     null,
                     request
             );
-
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        User user = found.get();
+        User user = authResult.getUser();
+
+        // Update FCM token if provided
         if (dto.getFcmToken() != null && user.getRole() != UserRole.ADMIN) {
             user.setFcmToken(dto.getFcmToken());
             userRepository.save(user);
@@ -90,8 +88,8 @@ public class AuthController {
         );
 
         return ResponseEntity.ok(new LoginResponseDTO(
-                jwtService.generateToken(user),
-                jwtService.getExpirationMinutes() * 60,
+                authResult.getToken(),
+                authResult.getExpiresIn(),
                 new UserResponseDTO(user)));
     }
 }

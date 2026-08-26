@@ -41,6 +41,9 @@ public class User {
     @Column(name = "fcm_token")
     private String fcmToken = null;
 
+    @Column(name = "is_active")
+    private Boolean active = true;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

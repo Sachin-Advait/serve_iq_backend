@@ -1,16 +1,24 @@
 package com.gis.servelq.controllers;
 
+import com.gis.servelq.dto.TvContentResponseDTO;
 import com.gis.servelq.models.TvContent;
 import com.gis.servelq.services.TvContentService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @RestController
 @RequestMapping("/serveiq/api/tv-content")
 @RequiredArgsConstructor
@@ -18,10 +26,24 @@ public class TvContentController {
 
     private final TvContentService service;
 
+    // ==================== QUERY ENDPOINTS ====================
+
     @GetMapping("/{branchId}")
-    public List<TvContent> getContent(@PathVariable String branchId) {
+    public List<TvContentResponseDTO> getContent(@PathVariable String branchId) {
         return service.getContentByBranch(branchId);
     }
+
+    @GetMapping("/archived/{branchId}")
+    public ResponseEntity<List<TvContentResponseDTO>> getArchivedContent(@PathVariable String branchId) {
+        return ResponseEntity.ok(service.getArchivedContent(branchId));
+    }
+
+    @GetMapping("/active/{branchId}")
+    public ResponseEntity<List<TvContentResponseDTO>> getActiveContent(@PathVariable String branchId) {
+        return ResponseEntity.ok(service.getActiveContent(branchId));
+    }
+
+    // ==================== URL ENDPOINTS ====================
 
     @PostMapping("/url")
     public TvContent addUrl(@RequestBody Map<String, String> req) {
@@ -33,37 +55,155 @@ public class TvContentController {
         service.delete(id);
     }
 
-    @PostMapping("/video")
-    public TvContent addVideo(@RequestBody Map<String, String> req) {
-        // only store video NAME — no file upload
-        return service.addVideo(req.get("branchId"), req.get("name"));
-    }
-
     @PatchMapping("/activateVideo")
     public TvContent activate(@RequestBody Map<String, String> req) {
         return service.activateVideo(req.get("branchId"), req.get("id"));
     }
 
+    // ==================== ARCHIVE/UNARCHIVE ====================
+
+    @PatchMapping("/{id}/archive")
+    public ResponseEntity<TvContent> archiveContent(@PathVariable String id) {
+        return ResponseEntity.ok(service.archiveContent(id));
+    }
+
+    @PatchMapping("/{id}/unarchive")
+    public ResponseEntity<TvContent> unarchiveContent(@PathVariable String id) {
+        return ResponseEntity.ok(service.unarchiveContent(id));
+    }
+
+    // ==================== CHUNKED VIDEO UPLOAD ====================
+
+    @PostMapping("/video/upload/init")
+    public ResponseEntity<TvContent> initiateVideoUpload(
+            @RequestParam String branchId,
+            @RequestParam String fileName,
+            @RequestParam String contentType,
+            @RequestParam Long totalSize) {
+        return ResponseEntity.ok(service.initiateVideoUpload(branchId, fileName, contentType, totalSize));
+    }
+
+    @PostMapping("/video/upload/{contentId}/chunk/{chunkNumber}")
+    public ResponseEntity<TvContent> uploadVideoChunk(
+            @PathVariable String contentId,
+            @PathVariable Integer chunkNumber,
+            @RequestParam String fileName,
+            @RequestParam("chunk") MultipartFile chunk) {
+        return ResponseEntity.ok(service.uploadVideoChunk(contentId, fileName, chunkNumber, chunk));
+    }
+
+    @PostMapping("/video/upload/{contentId}/complete")
+    public ResponseEntity<TvContent> completeVideoUpload(
+            @PathVariable String contentId,
+            @RequestParam String fileName,
+            @RequestParam Integer totalChunks) {
+        return ResponseEntity.ok(service.completeVideoUpload(contentId, fileName, totalChunks));
+    }
+
+    @DeleteMapping("/video/upload/{contentId}/cancel")
+    public ResponseEntity<Void> cancelVideoUpload(
+            @PathVariable String contentId,
+            @RequestParam String fileName) {
+        service.cancelVideoUpload(contentId, fileName);
+        return ResponseEntity.noContent().build();
+    }
+
+    // ==================== STREAMING ====================
+
+    @GetMapping("/stream/{contentId}")
+    public ResponseEntity<Resource> streamVideo(@PathVariable String contentId) {
+        try {
+            Path filePath = service.getVideoFilePath(contentId);
+            Resource resource = new UrlResource(filePath.toUri());
+            if (!resource.exists()) return ResponseEntity.notFound().build();
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType("video/mp4"))
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filePath.getFileName() + "\"")
+                    .body(resource);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/hls/{contentId}/{fileName}")
+    public ResponseEntity<Resource> getHlsFile(@PathVariable String contentId,
+                                               @PathVariable String fileName) {
+        try {
+            Path filePath = service.getHlsPlaylistPath(contentId, fileName);
+            Resource resource = new UrlResource(filePath.toUri());
+            if (!resource.exists()) return ResponseEntity.notFound().build();
+
+            String contentType = fileName.endsWith(".m3u8")
+                    ? "application/vnd.apple.mpegurl" : "video/mp2t";
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType(contentType))
+                    .header(HttpHeaders.CACHE_CONTROL, "no-cache")
+                    .body(resource);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/hls/{contentId}/segments/{fileName}")
+    public ResponseEntity<Resource> getHlsSegment(@PathVariable String contentId,
+                                                  @PathVariable String fileName) {
+        try {
+            Path filePath = service.getHlsSegmentPath(contentId, fileName);
+            Resource resource = new UrlResource(filePath.toUri());
+            if (!resource.exists()) return ResponseEntity.notFound().build();
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType("video/mp2t"))
+                    .header(HttpHeaders.CACHE_CONTROL, "no-cache")
+                    .body(resource);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/hls/archived/{contentId}/{fileName}")
+    public ResponseEntity<Resource> getArchivedHlsFile(@PathVariable String contentId,
+                                                       @PathVariable String fileName) {
+        try {
+            Path filePath = service.getArchivedHlsPath(contentId, fileName);
+            Resource resource = new UrlResource(filePath.toUri());
+            if (!resource.exists()) return ResponseEntity.notFound().build();
+
+            String contentType = fileName.endsWith(".m3u8")
+                    ? "application/vnd.apple.mpegurl" : "video/mp2t";
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType(contentType))
+                    .header(HttpHeaders.CACHE_CONTROL, "no-cache")
+                    .body(resource);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    // ==================== IMAGE ENDPOINTS ====================
+
     @PostMapping("/image/upload")
-    public ResponseEntity<TvContent> upload(@RequestParam String branchId, @RequestParam MultipartFile file
-    ) throws IOException {
+    public ResponseEntity<TvContent> upload(@RequestParam String branchId,
+                                            @RequestParam MultipartFile file) throws IOException {
         return ResponseEntity.ok(service.uploadImage(branchId, file));
     }
 
     @GetMapping("/image")
-    public ResponseEntity<List<TvContent>> getAll(
-            @RequestParam String branchId
-    ) {
+    public ResponseEntity<List<TvContentResponseDTO>> getAll(@RequestParam String branchId) {
         return ResponseEntity.ok(service.getAllImages(branchId));
     }
 
     @GetMapping("/image/active")
-    public ResponseEntity<List<TvContent>> getActiveImages(@RequestParam String branchId) {
+    public ResponseEntity<List<TvContentResponseDTO>> getActiveImages(@RequestParam String branchId) {
         return ResponseEntity.ok(service.getActiveImages(branchId));
     }
 
     @PatchMapping("/image/toggle/{id}")
-    public ResponseEntity<TvContent> toggleImageStatus(@RequestParam String branchId, @PathVariable String id) {
+    public ResponseEntity<TvContent> toggleImageStatus(@RequestParam String branchId,
+                                                       @PathVariable String id) {
         return ResponseEntity.ok(service.toggleImageStatus(branchId, id));
     }
 

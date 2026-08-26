@@ -8,32 +8,25 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "tv_content")
+@Table(name = "news_source_config")
 @Data
-public class TvContent {
+public class NewsSourceConfig {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
-    private String branchId;
-    private String name;
+    @Column(name = "source_name", unique = true)
+    private String sourceName;
 
-    @Column(columnDefinition = "TEXT")
-    private String url;
+    @Column(name = "rss_url")
+    private String rssUrl;
 
-    private String type;
-    private Boolean active;
-    private String size;
+    private String category;
+    private Boolean active = true;
 
-    @Column(name = "archived")
-    private Boolean archived = false;
-
-    @Column(columnDefinition = "TEXT")
-    private String hlsUrl;
-
-    @Column(name = "hls_processed")
-    private Boolean hlsProcessed = false;
+    @Column(name = "max_items")
+    private Integer maxItems = 5;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
