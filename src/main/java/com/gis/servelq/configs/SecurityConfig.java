@@ -21,11 +21,6 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.Arrays;
 import java.util.List;
 
-/**
- * The chain was anyRequest().permitAll() and login handed back no token, so
- * nothing was ever actually authenticated. This denies by default and opens up
- * only what has to be reachable without an account.
- */
 @Configuration
 @EnableMethodSecurity
 @RequiredArgsConstructor
@@ -40,7 +35,6 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                // Stateless bearer tokens, no cookies, so CSRF does not apply.
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .formLogin(AbstractHttpConfigurer::disable)
@@ -58,25 +52,24 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/serveiq/api/tv-content/hls/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/images/**").permitAll()
 
-                        // Walk-up kiosk: a visitor takes a ticket without an
-                        // account and rates the service afterwards. The lobby TV
-                        // also has no login.
+                        // Public: App config images and dashboard (for TV/Feedback/Kiosk displays)
+                        .requestMatchers(HttpMethod.GET, "/serveiq/api/app-config/images/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/serveiq/api/app-config/*/dashboard").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/serveiq/api/app-config/templates/*/active").permitAll()
+
+                        // Walk-up kiosk
                         .requestMatchers(HttpMethod.POST, "/serveiq/api/tokens/generate").permitAll()
                         .requestMatchers(HttpMethod.POST, "/serveiq/api/feedback").permitAll()
                         .requestMatchers(HttpMethod.GET, "/serveiq/api/tv-display/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/serveiq/api/news/breaking-news").permitAll()
                         .requestMatchers(HttpMethod.GET, "/serveiq/api/news/images/**").permitAll()
-                        // Creating accounts is an admin job. Registration used to
-                        // be open and honoured the role from the body, so anyone
-                        // could POST {"role":"ADMIN"} and become one.
+
+                        // Admin only
                         .requestMatchers("/serveiq/api/auth/register").hasRole("ADMIN")
                         .requestMatchers("/serveiq/api/users/**").hasAnyRole("ADMIN","MANAGER")
                         .requestMatchers("/api/admin/**", "/serveiq/api/admin/**").hasAnyRole("ADMIN","MANAGER")
                         .requestMatchers("/serveiq/api/reports/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/serveiq/api/branches/**").hasAnyRole("ADMIN", "MANAGER")
-
-                        // Outbound WhatsApp was wide open, so anyone could push
-                        // messages through the Twilio account at our cost.
                         .requestMatchers("/serveiq/api/whatsapp/**").hasRole("ADMIN")
 
                         // Serving customers
@@ -94,8 +87,6 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        // Was allowedOriginPatterns("*") together with allowCredentials(true),
-        // which reflects back whatever Origin the caller sends.
         List<String> origins = Arrays.stream(allowedOrigins.split(","))
                 .map(String::trim)
                 .filter(o -> !o.isEmpty())
