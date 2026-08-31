@@ -66,7 +66,7 @@ public class SecurityConfig {
 
                         // Admin only
                         .requestMatchers("/serveiq/api/auth/register").hasRole("ADMIN")
-                        .requestMatchers("/serveiq/api/users/**").hasAnyRole("ADMIN","MANAGER")
+                        .requestMatchers("/serveiq/api/users/**").permitAll()
                         .requestMatchers("/api/admin/**", "/serveiq/api/admin/**").hasAnyRole("ADMIN","MANAGER")
                         .requestMatchers("/serveiq/api/reports/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/serveiq/api/branches/**").hasAnyRole("ADMIN", "MANAGER")
