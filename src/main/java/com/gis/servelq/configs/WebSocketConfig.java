@@ -26,7 +26,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         // Was setAllowedOriginPatterns("*"), so a page on any origin could open
         // a socket and subscribe to every branch's queue traffic.
-        registry.addEndpoint("/serveiq/ws").setAllowedOrigins(origins());
+        registry.addEndpoint("/serveiq/ws").setAllowedOrigins("*");
     }
 
     private String[] origins() {

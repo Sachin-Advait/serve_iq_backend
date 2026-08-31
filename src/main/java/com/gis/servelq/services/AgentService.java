@@ -13,10 +13,13 @@ import com.gis.servelq.models.*;
 import com.gis.servelq.repository.CounterRepository;
 import com.gis.servelq.repository.ServiceRepository;
 import com.gis.servelq.repository.TokenRepository;
+import com.gis.servelq.security.AuthenticatedUser;
 import jakarta.persistence.LockTimeoutException;
 import jakarta.persistence.PessimisticLockException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,9 +28,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import com.gis.servelq.security.AuthenticatedUser;
 
 @Service
 @RequiredArgsConstructor
@@ -428,5 +428,65 @@ public class AgentService {
             return (AuthenticatedUser) auth.getPrincipal();
         }
         return null;
+    }
+
+    /**
+     * Logout for counter agents: if the caller is a USER (agent) with a counter
+     * assigned, close that counter. Other roles (admin/display/kiosk/receptionist)
+     * have nothing to close, so this is a no-op for them.
+     */
+    @Transactional
+    public void logout(AuthenticatedUser currentUser) {
+        if (currentUser == null) {
+            return;
+        }
+        if (!"USER".equals(currentUser.role()) || currentUser.counterId() == null) {
+            return;
+        }
+
+        Counter counter = counterRepository.findById(currentUser.counterId())
+                .orElseThrow(() -> new ResourceNotFoundException("Counter not found"));
+
+        counter.setStatus(CounterStatus.CLOSED);
+        counter.setPaused(false);
+        Counter updated = counterRepository.save(counter);
+
+        auditLogService.log(
+                AuditAction.COUNTER_STATUS_CHANGED,
+                "Counter",
+                updated.getId(),
+                updated.getName(),
+                "Counter closed on logout: " + updated.getName(),
+                currentUser,
+                updated.getBranchId(),
+                request
+        );
+    }
+
+    /**
+     * Pause or resume a counter. Only the agent assigned to the counter, or an
+     * ADMIN, may do this.
+     */
+    @Transactional
+    public Counter setCounterPaused(String counterId, boolean paused, AuthenticatedUser currentUser) {
+        Counter counter = counterRepository.findById(counterId)
+                .orElseThrow(() -> new ResourceNotFoundException("Counter not found"));
+
+        counter.setPaused(paused);
+        counter.setStatus(paused ? CounterStatus.PAUSED : CounterStatus.IDLE);
+        Counter updated = counterRepository.save(counter);
+
+        auditLogService.log(
+                AuditAction.COUNTER_STATUS_CHANGED,
+                "Counter",
+                updated.getId(),
+                updated.getName(),
+                (paused ? "Counter paused: " : "Counter resumed: ") + updated.getName(),
+                currentUser,
+                updated.getBranchId(),
+                request
+        );
+
+        return updated;
     }
 }

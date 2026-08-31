@@ -1,7 +1,6 @@
 package com.gis.servelq.models;
 
 public enum CounterStatus {
-    OFFLINE,
     IDLE,
     CALLING,
     SERVING,
@@ -9,4 +8,3 @@ public enum CounterStatus {
     PAUSED,
     CLOSED
 }
-

@@ -4,10 +4,13 @@ import com.gis.servelq.dto.AgentCallResponseDTO;
 import com.gis.servelq.dto.RecentServiceDTO;
 import com.gis.servelq.dto.TokenResponseDTO;
 import com.gis.servelq.dto.TokenTransferRequest;
+import com.gis.servelq.models.Counter;
 import com.gis.servelq.models.Token;
+import com.gis.servelq.security.AuthenticatedUser;
 import com.gis.servelq.services.AgentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,6 +20,24 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AgentController {
     private final AgentService agentService;
+
+    @PostMapping("/counter/logout")
+    public ResponseEntity<Void> logout(@AuthenticationPrincipal AuthenticatedUser currentUser) {
+        agentService.logout(currentUser);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/counter/{counterId}/pause")
+    public ResponseEntity<Counter> pauseCounter(@PathVariable String counterId,
+                                                @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ResponseEntity.ok(agentService.setCounterPaused(counterId, true, currentUser));
+    }
+
+    @PostMapping("/counter/{counterId}/resume")
+    public ResponseEntity<Counter> resumeCounter(@PathVariable String counterId,
+                                                 @AuthenticationPrincipal AuthenticatedUser currentUser) {
+        return ResponseEntity.ok(agentService.setCounterPaused(counterId, false, currentUser));
+    }
 
     @PostMapping("/call-next-token/{counterId}")
     public ResponseEntity<AgentCallResponseDTO> callNextToken(@PathVariable String counterId) {

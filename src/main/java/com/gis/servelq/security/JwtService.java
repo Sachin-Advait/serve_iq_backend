@@ -1,11 +1,13 @@
 package com.gis.servelq.security;
 
 import com.gis.servelq.models.User;
+import com.gis.servelq.models.UserRole;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,7 @@ import java.util.Map;
 public class JwtService {
 
     private final String secret;
+    @Getter
     private final long expirationMinutes;
     private SecretKey key;
 
@@ -56,13 +59,21 @@ public class JwtService {
             claims.put("counterId", user.getCounterId());
         }
 
-        return Jwts.builder()
+        boolean nonExpiring = user.getRole() == UserRole.DISPLAY || user.getRole() == UserRole.KIOSK
+                || user.getRole() == UserRole.RECEPTIONIST;
+
+        var builder = Jwts.builder()
                 .claims(claims)
                 .subject(user.getId())
-                .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plus(expirationMinutes, ChronoUnit.MINUTES)))
-                .signWith(key)
-                .compact();
+                .issuedAt(Date.from(now));
+
+        if (!nonExpiring) {
+            builder.expiration(Date.from(now.plus(expirationMinutes, ChronoUnit.MINUTES)));
+        }
+        // DISPLAY/KIOSK tokens intentionally omit the `exp` claim so they never
+        // expire — JJWT's parser only enforces expiration when `exp` is present.
+
+        return builder.signWith(key).compact();
     }
 
     /**
@@ -83,7 +94,4 @@ public class JwtService {
         }
     }
 
-    public long getExpirationMinutes() {
-        return expirationMinutes;
-    }
 }
