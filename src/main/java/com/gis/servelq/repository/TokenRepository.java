@@ -4,9 +4,9 @@ import com.gis.servelq.models.Token;
 import com.gis.servelq.models.TokenStatus;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.QueryHint;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
@@ -22,11 +22,9 @@ public interface TokenRepository extends JpaRepository<Token, String> {
 
     long countByBranchId(String branchId);
 
-    List<Token> findByBranchIdAndStatusOrderByPriorityAscCreatedAtAsc(String branchId, TokenStatus status);
-
     /**
      * Same ordering but with the row limit applied by the database.
-     *
+     * <p>
      * The TV display asked for every WAITING/HOLD token for the branch and then
      * did .stream().limit(10) in Java, so Postgres shipped and Hibernate
      * hydrated the entire queue to show ten of them.
@@ -45,8 +43,6 @@ public interface TokenRepository extends JpaRepository<Token, String> {
     List<Token> findTop20ByStatusAndAssignedCounterIdOrderByEndAtDesc(TokenStatus status, String assignedCounterId);
 
     Optional<Token> findByStatusInAndAssignedCounterId(List<TokenStatus> statuses, String assignedCounterId);
-
-    long countByBranchIdAndStatus(String branchId, TokenStatus status);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @QueryHints(@QueryHint(
@@ -136,10 +132,4 @@ public interface TokenRepository extends JpaRepository<Token, String> {
 
     @Query("SELECT COUNT(t) FROM Token t WHERE t.assignedCounterId = :counterId AND t.status = :status")
     long countByAssignedCounterIdAndStatus(@Param("counterId") String counterId, @Param("status") TokenStatus status);
-
-    @Query("SELECT t FROM Token t WHERE t.branchId = :branchId " +
-            "AND t.status = 'DONE' AND t.createdAt BETWEEN :start AND :end")
-    List<Token> findCompletedTokensByDate(@Param("branchId") String branchId,
-                                          @Param("start") LocalDateTime start,
-                                          @Param("end") LocalDateTime end);
 }

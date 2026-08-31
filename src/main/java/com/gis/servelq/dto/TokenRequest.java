@@ -15,4 +15,7 @@ public class TokenRequest {
     @NotNull
     private Boolean greenToken;
     private Integer priority = 50;
+
+    @NotNull
+    private String language;
 }
