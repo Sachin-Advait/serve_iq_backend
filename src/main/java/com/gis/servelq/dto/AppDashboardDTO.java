@@ -2,19 +2,14 @@ package com.gis.servelq.dto;
 
 import com.gis.servelq.models.BreakingNews;
 import com.gis.servelq.models.TvContent;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
-
 import java.util.List;
 
 @Data
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
 public class AppDashboardDTO {
-    // ==================== COMMON FIELDS ====================
+    // Common fields
     private String backgroundImage;
     private String appLogo;
     private String backgroundImageUrl;
@@ -24,7 +19,7 @@ public class AppDashboardDTO {
     private String primaryColor;
     private String secondaryColor;
 
-    // ==================== TV DISPLAY FIELDS ====================
+    // TV Display fields
     private Boolean tickerEnabled;
     private Integer tickerSpeed;
     private Boolean videosEnabled;
@@ -33,9 +28,35 @@ public class AppDashboardDTO {
     private List<BreakingNews> tickers;
     private List<TvContent> activeVideos;
 
-    // ==================== FEEDBACK FIELDS ====================
+    // Feedback fields
     private Boolean imageCarouselEnabled;
     private Boolean feedbackVideoEnabled;
     private List<TvContent> activeImages;
     private List<TvContent> activeFeedbackVideo;
+
+    // ==================== KIOSK PRINT FIELDS ====================
+
+    // General
+    private Boolean kioskPrintEnabled;
+    private String kioskPrintLanguage;
+
+    // Header
+    private String kioskHeaderTitle;
+    private String kioskHeaderSubtitle;
+
+    // Token
+    private String kioskTokenTitle;
+
+    // Service
+    private String kioskServiceLabel;
+
+    // Date & Time
+    private String kioskDateLabel;
+    private String kioskTimeLabel;
+
+    // Waiting message
+    private String kioskWaitingMessage;
+
+    // Footer
+    private String kioskThankYouMessage;
 }

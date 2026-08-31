@@ -46,4 +46,30 @@ public class AppConfig {
     // Feedback media mode (mutually exclusive)
     private Boolean imageCarouselEnabled;  // Show rotating images on feedback screen
     private Boolean feedbackVideoEnabled;  // Show video on feedback screen
+
+    // ==================== KIOSK PRINT FIELDS ====================
+
+    // General
+    private Boolean kioskPrintEnabled = true;
+    private String kioskPrintLanguage = "ENGLISH";
+
+    // Header
+    private String kioskHeaderTitle;
+    private String kioskHeaderSubtitle;
+
+    // Token
+    private String kioskTokenTitle;
+
+    // Service
+    private String kioskServiceLabel;
+
+    // Date & Time
+    private String kioskDateLabel;
+    private String kioskTimeLabel;
+
+    // Waiting message
+    private String kioskWaitingMessage;
+
+    // Footer
+    private String kioskThankYouMessage;
 }

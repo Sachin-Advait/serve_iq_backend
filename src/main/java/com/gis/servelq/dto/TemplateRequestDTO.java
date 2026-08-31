@@ -1,16 +1,9 @@
 package com.gis.servelq.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
-
 import java.util.List;
 
 @Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
 public class TemplateRequestDTO {
     private String templateName;
     private String description;
@@ -35,4 +28,30 @@ public class TemplateRequestDTO {
     // Feedback fields
     private Boolean imageCarouselEnabled;
     private Boolean feedbackVideoEnabled;
+
+    // ==================== KIOSK PRINT FIELDS ====================
+
+    // General
+    private Boolean kioskPrintEnabled;
+    private String kioskPrintLanguage;
+
+    // Header
+    private String kioskHeaderTitle;
+    private String kioskHeaderSubtitle;
+
+    // Token
+    private String kioskTokenTitle;
+
+    // Service
+    private String kioskServiceLabel;
+
+    // Date & Time
+    private String kioskDateLabel;
+    private String kioskTimeLabel;
+
+    // Waiting message
+    private String kioskWaitingMessage;
+
+    // Footer
+    private String kioskThankYouMessage;
 }

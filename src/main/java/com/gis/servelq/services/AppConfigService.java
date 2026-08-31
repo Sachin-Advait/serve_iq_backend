@@ -84,6 +84,7 @@ public class AppConfigService {
             }
             case KIOSK -> {
                 setDefaultBackgroundImage(config, appType);
+                setDefaultKioskSettings(config);
             }
         }
 
@@ -177,7 +178,47 @@ public class AppConfigService {
                 }
             }
             case KIOSK -> {
-                // Kiosk only has common fields
+                // KIOSK PRINT FIELDS
+                if (updated.getKioskPrintEnabled() != null) {
+                    config.setKioskPrintEnabled(updated.getKioskPrintEnabled());
+                    hasChanges = true;
+                }
+                if (updated.getKioskPrintLanguage() != null) {
+                    config.setKioskPrintLanguage(updated.getKioskPrintLanguage());
+                    hasChanges = true;
+                }
+                if (updated.getKioskHeaderTitle() != null) {
+                    config.setKioskHeaderTitle(updated.getKioskHeaderTitle());
+                    hasChanges = true;
+                }
+                if (updated.getKioskHeaderSubtitle() != null) {
+                    config.setKioskHeaderSubtitle(updated.getKioskHeaderSubtitle());
+                    hasChanges = true;
+                }
+                if (updated.getKioskTokenTitle() != null) {
+                    config.setKioskTokenTitle(updated.getKioskTokenTitle());
+                    hasChanges = true;
+                }
+                if (updated.getKioskServiceLabel() != null) {
+                    config.setKioskServiceLabel(updated.getKioskServiceLabel());
+                    hasChanges = true;
+                }
+                if (updated.getKioskDateLabel() != null) {
+                    config.setKioskDateLabel(updated.getKioskDateLabel());
+                    hasChanges = true;
+                }
+                if (updated.getKioskTimeLabel() != null) {
+                    config.setKioskTimeLabel(updated.getKioskTimeLabel());
+                    hasChanges = true;
+                }
+                if (updated.getKioskWaitingMessage() != null) {
+                    config.setKioskWaitingMessage(updated.getKioskWaitingMessage());
+                    hasChanges = true;
+                }
+                if (updated.getKioskThankYouMessage() != null) {
+                    config.setKioskThankYouMessage(updated.getKioskThankYouMessage());
+                    hasChanges = true;
+                }
             }
         }
 
@@ -396,6 +437,7 @@ public class AppConfigService {
             }
             case KIOSK -> {
                 setDefaultBackgroundImage(config, appType);
+                setDefaultKioskSettings(config);
             }
         }
 
@@ -510,6 +552,40 @@ public class AppConfigService {
                     .activeFeedbackVideo(activeFeedbackVideo)
                     .build();
         }
+        if (appType == AppType.KIOSK) {
+            return AppDashboardDTO.builder()
+                    .backgroundImage(config.getBackgroundImage())
+                    .appLogo(config.getAppLogo())
+                    .backgroundImageUrl(config.getBackgroundImageUrl())
+                    .appLogoUrl(config.getAppLogoUrl())
+                    .appLanguage(config.getAppLanguage())
+                    .defaultEnabled(config.getDefaultEnabled())
+                    .primaryColor(config.getPrimaryColor())
+                    .secondaryColor(config.getSecondaryColor())
+                    .tickerEnabled(null)
+                    .tickerSpeed(null)
+                    .videosEnabled(null)
+                    .flickerTime(null)
+                    .componentOrder(null)
+                    .tickers(null)
+                    .activeVideos(null)
+                    .imageCarouselEnabled(null)
+                    .feedbackVideoEnabled(null)
+                    .activeImages(null)
+                    .activeFeedbackVideo(null)
+                    // KIOSK PRINT FIELDS
+                    .kioskPrintEnabled(config.getKioskPrintEnabled())
+                    .kioskPrintLanguage(config.getKioskPrintLanguage())
+                    .kioskHeaderTitle(config.getKioskHeaderTitle())
+                    .kioskHeaderSubtitle(config.getKioskHeaderSubtitle())
+                    .kioskTokenTitle(config.getKioskTokenTitle())
+                    .kioskServiceLabel(config.getKioskServiceLabel())
+                    .kioskDateLabel(config.getKioskDateLabel())
+                    .kioskTimeLabel(config.getKioskTimeLabel())
+                    .kioskWaitingMessage(config.getKioskWaitingMessage())
+                    .kioskThankYouMessage(config.getKioskThankYouMessage())
+                    .build();
+        }
 
         return AppDashboardDTO.builder()
                 .backgroundImage(config.getBackgroundImage())
@@ -585,5 +661,31 @@ public class AppConfigService {
             return fileName.substring(fileName.lastIndexOf(".")).toLowerCase();
         }
         return ".jpg";
+    }
+
+    private void setDefaultKioskSettings(AppConfig config) {
+        // General
+        config.setKioskPrintEnabled(true);
+        config.setKioskPrintLanguage("ENGLISH");
+
+        // Header
+        config.setKioskHeaderTitle("Welcome");
+        config.setKioskHeaderSubtitle("Please take a ticket");
+
+        // Token
+        config.setKioskTokenTitle("Your Token Number");
+
+        // Service
+        config.setKioskServiceLabel("Service");
+
+        // Date & Time
+        config.setKioskDateLabel("Date");
+        config.setKioskTimeLabel("Time");
+
+        // Waiting message
+        config.setKioskWaitingMessage("Please wait for your turn");
+
+        // Footer
+        config.setKioskThankYouMessage("Thank you for visiting");
     }
 }

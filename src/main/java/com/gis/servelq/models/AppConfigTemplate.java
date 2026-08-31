@@ -46,6 +46,32 @@ public class AppConfigTemplate {
     private Boolean imageCarouselEnabled;
     private Boolean feedbackVideoEnabled;
 
+    // ==================== KIOSK PRINT FIELDS ====================
+
+    // General
+    private Boolean kioskPrintEnabled = true;
+    private String kioskPrintLanguage = "ENGLISH";
+
+    // Header
+    private String kioskHeaderTitle;
+    private String kioskHeaderSubtitle;
+
+    // Token
+    private String kioskTokenTitle;
+
+    // Service
+    private String kioskServiceLabel;
+
+    // Date & Time
+    private String kioskDateLabel;
+    private String kioskTimeLabel;
+
+    // Waiting message
+    private String kioskWaitingMessage;
+
+    // Footer
+    private String kioskThankYouMessage;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
