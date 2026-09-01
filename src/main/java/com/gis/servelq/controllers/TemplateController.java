@@ -5,6 +5,7 @@ import com.gis.servelq.dto.TemplateRequestDTO;
 import com.gis.servelq.models.AppConfig;
 import com.gis.servelq.models.AppConfigTemplate;
 import com.gis.servelq.models.AppType;
+import com.gis.servelq.services.SocketService;
 import com.gis.servelq.services.TemplateService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -19,6 +20,7 @@ import java.util.List;
 public class TemplateController {
 
     private final TemplateService templateService;
+    private final SocketService socketService;
 
     @GetMapping("/{appType}")
     @PreAuthorize("hasRole('ADMIN')")
@@ -61,6 +63,7 @@ public class TemplateController {
             @PathVariable AppType appType,
             @RequestBody AppConfig config) {
         AppConfigTemplate updated = templateService.updateActiveTemplateConfig(appType, config);
+        socketService.broadcastAppDashboard(appType);
         return new ApiResponseDTO<>(true, "Active template updated", updated);
     }
 
@@ -70,6 +73,9 @@ public class TemplateController {
             @PathVariable String templateId,
             @RequestBody TemplateRequestDTO request) {
         AppConfigTemplate updated = templateService.updateTemplate(templateId, request);
+        if (updated.isActive() || updated.isDefault()) {
+            socketService.broadcastAppDashboard(AppType.valueOf(updated.getAppType()));
+        }
         return new ApiResponseDTO<>(true, "Template updated", updated);
     }
 
@@ -79,6 +85,9 @@ public class TemplateController {
             @PathVariable String templateId,
             @RequestParam("file") MultipartFile file) {
         AppConfigTemplate updated = templateService.uploadTemplateLogo(templateId, file);
+        if (updated.isActive() || updated.isDefault()) {
+            socketService.broadcastAppDashboard(AppType.valueOf(updated.getAppType()));
+        }
         return new ApiResponseDTO<>(true, "Template logo uploaded", updated);
     }
 
@@ -88,6 +97,9 @@ public class TemplateController {
             @PathVariable String templateId,
             @RequestParam("file") MultipartFile file) {
         AppConfigTemplate updated = templateService.uploadTemplateBackground(templateId, file);
+        if (updated.isActive() || updated.isDefault()) {
+            socketService.broadcastAppDashboard(AppType.valueOf(updated.getAppType()));
+        }
         return new ApiResponseDTO<>(true, "Template background uploaded", updated);
     }
 
@@ -95,20 +107,37 @@ public class TemplateController {
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponseDTO<AppConfigTemplate> activateTemplate(@PathVariable String templateId) {
         AppConfigTemplate activated = templateService.activateTemplate(templateId);
+        socketService.broadcastAppDashboard(AppType.valueOf(activated.getAppType()));
         return new ApiResponseDTO<>(true, "Template activated", activated);
     }
 
     @PostMapping("/{templateId}/deactivate")
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponseDTO<Void> deactivateTemplate(@PathVariable String templateId) {
+        // Get template info BEFORE deactivating
+        AppConfigTemplate template = templateService.getTemplateById(templateId);
         templateService.deactivateTemplate(templateId);
+
+        // Broadcast because active template changed
+        socketService.broadcastAppDashboard(AppType.valueOf(template.getAppType()));
+
         return new ApiResponseDTO<>(true, "Template deactivated", null);
     }
 
     @DeleteMapping("/{templateId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponseDTO<Void> deleteTemplate(@PathVariable String templateId) {
+        // Get template info BEFORE deleting
+        AppConfigTemplate template = templateService.getTemplateById(templateId);
+        boolean wasActive = template.isActive();
+
         templateService.deleteTemplate(templateId);
+
+        // Broadcast only if we deleted the active template
+        if (wasActive) {
+            socketService.broadcastAppDashboard(AppType.valueOf(template.getAppType()));
+        }
+
         return new ApiResponseDTO<>(true, "Template deleted", null);
     }
 }

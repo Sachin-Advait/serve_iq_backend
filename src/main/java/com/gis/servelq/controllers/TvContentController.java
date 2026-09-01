@@ -1,7 +1,9 @@
 package com.gis.servelq.controllers;
 
 import com.gis.servelq.dto.TvContentResponseDTO;
+import com.gis.servelq.models.AppType;
 import com.gis.servelq.models.TvContent;
+import com.gis.servelq.services.SocketService;
 import com.gis.servelq.services.TvContentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +27,7 @@ import java.util.Map;
 public class TvContentController {
 
     private final TvContentService service;
+    private final SocketService socketService;
 
     // ==================== QUERY ENDPOINTS ====================
 
@@ -47,16 +50,19 @@ public class TvContentController {
 
     @PostMapping("/url")
     public TvContent addUrl(@RequestBody Map<String, String> req) {
+        socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
         return service.addUrl(req.get("branchId"), req.get("url"), req.get("name"));
     }
 
     @DeleteMapping("/{id}")
     public void delete(@PathVariable String id) {
         service.delete(id);
+        socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
     }
 
     @PatchMapping("/activateVideo")
     public TvContent activate(@RequestBody Map<String, String> req) {
+        socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
         return service.activateVideo(req.get("branchId"), req.get("id"));
     }
 
@@ -64,11 +70,13 @@ public class TvContentController {
 
     @PatchMapping("/{id}/archive")
     public ResponseEntity<TvContent> archiveContent(@PathVariable String id) {
+        socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
         return ResponseEntity.ok(service.archiveContent(id));
     }
 
     @PatchMapping("/{id}/unarchive")
     public ResponseEntity<TvContent> unarchiveContent(@PathVariable String id) {
+        socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
         return ResponseEntity.ok(service.unarchiveContent(id));
     }
 
@@ -105,6 +113,7 @@ public class TvContentController {
             @PathVariable String contentId,
             @RequestParam String fileName) {
         service.cancelVideoUpload(contentId, fileName);
+        socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
         return ResponseEntity.noContent().build();
     }
 
@@ -188,6 +197,7 @@ public class TvContentController {
     @PostMapping("/image/upload")
     public ResponseEntity<TvContent> upload(@RequestParam String branchId,
                                             @RequestParam MultipartFile file) throws IOException {
+        socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
         return ResponseEntity.ok(service.uploadImage(branchId, file));
     }
 
@@ -204,12 +214,14 @@ public class TvContentController {
     @PatchMapping("/image/toggle/{id}")
     public ResponseEntity<TvContent> toggleImageStatus(@RequestParam String branchId,
                                                        @PathVariable String id) {
+        socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
         return ResponseEntity.ok(service.toggleImageStatus(branchId, id));
     }
 
     @DeleteMapping("/image/{id}")
     public ResponseEntity<Void> deleteImage(@PathVariable String id) throws IOException {
         service.deleteImage(id);
+        socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
         return ResponseEntity.noContent().build();
     }
 }

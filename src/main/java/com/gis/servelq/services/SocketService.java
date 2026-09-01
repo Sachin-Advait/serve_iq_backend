@@ -1,7 +1,9 @@
 package com.gis.servelq.services;
 
+import com.gis.servelq.dto.AppDashboardDTO;
 import com.gis.servelq.dto.TVDisplayResponseDTO;
 import com.gis.servelq.dto.TokenResponseDTO;
+import com.gis.servelq.models.AppType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -16,6 +18,7 @@ public class SocketService {
 
     private final SimpMessagingTemplate messagingTemplate;
     private final TVDisplayService tvDisplayService;
+    private final AppConfigService appConfigService;
 
     public void broadcast(String destination, Object payload) {
         log.info("🔥 WEBSOCKET PUSH → destination={}", destination);
@@ -46,5 +49,15 @@ public class SocketService {
 
     public void notifyAgentQueue(String counterId, List<TokenResponseDTO> payload) {
         broadcast("/topic/agent-upcoming/" + counterId, payload);
+    }
+    public void broadcastAppDashboard(AppType appType) {
+        try {
+            AppDashboardDTO dashboard = appConfigService.getAppDashboard(appType);
+            String destination = "/topic/app-config/" + appType.name().toLowerCase();
+            broadcast(destination, dashboard);
+            log.info("Broadcast {} dashboard to {}", appType, destination);
+        } catch (Exception e) {
+            log.error("Failed to broadcast dashboard for {}", appType, e);
+        }
     }
 }

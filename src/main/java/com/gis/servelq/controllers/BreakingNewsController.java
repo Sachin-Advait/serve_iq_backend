@@ -3,9 +3,11 @@ package com.gis.servelq.controllers;
 import com.gis.servelq.dto.ApiResponseDTO;
 import com.gis.servelq.dto.NewsItemDTO;
 import com.gis.servelq.dto.NewsSourceConfigRequest;
+import com.gis.servelq.models.AppType;
 import com.gis.servelq.models.BreakingNews;
 import com.gis.servelq.models.NewsSourceConfig;
 import com.gis.servelq.services.BreakingNewsService;
+import com.gis.servelq.services.SocketService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
@@ -29,6 +31,7 @@ import java.util.Map;
 public class BreakingNewsController {
 
     private final BreakingNewsService newsService;
+    private final SocketService socketService;
 
     // ==================== PUBLIC ENDPOINTS ====================
 
@@ -52,20 +55,25 @@ public class BreakingNewsController {
             @RequestParam(required = false) String link,
             @RequestParam(required = false, defaultValue = "Manual") String source,
             @RequestParam(required = false, defaultValue = "Breaking") String category) {
-        return new ApiResponseDTO<>(true, "News added manually",
-                newsService.createManualNews(title, description, link, source, category));
+        BreakingNews news = newsService.createManualNews(title, description, link, source, category);
+        socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
+        return new ApiResponseDTO<>(true, "News added manually", news);
     }
 
     @PutMapping("/{id}/archive")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
     public ApiResponseDTO<BreakingNews> archiveNews(@PathVariable String id) {
-        return new ApiResponseDTO<>(true, "News archived", newsService.archiveNews(id));
+        BreakingNews news = newsService.archiveNews(id);
+        socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
+        return new ApiResponseDTO<>(true, "News archived", news);
     }
 
     @PutMapping("/{id}/unarchive")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
     public ApiResponseDTO<BreakingNews> unarchiveNews(@PathVariable String id) {
-        return new ApiResponseDTO<>(true, "News unarchived", newsService.unarchiveNews(id));
+        BreakingNews news = newsService.unarchiveNews(id);
+        socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
+        return new ApiResponseDTO<>(true, "News unarchived", news);
     }
 
     @GetMapping("/archived")
@@ -83,7 +91,9 @@ public class BreakingNewsController {
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
     public ApiResponseDTO<BreakingNews> updateNews(@PathVariable String id,
                                                    @RequestBody BreakingNews news) {
-        return new ApiResponseDTO<>(true, "News updated", newsService.updateNews(id, news));
+        BreakingNews updated = newsService.updateNews(id, news);
+        socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
+        return new ApiResponseDTO<>(true, "News updated", updated);
     }
 
     @GetMapping("/fetch")
@@ -108,23 +118,26 @@ public class BreakingNewsController {
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
     public ApiResponseDTO<List<BreakingNews>> publishNews(
             @RequestBody List<NewsItemDTO> items) {
-        return new ApiResponseDTO<>(true, "News published",
-                newsService.publishNewsItems(items));
+        List<BreakingNews> published = newsService.publishNewsItems(items);
+        socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
+        return new ApiResponseDTO<>(true, "News published", published);
     }
 
     @PostMapping("/fetch-publish")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
     public ApiResponseDTO<Map<String, Object>> manualFetchAndPublish() {
-        return new ApiResponseDTO<>(true, "News fetched and published",
-                newsService.manualFetchAndPublish());
+        Map<String, Object> result = newsService.manualFetchAndPublish();
+        socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
+        return new ApiResponseDTO<>(true, "News fetched and published", result);
     }
 
     @PostMapping("/source-config")
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponseDTO<NewsSourceConfig> saveSourceConfig(
             @RequestBody NewsSourceConfigRequest request) {
-        return new ApiResponseDTO<>(true, "Source config saved",
-                newsService.saveSourceConfig(request));
+        NewsSourceConfig config = newsService.saveSourceConfig(request);
+        socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
+        return new ApiResponseDTO<>(true, "Source config saved", config);
     }
 
     @GetMapping("/source-configs")
@@ -138,6 +151,7 @@ public class BreakingNewsController {
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponseDTO<Void> deleteSourceConfig(@PathVariable String id) {
         newsService.deleteSourceConfig(id);
+        socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
         return new ApiResponseDTO<>(true, "Source config deleted", null);
     }
 
@@ -152,6 +166,7 @@ public class BreakingNewsController {
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
     public ApiResponseDTO<Void> deleteNews(@PathVariable String id) {
         newsService.deleteNews(id);
+        socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
         return new ApiResponseDTO<>(true, "News deleted", null);
     }
 
@@ -164,6 +179,7 @@ public class BreakingNewsController {
             return new ApiResponseDTO<>(false, "No news IDs provided", null);
         }
         Map<String, Object> result = newsService.bulkDeleteNews(ids);
+        socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
         return new ApiResponseDTO<>(true, "Bulk delete completed", result);
     }
 
@@ -176,6 +192,7 @@ public class BreakingNewsController {
             return new ApiResponseDTO<>(false, "No news IDs provided", null);
         }
         Map<String, Object> result = newsService.bulkDeleteArchivedNews(ids);
+        socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
         return new ApiResponseDTO<>(true, "Bulk delete completed", result);
     }
 
@@ -185,6 +202,7 @@ public class BreakingNewsController {
             @RequestParam("file") MultipartFile file,
             HttpServletRequest request) {
         String imageUrl = newsService.uploadSeparatorImage(file, request);
+        socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
         return new ApiResponseDTO<>(true, "Separator image uploaded",
                 Map.of("separatorImageUrl", imageUrl));
     }

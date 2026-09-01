@@ -6,6 +6,7 @@ import com.gis.servelq.dto.ComponentOrderDTO;
 import com.gis.servelq.models.AppConfig;
 import com.gis.servelq.models.AppType;
 import com.gis.servelq.services.AppConfigService;
+import com.gis.servelq.services.SocketService;
 import com.gis.servelq.services.TemplateService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +32,7 @@ public class AppConfigController {
 
     private final AppConfigService configService;
     private final TemplateService templateService;
+    private final SocketService socketService;
 
     @Value("${image.upload.dir:uploads}")
     private String uploadDir;
@@ -59,6 +61,7 @@ public class AppConfigController {
                                                   @RequestBody AppConfig config) {
         templateService.updateActiveTemplateConfig(appType, config);
         AppConfig saved = configService.getConfig(appType);
+        socketService.broadcastAppDashboard(appType);
         return new ApiResponseDTO<>(true, "Active template updated", saved);
     }
 
@@ -67,6 +70,7 @@ public class AppConfigController {
     public ApiResponseDTO<AppConfig> resetToDefault(@PathVariable AppType appType) {
         AppConfig reset = configService.resetToDefault(appType);
         templateService.updateActiveTemplateConfig(appType, reset);
+        socketService.broadcastAppDashboard(appType);
         return new ApiResponseDTO<>(true, "All settings reset to default", reset);
     }
 
@@ -76,6 +80,7 @@ public class AppConfigController {
                                                            @RequestParam("file") MultipartFile file) {
         AppConfig updated = configService.uploadBackgroundImage(appType, file);
         templateService.updateActiveTemplateConfig(appType, updated);
+        socketService.broadcastAppDashboard(appType);
         return new ApiResponseDTO<>(true, "Background image uploaded", updated);
     }
 
@@ -85,6 +90,7 @@ public class AppConfigController {
                                                    @RequestParam("file") MultipartFile file) {
         AppConfig updated = configService.uploadAppLogo(appType, file);
         templateService.updateActiveTemplateConfig(appType, updated);
+        socketService.broadcastAppDashboard(appType);
         return new ApiResponseDTO<>(true, "App logo uploaded", updated);
     }
 
@@ -102,6 +108,7 @@ public class AppConfigController {
                                                           @RequestBody ComponentOrderDTO orderDTO) {
         AppConfig updated = configService.updateComponentOrder(appType, orderDTO);
         templateService.updateActiveTemplateConfig(appType, updated);
+        socketService.broadcastAppDashboard(appType);
         return new ApiResponseDTO<>(true, "Component order updated", updated);
     }
 

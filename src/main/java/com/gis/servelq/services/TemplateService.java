@@ -27,6 +27,15 @@ public class TemplateService {
     private final AppConfigRepository configRepository;
     private final AppConfigService configService;
 
+    /**
+     * Get template by ID
+     */
+    @Transactional(readOnly = true)
+    public AppConfigTemplate getTemplateById(String templateId) {
+        return templateRepository.findById(templateId)
+                .orElseThrow(() -> new BusinessException("Template not found with ID: " + templateId));
+    }
+
     @Transactional
     public List<AppConfigTemplate> getAllTemplates(AppType appType) {
         log.info("Getting all templates for app type: {}", appType);
@@ -143,8 +152,8 @@ public class TemplateService {
         if (request.getFlickerTime() != null) template.setFlickerTime(request.getFlickerTime());
         if (request.getComponentOrder() != null) template.setComponentOrder(new ArrayList<>(request.getComponentOrder()));
         if (request.getImageCarouselEnabled() != null) template.setImageCarouselEnabled(request.getImageCarouselEnabled());
-        // FIXED: Changed from getVideoEnabled() to getFeedbackVideoEnabled()
         if (request.getFeedbackVideoEnabled() != null) template.setFeedbackVideoEnabled(request.getFeedbackVideoEnabled());
+
         // KIOSK PRINT FIELDS
         if (request.getKioskPrintEnabled() != null) template.setKioskPrintEnabled(request.getKioskPrintEnabled());
         if (request.getKioskPrintLanguage() != null) template.setKioskPrintLanguage(request.getKioskPrintLanguage());
@@ -156,6 +165,7 @@ public class TemplateService {
         if (request.getKioskTimeLabel() != null) template.setKioskTimeLabel(request.getKioskTimeLabel());
         if (request.getKioskWaitingMessage() != null) template.setKioskWaitingMessage(request.getKioskWaitingMessage());
         if (request.getKioskThankYouMessage() != null) template.setKioskThankYouMessage(request.getKioskThankYouMessage());
+
         template.setActive(false);
         template.setDefault(false);
         template.setCreatedAt(LocalDateTime.now());
@@ -196,7 +206,6 @@ public class TemplateService {
             activeTemplate.setComponentOrder(new ArrayList<>(updatedConfig.getComponentOrder()));
         if (updatedConfig.getImageCarouselEnabled() != null)
             activeTemplate.setImageCarouselEnabled(updatedConfig.getImageCarouselEnabled());
-        // FIXED: Changed from getVideoEnabled() to getFeedbackVideoEnabled()
         if (updatedConfig.getFeedbackVideoEnabled() != null)
             activeTemplate.setFeedbackVideoEnabled(updatedConfig.getFeedbackVideoEnabled());
         if (updatedConfig.getKioskPrintEnabled() != null)
@@ -249,8 +258,8 @@ public class TemplateService {
         if (request.getFlickerTime() != null) template.setFlickerTime(request.getFlickerTime());
         if (request.getComponentOrder() != null) template.setComponentOrder(new ArrayList<>(request.getComponentOrder()));
         if (request.getImageCarouselEnabled() != null) template.setImageCarouselEnabled(request.getImageCarouselEnabled());
-        // FIXED: Changed from getVideoEnabled() to getFeedbackVideoEnabled()
         if (request.getFeedbackVideoEnabled() != null) template.setFeedbackVideoEnabled(request.getFeedbackVideoEnabled());
+
         // KIOSK PRINT FIELDS
         if (request.getKioskPrintEnabled() != null) template.setKioskPrintEnabled(request.getKioskPrintEnabled());
         if (request.getKioskPrintLanguage() != null) template.setKioskPrintLanguage(request.getKioskPrintLanguage());
@@ -411,6 +420,7 @@ public class TemplateService {
         config.setTickerSpeed(template.getTickerSpeed());
         config.setVideosEnabled(template.getVideosEnabled());
         config.setFlickerTime(template.getFlickerTime());
+
         // KIOSK PRINT FIELDS
         config.setKioskPrintEnabled(template.getKioskPrintEnabled());
         config.setKioskPrintLanguage(template.getKioskPrintLanguage());
@@ -428,7 +438,6 @@ public class TemplateService {
         }
 
         config.setImageCarouselEnabled(template.getImageCarouselEnabled());
-        // FIXED: Changed from getVideoEnabled() to getFeedbackVideoEnabled()
         config.setFeedbackVideoEnabled(template.getFeedbackVideoEnabled());
 
         config.setDefaultEnabled(template.isDefault());
@@ -452,8 +461,8 @@ public class TemplateService {
         template.setComponentOrder(config.getComponentOrder() != null ?
                 new ArrayList<>(config.getComponentOrder()) : null);
         template.setImageCarouselEnabled(config.getImageCarouselEnabled());
-        // FIXED: Changed from getVideoEnabled() to getFeedbackVideoEnabled()
         template.setFeedbackVideoEnabled(config.getFeedbackVideoEnabled());
+
         // KIOSK PRINT FIELDS
         template.setKioskPrintEnabled(config.getKioskPrintEnabled());
         template.setKioskPrintLanguage(config.getKioskPrintLanguage());
@@ -483,8 +492,8 @@ public class TemplateService {
         target.setComponentOrder(source.getComponentOrder() != null ?
                 new ArrayList<>(source.getComponentOrder()) : null);
         target.setImageCarouselEnabled(source.getImageCarouselEnabled());
-        // FIXED: Changed from getVideoEnabled() to getFeedbackVideoEnabled()
         target.setFeedbackVideoEnabled(source.getFeedbackVideoEnabled());
+
         // KIOSK PRINT FIELDS
         target.setKioskPrintEnabled(source.getKioskPrintEnabled());
         target.setKioskPrintLanguage(source.getKioskPrintLanguage());

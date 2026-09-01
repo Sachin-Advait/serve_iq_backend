@@ -6,6 +6,7 @@ import com.gis.servelq.dto.TvContentResponseDTO;
 import com.gis.servelq.events.TokenEvent;
 import com.gis.servelq.events.TokenEventPublisher;
 import com.gis.servelq.events.TokenEventType;
+import com.gis.servelq.models.AppType;
 import com.gis.servelq.models.TvContent;
 import com.gis.servelq.repository.TvContentRepository;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +46,7 @@ public class TvContentService {
 
     private final TvContentRepository tvContentRepository;
     private final TokenEventPublisher tokenEventPublisher;
+    private final SocketService socketService;
 
     @Value("${app.base-url:http://localhost:8085}")
     private String baseUrl;
@@ -646,6 +648,7 @@ public class TvContentService {
         ));
 
         log.info("✅ HLS processing completed for {}: {}", contentId, content.getHlsUrl());
+        socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
     }
 
     private int runFfmpeg(List<String> command, int timeoutMinutes) throws Exception {
