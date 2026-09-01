@@ -8,13 +8,18 @@ import jakarta.servlet.http.HttpServletResponseWrapper;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
 
+/**
+ * A wrapper for HttpServletResponse that caches the response body for logging purposes.
+ */
 public class CachingResponseWrapper extends HttpServletResponseWrapper {
 
     private final ByteArrayOutputStream content = new ByteArrayOutputStream();
     private final ServletOutputStream outputStream = new CachedServletOutputStream(content);
     private PrintWriter writer;
     private Integer status;
+    private String contentType;
 
     public CachingResponseWrapper(HttpServletResponse response) {
         super(response);
@@ -28,7 +33,7 @@ public class CachingResponseWrapper extends HttpServletResponseWrapper {
     @Override
     public PrintWriter getWriter() throws IOException {
         if (writer == null) {
-            writer = new PrintWriter(outputStream);
+            writer = new PrintWriter(outputStream, true, StandardCharsets.UTF_8);
         }
         return writer;
     }
@@ -58,6 +63,12 @@ public class CachingResponseWrapper extends HttpServletResponseWrapper {
     }
 
     @Override
+    public void setContentType(String type) {
+        super.setContentType(type);
+        this.contentType = type;
+    }
+
+    @Override
     public int getStatus() {
         if (status != null) {
             return status;
@@ -65,19 +76,37 @@ public class CachingResponseWrapper extends HttpServletResponseWrapper {
         return super.getStatus();
     }
 
+    @Override
+    public String getContentType() {
+        if (contentType != null) {
+            return contentType;
+        }
+        return super.getContentType();
+    }
+
     public byte[] getContent() {
         return content.toByteArray();
     }
 
     public String getContentAsString() {
-        return new String(getContent(), java.nio.charset.StandardCharsets.UTF_8);
+        return new String(getContent(), StandardCharsets.UTF_8);
+    }
+
+    public int getContentSize() {
+        return content.size();
+    }
+
+    public boolean hasContent() {
+        return content.size() > 0;
     }
 
     public void copyBodyToResponse() throws IOException {
         byte[] body = getContent();
         if (body.length > 0) {
-            getResponse().getOutputStream().write(body);
-            getResponse().getOutputStream().flush();
+            HttpServletResponse response = (HttpServletResponse) getResponse();
+            ServletOutputStream originalOutputStream = response.getOutputStream();
+            originalOutputStream.write(body);
+            originalOutputStream.flush();
         }
     }
 
@@ -99,6 +128,11 @@ public class CachingResponseWrapper extends HttpServletResponseWrapper {
         }
 
         @Override
+        public void write(byte[] b) throws IOException {
+            buffer.write(b);
+        }
+
+        @Override
         public boolean isReady() {
             return true;
         }
@@ -106,6 +140,7 @@ public class CachingResponseWrapper extends HttpServletResponseWrapper {
         @Override
         public void setWriteListener(WriteListener writeListener) {
             // Not implemented for synchronous writing
+            throw new UnsupportedOperationException("Not supported");
         }
     }
 }

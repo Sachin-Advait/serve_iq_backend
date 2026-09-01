@@ -16,6 +16,13 @@ import java.util.Collection;
 import java.util.Enumeration;
 import java.util.UUID;
 
+/**
+ * Production-grade request/response logging filter.
+ * - Skips multipart requests (file uploads) to avoid consuming input streams
+ * - Skips static resources and health check endpoints
+ * - Masks sensitive headers
+ * - Truncates large bodies
+ */
 @Slf4j
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -24,10 +31,22 @@ public class RequestResponseLoggingFilter extends OncePerRequestFilter {
     private static final int MAX_BODY_LENGTH = 5000;
     private static final String[] SENSITIVE_HEADERS = {"authorization", "cookie", "set-cookie"};
 
+    // Endpoints to skip logging entirely
+    private static final String[] SKIP_URIS = {
+            "/static/", "/css/", "/js/", "/images/", "/favicon.ico",
+            "/actuator", "/hls/", "/video/stream", "/stream/", "/ws"
+    };
+
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
+
+        // Check if this is a multipart request (file upload)
+        if (isMultipartRequest(request)) {
+            handleMultipartRequest(request, response, filterChain);
+            return;
+        }
 
         // Skip logging for certain endpoints
         if (shouldSkipLogging(request)) {
@@ -35,30 +54,55 @@ public class RequestResponseLoggingFilter extends OncePerRequestFilter {
             return;
         }
 
-        // Create wrappers
+        // Wrap request and response for body caching
         CachingRequestWrapper requestWrapper = new CachingRequestWrapper(request);
         CachingResponseWrapper responseWrapper = new CachingResponseWrapper(response);
 
         String requestId = generateRequestId();
         long startTime = System.currentTimeMillis();
 
-        // Log request details
+        // Log request
         logRequest(requestWrapper, requestId);
 
         try {
             // Process the request
             filterChain.doFilter(requestWrapper, responseWrapper);
 
-            // Log response details
+            // Log response
             logResponse(responseWrapper, requestId, startTime);
 
         } catch (Exception e) {
-            // Log error details
+            // Log error
             logError(e, requestId, startTime);
             throw e;
         } finally {
-            // Copy response body back to original response
-            responseWrapper.copyBodyToResponse();
+            // Copy cached response body back to original response
+            copyResponseBody(responseWrapper);
+        }
+    }
+
+    /**
+     * Handle multipart requests without wrapping to avoid stream consumption issues.
+     */
+    private void handleMultipartRequest(HttpServletRequest request,
+                                        HttpServletResponse response,
+                                        FilterChain filterChain) throws ServletException, IOException {
+        long startTime = System.currentTimeMillis();
+
+        log.debug("MULTIPART REQUEST: {} {} (Content-Type: {})",
+                request.getMethod(),
+                request.getRequestURI(),
+                request.getContentType());
+
+        try {
+            filterChain.doFilter(request, response);
+        } finally {
+            long duration = System.currentTimeMillis() - startTime;
+            log.debug("MULTIPART RESPONSE: {} {} - Status: {} - Duration: {}ms",
+                    request.getMethod(),
+                    request.getRequestURI(),
+                    response.getStatus(),
+                    duration);
         }
     }
 
@@ -81,7 +125,7 @@ public class RequestResponseLoggingFilter extends OncePerRequestFilter {
         // Log headers
         logMessage.append("║ Headers:\n");
         Enumeration<String> headerNames = request.getHeaderNames();
-        while (headerNames.hasMoreElements()) {
+        while (headerNames != null && headerNames.hasMoreElements()) {
             String headerName = headerNames.nextElement();
             String headerValue = maskSensitiveHeader(headerName, request.getHeader(headerName));
             logMessage.append("║   ").append(headerName).append(": ").append(headerValue).append("\n");
@@ -89,12 +133,8 @@ public class RequestResponseLoggingFilter extends OncePerRequestFilter {
 
         // Log request body
         logMessage.append("║ Body:\n");
-        if (request.isMultipartRequest()) {
-            logMessage.append("║   [MULTIPART CONTENT - NOT LOGGED]\n");
-        } else {
-            String body = getRequestBody(request);
-            logMessage.append("║   ").append(body).append("\n");
-        }
+        String body = getRequestBody(request);
+        logMessage.append("║   ").append(body).append("\n");
 
         logMessage.append("╚══════════════════════════════════════════════════════════════════╝");
 
@@ -153,38 +193,46 @@ public class RequestResponseLoggingFilter extends OncePerRequestFilter {
                 e.getClass().getName(),
                 e.getMessage(),
                 duration,
-                getRootCauseMessage(e),
-                e);
+                getRootCauseMessage(e));
     }
 
     private String getRequestBody(CachingRequestWrapper request) {
-        byte[] content = request.getBody();
-        if (content.length == 0) {
+        if (request.isMultipartRequest()) {
+            return "[MULTIPART CONTENT - NOT LOGGED]";
+        }
+
+        if (!request.hasBody()) {
             return "[EMPTY]";
         }
 
-        String body = new String(content, StandardCharsets.UTF_8);
+        String body = request.getBodyAsString();
         return truncateBody(body);
     }
 
     private String getResponseBody(CachingResponseWrapper response) {
-        byte[] content = response.getContent();
-        if (content.length == 0) {
+        if (!response.hasContent()) {
             return "[EMPTY]";
         }
 
         // Check if it's binary content
         String contentType = response.getContentType();
-        if (contentType != null &&
-                (contentType.contains("video") ||
-                        contentType.contains("image") ||
-                        contentType.contains("audio") ||
-                        contentType.contains("octet-stream"))) {
-            return "[BINARY CONTENT: " + contentType + ", Size: " + content.length + " bytes]";
+        if (contentType != null && isBinaryContent(contentType)) {
+            return "[BINARY CONTENT: " + contentType + ", Size: " + response.getContentSize() + " bytes]";
         }
 
-        String body = new String(content, StandardCharsets.UTF_8);
+        String body = response.getContentAsString();
         return truncateBody(body);
+    }
+
+    private boolean isBinaryContent(String contentType) {
+        String lower = contentType.toLowerCase();
+        return lower.contains("video") ||
+                lower.contains("image") ||
+                lower.contains("audio") ||
+                lower.contains("octet-stream") ||
+                lower.contains("pdf") ||
+                lower.contains("zip") ||
+                lower.contains("gzip");
     }
 
     private String truncateBody(String body) {
@@ -208,36 +256,36 @@ public class RequestResponseLoggingFilter extends OncePerRequestFilter {
         return headerValue;
     }
 
+    private boolean isMultipartRequest(HttpServletRequest request) {
+        String contentType = request.getContentType();
+        return contentType != null && contentType.toLowerCase().startsWith("multipart/");
+    }
+
     private boolean shouldSkipLogging(HttpServletRequest request) {
         String uri = request.getRequestURI();
         String method = request.getMethod();
-
-        // Skip static resources
-        if (uri.startsWith("/static/") ||
-                uri.startsWith("/css/") ||
-                uri.startsWith("/js/") ||
-                uri.startsWith("/images/") ||
-                uri.startsWith("/favicon.ico") ||
-                uri.startsWith("/actuator")) {
-            return true;
-        }
 
         // Skip OPTIONS requests (CORS preflight)
         if ("OPTIONS".equalsIgnoreCase(method)) {
             return true;
         }
 
-        // Skip video streaming endpoints if too noisy
-        if (uri.contains("/hls/") || uri.contains("/video/stream") || uri.contains("/stream/")) {
-            return true;
-        }
-
-        // Skip WebSocket endpoints
-        if (uri.contains("/ws")) {
-            return true;
+        // Skip configured URIs
+        for (String skipUri : SKIP_URIS) {
+            if (uri.startsWith(skipUri) || uri.contains(skipUri)) {
+                return true;
+            }
         }
 
         return false;
+    }
+
+    private void copyResponseBody(CachingResponseWrapper responseWrapper) {
+        try {
+            responseWrapper.copyBodyToResponse();
+        } catch (IOException e) {
+            log.warn("Failed to copy response body: {}", e.getMessage());
+        }
     }
 
     private String generateRequestId() {
