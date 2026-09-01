@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -154,17 +155,17 @@ public class TemplateService {
         if (request.getImageCarouselEnabled() != null) template.setImageCarouselEnabled(request.getImageCarouselEnabled());
         if (request.getFeedbackVideoEnabled() != null) template.setFeedbackVideoEnabled(request.getFeedbackVideoEnabled());
 
-        // KIOSK PRINT FIELDS
+        // KIOSK PRINT FIELDS - WITH ENCODING FIX
         if (request.getKioskPrintEnabled() != null) template.setKioskPrintEnabled(request.getKioskPrintEnabled());
         if (request.getKioskPrintLanguage() != null) template.setKioskPrintLanguage(request.getKioskPrintLanguage());
-        if (request.getKioskHeaderTitle() != null) template.setKioskHeaderTitle(request.getKioskHeaderTitle());
-        if (request.getKioskHeaderSubtitle() != null) template.setKioskHeaderSubtitle(request.getKioskHeaderSubtitle());
-        if (request.getKioskTokenTitle() != null) template.setKioskTokenTitle(request.getKioskTokenTitle());
-        if (request.getKioskServiceLabel() != null) template.setKioskServiceLabel(request.getKioskServiceLabel());
-        if (request.getKioskDateLabel() != null) template.setKioskDateLabel(request.getKioskDateLabel());
-        if (request.getKioskTimeLabel() != null) template.setKioskTimeLabel(request.getKioskTimeLabel());
-        if (request.getKioskWaitingMessage() != null) template.setKioskWaitingMessage(request.getKioskWaitingMessage());
-        if (request.getKioskThankYouMessage() != null) template.setKioskThankYouMessage(request.getKioskThankYouMessage());
+        if (request.getKioskHeaderTitle() != null) template.setKioskHeaderTitle(fixEncoding(request.getKioskHeaderTitle()));
+        if (request.getKioskHeaderSubtitle() != null) template.setKioskHeaderSubtitle(fixEncoding(request.getKioskHeaderSubtitle()));
+        if (request.getKioskTokenTitle() != null) template.setKioskTokenTitle(fixEncoding(request.getKioskTokenTitle()));
+        if (request.getKioskServiceLabel() != null) template.setKioskServiceLabel(fixEncoding(request.getKioskServiceLabel()));
+        if (request.getKioskDateLabel() != null) template.setKioskDateLabel(fixEncoding(request.getKioskDateLabel()));
+        if (request.getKioskTimeLabel() != null) template.setKioskTimeLabel(fixEncoding(request.getKioskTimeLabel()));
+        if (request.getKioskWaitingMessage() != null) template.setKioskWaitingMessage(fixEncoding(request.getKioskWaitingMessage()));
+        if (request.getKioskThankYouMessage() != null) template.setKioskThankYouMessage(fixEncoding(request.getKioskThankYouMessage()));
 
         template.setActive(false);
         template.setDefault(false);
@@ -213,21 +214,21 @@ public class TemplateService {
         if (updatedConfig.getKioskPrintLanguage() != null)
             activeTemplate.setKioskPrintLanguage(updatedConfig.getKioskPrintLanguage());
         if (updatedConfig.getKioskHeaderTitle() != null)
-            activeTemplate.setKioskHeaderTitle(updatedConfig.getKioskHeaderTitle());
+            activeTemplate.setKioskHeaderTitle(fixEncoding(updatedConfig.getKioskHeaderTitle()));
         if (updatedConfig.getKioskHeaderSubtitle() != null)
-            activeTemplate.setKioskHeaderSubtitle(updatedConfig.getKioskHeaderSubtitle());
+            activeTemplate.setKioskHeaderSubtitle(fixEncoding(updatedConfig.getKioskHeaderSubtitle()));
         if (updatedConfig.getKioskTokenTitle() != null)
-            activeTemplate.setKioskTokenTitle(updatedConfig.getKioskTokenTitle());
+            activeTemplate.setKioskTokenTitle(fixEncoding(updatedConfig.getKioskTokenTitle()));
         if (updatedConfig.getKioskServiceLabel() != null)
-            activeTemplate.setKioskServiceLabel(updatedConfig.getKioskServiceLabel());
+            activeTemplate.setKioskServiceLabel(fixEncoding(updatedConfig.getKioskServiceLabel()));
         if (updatedConfig.getKioskDateLabel() != null)
-            activeTemplate.setKioskDateLabel(updatedConfig.getKioskDateLabel());
+            activeTemplate.setKioskDateLabel(fixEncoding(updatedConfig.getKioskDateLabel()));
         if (updatedConfig.getKioskTimeLabel() != null)
-            activeTemplate.setKioskTimeLabel(updatedConfig.getKioskTimeLabel());
+            activeTemplate.setKioskTimeLabel(fixEncoding(updatedConfig.getKioskTimeLabel()));
         if (updatedConfig.getKioskWaitingMessage() != null)
-            activeTemplate.setKioskWaitingMessage(updatedConfig.getKioskWaitingMessage());
+            activeTemplate.setKioskWaitingMessage(fixEncoding(updatedConfig.getKioskWaitingMessage()));
         if (updatedConfig.getKioskThankYouMessage() != null)
-            activeTemplate.setKioskThankYouMessage(updatedConfig.getKioskThankYouMessage());
+            activeTemplate.setKioskThankYouMessage(fixEncoding(updatedConfig.getKioskThankYouMessage()));
 
         activeTemplate.setUpdatedAt(LocalDateTime.now());
         AppConfigTemplate saved = templateRepository.save(activeTemplate);
@@ -241,6 +242,10 @@ public class TemplateService {
     public AppConfigTemplate updateTemplate(String templateId, TemplateRequestDTO request) {
         AppConfigTemplate template = templateRepository.findById(templateId)
                 .orElseThrow(() -> new BusinessException("Template not found"));
+
+        // DEBUG LOGGING
+        log.info("🔍 RECEIVED kioskHeaderTitle: [{}]", request.getKioskHeaderTitle());
+        log.info("🔍 RECEIVED kioskHeaderSubtitle: [{}]", request.getKioskHeaderSubtitle());
 
         if (request.getTemplateName() != null) template.setTemplateName(request.getTemplateName());
         if (request.getDescription() != null) template.setDescription(request.getDescription());
@@ -260,17 +265,17 @@ public class TemplateService {
         if (request.getImageCarouselEnabled() != null) template.setImageCarouselEnabled(request.getImageCarouselEnabled());
         if (request.getFeedbackVideoEnabled() != null) template.setFeedbackVideoEnabled(request.getFeedbackVideoEnabled());
 
-        // KIOSK PRINT FIELDS
+        // KIOSK PRINT FIELDS - WITH ENCODING FIX
         if (request.getKioskPrintEnabled() != null) template.setKioskPrintEnabled(request.getKioskPrintEnabled());
         if (request.getKioskPrintLanguage() != null) template.setKioskPrintLanguage(request.getKioskPrintLanguage());
-        if (request.getKioskHeaderTitle() != null) template.setKioskHeaderTitle(request.getKioskHeaderTitle());
-        if (request.getKioskHeaderSubtitle() != null) template.setKioskHeaderSubtitle(request.getKioskHeaderSubtitle());
-        if (request.getKioskTokenTitle() != null) template.setKioskTokenTitle(request.getKioskTokenTitle());
-        if (request.getKioskServiceLabel() != null) template.setKioskServiceLabel(request.getKioskServiceLabel());
-        if (request.getKioskDateLabel() != null) template.setKioskDateLabel(request.getKioskDateLabel());
-        if (request.getKioskTimeLabel() != null) template.setKioskTimeLabel(request.getKioskTimeLabel());
-        if (request.getKioskWaitingMessage() != null) template.setKioskWaitingMessage(request.getKioskWaitingMessage());
-        if (request.getKioskThankYouMessage() != null) template.setKioskThankYouMessage(request.getKioskThankYouMessage());
+        if (request.getKioskHeaderTitle() != null) template.setKioskHeaderTitle(fixEncoding(request.getKioskHeaderTitle()));
+        if (request.getKioskHeaderSubtitle() != null) template.setKioskHeaderSubtitle(fixEncoding(request.getKioskHeaderSubtitle()));
+        if (request.getKioskTokenTitle() != null) template.setKioskTokenTitle(fixEncoding(request.getKioskTokenTitle()));
+        if (request.getKioskServiceLabel() != null) template.setKioskServiceLabel(fixEncoding(request.getKioskServiceLabel()));
+        if (request.getKioskDateLabel() != null) template.setKioskDateLabel(fixEncoding(request.getKioskDateLabel()));
+        if (request.getKioskTimeLabel() != null) template.setKioskTimeLabel(fixEncoding(request.getKioskTimeLabel()));
+        if (request.getKioskWaitingMessage() != null) template.setKioskWaitingMessage(fixEncoding(request.getKioskWaitingMessage()));
+        if (request.getKioskThankYouMessage() != null) template.setKioskThankYouMessage(fixEncoding(request.getKioskThankYouMessage()));
 
         template.setUpdatedAt(LocalDateTime.now());
         AppConfigTemplate saved = templateRepository.save(template);
@@ -280,6 +285,31 @@ public class TemplateService {
         }
 
         return saved;
+    }
+
+    /**
+     * Fix Arabic text encoding - converts from ISO-8859-1 back to UTF-8 if garbled
+     */
+    private String fixEncoding(String text) {
+        if (text == null || text.isEmpty()) return text;
+
+        // Log for debugging
+        log.info("🔧 Encoding check - Original: [{}]", text);
+
+        // Check if text contains garbled characters
+        if (text.contains("Ù") || text.contains("Ø") || text.contains("Â") || text.contains("Ã")) {
+            try {
+                String fixed = new String(text.getBytes(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8);
+                log.info("🔧 Encoding fixed - From: [{}] To: [{}]", text, fixed);
+                return fixed;
+            } catch (Exception e) {
+                log.warn("Failed to fix encoding: {}", e.getMessage());
+            }
+        } else {
+            log.info("✅ Encoding OK - Text is already correct: [{}]", text);
+        }
+
+        return text;
     }
 
     @Transactional
