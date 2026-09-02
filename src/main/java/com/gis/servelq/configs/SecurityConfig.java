@@ -71,6 +71,7 @@ public class SecurityConfig {
                         .requestMatchers("/serveiq/api/reports/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/serveiq/api/branches/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/serveiq/api/whatsapp/**").hasRole("ADMIN")
+                        .requestMatchers("/serveiq/api/admin/ad-sync/**").hasRole("ADMIN")
 
                         // Serving customers
                         .requestMatchers("/serveiq/api/agent/**")

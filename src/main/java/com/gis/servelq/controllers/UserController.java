@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -24,9 +25,43 @@ public class UserController {
 
     private final UserService userService;
 
+    /**
+     * Get all users with optional pagination, search, and filters
+     * No params → returns full list (backward compatible)
+     */
     @GetMapping
-    public List<UserResponseDTO> getAllUsers() {
-        return userService.getAllUsers().stream().map(UserResponseDTO::new).collect(Collectors.toList());
+    public ResponseEntity<?> getAllUsers(
+            @RequestParam(required = false, defaultValue = "0") int page,
+            @RequestParam(required = false, defaultValue = "10") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String role,
+            @RequestParam(required = false) String sortBy,
+            @RequestParam(required = false, defaultValue = "asc") String sortDirection) {
+
+        boolean hasParams = search != null || role != null || sortBy != null
+                || page > 0 || size != 10;
+
+        if (!hasParams) {
+            // Legacy: return full list
+            List<UserResponseDTO> allUsers = userService.getAllUsers().stream()
+                    .map(UserResponseDTO::new)
+                    .collect(Collectors.toList());
+            return ResponseEntity.ok(allUsers);
+        }
+
+        // Paginated
+        PageResponseDTO<UserResponseDTO> result = userService.getUsersPaginated(
+                page, size, search, role, sortBy, sortDirection);
+        return ResponseEntity.ok(new ApiResponseDTO<>(true, "Users fetched successfully", result));
+    }
+
+    /**
+     * Get user statistics
+     */
+    @GetMapping("/stats")
+    public ResponseEntity<ApiResponseDTO<Map<String, Object>>> getUserStats() {
+        return ResponseEntity.ok(new ApiResponseDTO<>(true, "User stats fetched successfully",
+                userService.getUserStats()));
     }
 
     @GetMapping("/{id}")
@@ -36,7 +71,6 @@ public class UserController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    /** Profile and assignment fields. Role and password are handled separately. */
     @PutMapping("/{id}")
     public ResponseEntity<UserResponseDTO> updateUser(@PathVariable String id,
                                                       @RequestBody User user,
@@ -61,10 +95,6 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
-    /**
-     * A user changes their own password and must supply the current one. Note
-     * this is under /me so it cannot be pointed at somebody else's account.
-     */
     @PostMapping("/me/password")
     public ResponseEntity<Void> changeOwnPassword(@AuthenticationPrincipal AuthenticatedUser caller,
                                                   @Valid @RequestBody ChangePasswordRequest request) {
@@ -85,6 +115,7 @@ public class UserController {
         User updatedUser = userService.updateFcmToken(id, req.getFcmToken());
         return ResponseEntity.ok(new UserResponseDTO(updatedUser));
     }
+
     @GetMapping("/roles")
     public ResponseEntity<List<String>> getAllRoles() {
         List<String> roles = Arrays.stream(UserRole.values())
@@ -93,13 +124,30 @@ public class UserController {
         return ResponseEntity.ok(roles);
     }
 
+    /**
+     * Get users by role with optional pagination
+     */
     @GetMapping("/role/{role}")
-    public ResponseEntity<List<UserResponseDTO>> getUsersByRole(@PathVariable UserRole role) {
-        List<UserResponseDTO> usersDto = userService.getUsersByRole(role).stream()
-                .map(UserResponseDTO::new)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(usersDto);
+    public ResponseEntity<?> getUsersByRole(
+            @PathVariable UserRole role,
+            @RequestParam(required = false, defaultValue = "0") int page,
+            @RequestParam(required = false, defaultValue = "10") int size,
+            @RequestParam(required = false) String sortBy,
+            @RequestParam(required = false, defaultValue = "asc") String sortDirection) {
+
+        boolean hasParams = page > 0 || size != 10 || sortBy != null;
+
+        if (!hasParams) {
+            // Legacy behavior
+            List<UserResponseDTO> usersDto = userService.getUsersByRole(role).stream()
+                    .map(UserResponseDTO::new)
+                    .collect(Collectors.toList());
+            return ResponseEntity.ok(usersDto);
+        }
+
+        // Paginated
+        PageResponseDTO<UserResponseDTO> result = userService.getUsersByRolePaginated(
+                role, page, size, sortBy, sortDirection);
+        return ResponseEntity.ok(new ApiResponseDTO<>(true, "Users fetched successfully", result));
     }
-
-
 }
