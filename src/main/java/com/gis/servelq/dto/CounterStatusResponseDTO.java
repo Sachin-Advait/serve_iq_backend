@@ -18,11 +18,13 @@ public class CounterStatusResponseDTO {
     private String tokenId;
     private String serviceId;
     private String serviceName;
+    private String serviceCode;  // ADD THIS FIELD
 
     public void clearTokenDetails() {
         this.tokenId = null;
         this.tokenNumber = null;
         this.serviceId = null;
         this.serviceName = null;
+        this.serviceCode = null;  // ADD THIS LINE
     }
 }
