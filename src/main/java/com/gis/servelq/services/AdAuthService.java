@@ -1,8 +1,10 @@
 package com.gis.servelq.services;
 
+import com.gis.servelq.models.CounterStatus;
 import com.gis.servelq.models.User;
 import com.gis.servelq.models.UserRole;
 import com.gis.servelq.repository.BranchRepository;
+import com.gis.servelq.repository.CounterRepository;
 import com.gis.servelq.repository.UserRepository;
 import com.gis.servelq.security.JwtService;
 import lombok.AllArgsConstructor;
@@ -23,6 +25,7 @@ public class AdAuthService {
     private final ActiveDirectoryService adService;
     private final UserRepository userRepository;
     private final BranchRepository branchRepository;
+    private final CounterRepository counterRepository;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;  // For local DB password check
 
@@ -88,6 +91,9 @@ public class AdAuthService {
             return AuthResult.failed("Account is deactivated");
         }
 
+        // Reset the user's assigned counter to IDLE/unpaused on every login
+        activateUserCounter(savedUser);
+
         // Generate JWT
         String token = jwtService.generateToken(savedUser);
         long expiresIn = jwtService.getExpirationMinutes() * 60;
@@ -131,12 +137,40 @@ public class AdAuthService {
         assignDefaultBranchIfNeeded(user);
         user = userRepository.save(user);
 
+        // Reset the user's assigned counter to IDLE/unpaused on every login
+        activateUserCounter(user);
+
         // Generate JWT
         String token = jwtService.generateToken(user);
         long expiresIn = jwtService.getExpirationMinutes() * 60;
 
         log.info("PostgreSQL login successful for: {}", email);
         return AuthResult.success(token, expiresIn, user);
+    }
+
+    /**
+     * On successful login, put the user's assigned counter (if any) back into
+     * a serviceable state: enabled counters go to IDLE with paused=false, so
+     * an agent who logged out mid-break/mid-call doesn't come back to a
+     * counter still stuck showing their last status.
+     * <p>
+     * Best-effort: a missing/already-deleted counter just logs and moves on,
+     * it should never block login.
+     */
+    private void activateUserCounter(User user) {
+        String counterId = user.getCounterId();
+        if (counterId == null || counterId.isBlank()) {
+            return;
+        }
+
+        counterRepository.findById(counterId).ifPresentOrElse(counter -> {
+            counter.setStatus(CounterStatus.IDLE);
+            counter.setPaused(false);
+            counterRepository.save(counter);
+            log.info("Counter {} reset to IDLE/unpaused on login for user {}",
+                    counterId, user.getEmail());
+        }, () -> log.warn("User {} references missing counter {} on login",
+                user.getEmail(), counterId));
     }
 
     private void assignDefaultBranchIfNeeded(User user) {
