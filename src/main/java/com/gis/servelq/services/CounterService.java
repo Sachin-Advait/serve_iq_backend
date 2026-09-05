@@ -2,10 +2,7 @@ package com.gis.servelq.services;
 
 import com.gis.servelq.Exceptions.BusinessException;
 import com.gis.servelq.Exceptions.ResourceNotFoundException;
-import com.gis.servelq.dto.CounterRequest;
-import com.gis.servelq.dto.CounterResponseDTO;
-import com.gis.servelq.dto.CounterStatusResponseDTO;
-import com.gis.servelq.dto.CounterUpdateRequest;
+import com.gis.servelq.dto.*;
 import com.gis.servelq.events.TokenEvent;
 import com.gis.servelq.events.TokenEventPublisher;
 import com.gis.servelq.events.TokenEventType;
@@ -21,6 +18,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -29,6 +27,8 @@ import java.util.stream.Collectors;
 @Slf4j
 public class CounterService {
 
+    private static final List<TokenStatus> ACTIVE_TOKEN_STATUSES =
+            List.of(TokenStatus.SERVING, TokenStatus.CALLING, TokenStatus.REVIEW);
     private final CounterRepository counterRepository;
     private final BranchRepository branchRepository;
     private final ServiceRepository serviceRepository;
@@ -477,6 +477,65 @@ public class CounterService {
         if (!StringUtils.hasText(request.getBranchId())) {
             throw new BusinessException("Branch ID is required");
         }
+    }
+
+    /**
+     * TV/display-board feed: every counter in the branch with its current
+     * token number, serving service, and status — built with two bulk
+     * queries (services, active tokens) instead of one query per counter.
+     */
+    @Transactional(readOnly = true)
+    public List<CounterDisplayDTO> getCounterDisplayBoard(String branchId) {
+        List<Counter> counters = counterRepository.findByBranchIdOrderByCreatedAtAsc(branchId);
+        if (counters.isEmpty()) {
+            return List.of();
+        }
+
+        List<String> counterIds = counters.stream()
+                .map(Counter::getId)
+                .collect(Collectors.toList());
+
+        List<String> serviceIds = counters.stream()
+                .map(Counter::getServiceId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+
+        Map<String, String> serviceNameById = serviceRepository.findAllById(serviceIds).stream()
+                .collect(Collectors.toMap(Services::getId, Services::getName));
+
+        Map<String, Token> activeTokenByCounter = tokenRepository
+                .findByStatusInAndAssignedCounterIdIn(ACTIVE_TOKEN_STATUSES, counterIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        Token::getAssignedCounterId,
+                        t -> t,
+                        (first, second) -> first
+                ));
+
+        return counters.stream().map(counter -> {
+            CounterDisplayDTO dto = new CounterDisplayDTO();
+            dto.setCounterId(counter.getId());
+            dto.setCounterCode(counter.getCode());
+            dto.setCounterName(counter.getName());
+            dto.setEnabled(counter.getEnabled());
+            dto.setPaused(counter.getPaused());
+            dto.setCounterStatus(counter.getStatus());
+
+            Token activeToken = activeTokenByCounter.get(counter.getId());
+            if (activeToken != null) {
+                dto.setTokenId(activeToken.getId());
+                dto.setTokenNumber(activeToken.getToken());
+                dto.setCalledAt(activeToken.getStartAt());
+                dto.setServiceId(activeToken.getServiceId());
+                dto.setServiceName(serviceNameById.get(activeToken.getServiceId()));
+            } else {
+                dto.setServiceId(counter.getServiceId());
+                dto.setServiceName(serviceNameById.get(counter.getServiceId()));
+            }
+
+            return dto;
+        }).collect(Collectors.toList());
     }
 
     /**

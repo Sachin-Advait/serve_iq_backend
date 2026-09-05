@@ -1,5 +1,6 @@
 package com.gis.servelq.controllers;
 
+import com.gis.servelq.dto.CounterDisplayDTO;
 import com.gis.servelq.dto.CounterRequest;
 import com.gis.servelq.dto.CounterResponseDTO;
 import com.gis.servelq.dto.CounterUpdateRequest;
@@ -61,7 +62,6 @@ public class CounterController {
         }
     }
 
-    // Delete counter
     @DeleteMapping("/{counterId}")
     public ResponseEntity<?> deleteCounter(@PathVariable String counterId,
                                            @AuthenticationPrincipal AuthenticatedUser user) {
@@ -105,5 +105,11 @@ public class CounterController {
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
+    }
+
+    // TV/display-board feed: token, counter, service, status for every counter in a branch
+    @GetMapping("/display-board/branch/{branchId}")
+    public ResponseEntity<List<CounterDisplayDTO>> getCounterDisplayBoard(@PathVariable String branchId) {
+        return ResponseEntity.ok(counterService.getCounterDisplayBoard(branchId));
     }
 }

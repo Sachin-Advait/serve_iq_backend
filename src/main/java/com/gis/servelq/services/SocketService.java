@@ -1,6 +1,7 @@
 package com.gis.servelq.services;
 
 import com.gis.servelq.dto.AppDashboardDTO;
+import com.gis.servelq.dto.CounterDisplayDTO;
 import com.gis.servelq.dto.TVDisplayResponseDTO;
 import com.gis.servelq.dto.TokenResponseDTO;
 import com.gis.servelq.models.AppType;
@@ -19,6 +20,7 @@ public class SocketService {
     private final SimpMessagingTemplate messagingTemplate;
     private final TVDisplayService tvDisplayService;
     private final AppConfigService appConfigService;
+    private final CounterService counterService;
 
     public void broadcast(String destination, Object payload) {
         log.info("🔥 WEBSOCKET PUSH → destination={}", destination);
@@ -43,6 +45,11 @@ public class SocketService {
         broadcast("/topic/tv/" + branchId, data);
     }
 
+    public void notifyMeetingTV(String branchId) {
+        List<CounterDisplayDTO> data = counterService.getCounterDisplayBoard(branchId);
+        broadcast("/topic/meeting-tv/" + branchId, data);
+    }
+
     public void notifyBranchTVMedia(String branchId, Object payload) {
         broadcast("/topic/tv-media/" + branchId, payload);
     }
@@ -50,6 +57,7 @@ public class SocketService {
     public void notifyAgentQueue(String counterId, List<TokenResponseDTO> payload) {
         broadcast("/topic/agent-upcoming/" + counterId, payload);
     }
+
     public void broadcastAppDashboard(AppType appType) {
         try {
             AppDashboardDTO dashboard = appConfigService.getAppDashboard(appType);

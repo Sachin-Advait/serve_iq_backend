@@ -31,6 +31,7 @@ public class TokenEventDispatcher {
                         event.getCounterId(),
                         counterService.getCounterStatusDetails(event.getCounterId())
                 );
+                socketService.notifyMeetingTV(event.getBranchId());
             }
 
             case TOKEN_SERVING_STARTED,
@@ -39,6 +40,7 @@ public class TokenEventDispatcher {
                  TOKEN_HELD,
                  TOKEN_NO_SHOW -> {
                 socketService.notifyBranchTV(event.getBranchId());
+                socketService.notifyMeetingTV(event.getBranchId());
 
                 var data = counterService.getCounterStatusDetails(event.getCounterId());
                 socketService.notifyCounterDisplay(event.getCounterId(), data);
@@ -55,6 +57,7 @@ public class TokenEventDispatcher {
             case COUNTER_STATUS_CHANGED -> {
                 var data = counterService.getCounterStatusDetails(event.getCounterId());
                 socketService.notifyCounterDisplay(event.getCounterId(), data);
+                socketService.notifyMeetingTV(event.getBranchId());
             }
 
             case COUNTER_DISPLAY_IMAGE_CHANGED -> {

@@ -22,27 +22,23 @@ public interface TokenRepository extends JpaRepository<Token, String> {
 
     long countByBranchId(String branchId);
 
-    /**
-     * Same ordering but with the row limit applied by the database.
-     * <p>
-     * The TV display asked for every WAITING/HOLD token for the branch and then
-     * did .stream().limit(10) in Java, so Postgres shipped and Hibernate
-     * hydrated the entire queue to show ten of them.
-     */
     List<Token> findByBranchIdAndStatusOrderByPriorityAscCreatedAtAsc(
             String branchId, TokenStatus status, Pageable pageable);
 
-    /**
-     * Counts for every status the board shows, in one round trip instead of the
-     * four separate COUNT queries it used to run. Statuses with no rows are
-     * absent from the result, so the caller defaults them to zero.
-     */
     @Query("SELECT t.status, COUNT(t) FROM Token t WHERE t.branchId = :branchId GROUP BY t.status")
     List<Object[]> countByStatusForBranch(@Param("branchId") String branchId);
 
     List<Token> findTop20ByStatusAndAssignedCounterIdOrderByEndAtDesc(TokenStatus status, String assignedCounterId);
 
     Optional<Token> findByStatusInAndAssignedCounterId(List<TokenStatus> statuses, String assignedCounterId);
+
+    /**
+     * Bulk version of findByStatusInAndAssignedCounterId — one query for the
+     * whole display board instead of one query per counter. There should be
+     * at most one SERVING/CALLING/REVIEW token per counter, so the caller can
+     * safely key the result by assignedCounterId.
+     */
+    List<Token> findByStatusInAndAssignedCounterIdIn(List<TokenStatus> statuses, List<String> assignedCounterIds);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @QueryHints(@QueryHint(

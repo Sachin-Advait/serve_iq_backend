@@ -451,6 +451,15 @@ public class AgentService {
         counter.setPaused(false);
         Counter updated = counterRepository.save(counter);
 
+        tokenEventPublisher.publish(new TokenEvent(
+                TokenEventType.COUNTER_STATUS_CHANGED,
+                counter.getBranchId(),
+                null,
+                null,
+                counter.getId(),
+                Instant.now()
+        ));
+
         auditLogService.log(
                 AuditAction.COUNTER_STATUS_CHANGED,
                 "Counter",
@@ -475,6 +484,15 @@ public class AgentService {
         counter.setPaused(paused);
         counter.setStatus(paused ? CounterStatus.PAUSED : CounterStatus.IDLE);
         Counter updated = counterRepository.save(counter);
+
+        tokenEventPublisher.publish(new TokenEvent(
+                TokenEventType.COUNTER_STATUS_CHANGED,
+                counter.getBranchId(),
+                null,
+                null,
+                counter.getId(),
+                Instant.now()
+        ));
 
         auditLogService.log(
                 AuditAction.COUNTER_STATUS_CHANGED,
