@@ -226,16 +226,11 @@ public class TvContentService {
 
     @Transactional
     public TvContent activateVideo(String branchId, String id) {
-        List<String> allowedTypes = List.of("URL", "VIDEO");
-
-        List<TvContent> all = tvContentRepository.findByBranchIdAndTypeInAndArchivedFalse(branchId, allowedTypes);
-        all.forEach(c -> c.setActive(false));
-        tvContentRepository.saveAll(all);
-
         TvContent selected = tvContentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Content not found"));
 
-        selected.setActive(true);
+        // Toggle active status instead of deactivating all others
+        selected.setActive(!selected.getActive());
         TvContent saved = tvContentRepository.save(selected);
 
         tokenEventPublisher.publish(new TokenEvent(
@@ -243,9 +238,11 @@ public class TvContentService {
                 branchId, null, null, null, Instant.now()
         ));
 
+        log.info("Content {} toggled to {} for branch {}",
+                saved.getId(), saved.getActive() ? "ACTIVE" : "INACTIVE", branchId);
+
         return saved;
     }
-
     // ==================== ARCHIVE/UNARCHIVE ====================
 
     @Transactional

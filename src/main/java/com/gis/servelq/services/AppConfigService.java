@@ -479,7 +479,7 @@ public class AppConfigService {
             // Get VIDEO and IPTV_URL type content for TV Display
             List<TvContent> activeVideos = Boolean.TRUE.equals(config.getVideosEnabled())
                     ? tvContentRepository.findByTypeInAndActiveTrueAndArchivedFalseOrderByCreatedAtDesc(
-                    List.of("VIDEO", "IPTV_URL"))
+                    List.of("VIDEO", "URL"))
                     : List.of();
 
             // Convert URLs to full URLs
@@ -518,7 +518,7 @@ public class AppConfigService {
 
             List<TvContent> activeFeedbackVideo = Boolean.TRUE.equals(config.getFeedbackVideoEnabled())
                     ? tvContentRepository.findByTypeInAndActiveTrueAndArchivedFalseOrderByCreatedAtDesc(
-                    List.of("VIDEO", "IPTV_URL"))
+                    List.of("VIDEO", "URL"))
                     : List.of();
 
             // Convert URLs to full URLs
