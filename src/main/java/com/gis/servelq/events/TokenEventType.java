@@ -13,8 +13,6 @@ public enum TokenEventType {
     // UI intent events
     AGENT_QUEUE_CHANGED,
     COUNTER_STATUS_CHANGED,
-    COUNTER_DISPLAY_IMAGE_CHANGED,
-    TV_MEDIA_CHANGED,
 
     // Feedback
     FEEDBACK_SUBMITTED,

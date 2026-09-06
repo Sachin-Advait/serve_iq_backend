@@ -28,10 +28,6 @@ public class SocketService {
         messagingTemplate.convertAndSend(destination, payload);
     }
 
-    public void notifyCounterDisplayImage(String branchId, Object payload) {
-        broadcast("/topic/counter-display/image/" + branchId, payload);
-    }
-
     public void notifyCounterDisplay(String counterId, Object payload) {
         broadcast("/topic/counter-display/" + counterId, payload);
     }
@@ -48,10 +44,6 @@ public class SocketService {
     public void notifyMeetingTV(String branchId) {
         List<CounterDisplayDTO> data = counterService.getCounterDisplayBoard(branchId);
         broadcast("/topic/meeting-tv/" + branchId, data);
-    }
-
-    public void notifyBranchTVMedia(String branchId, Object payload) {
-        broadcast("/topic/tv-media/" + branchId, payload);
     }
 
     public void notifyAgentQueue(String counterId, List<TokenResponseDTO> payload) {

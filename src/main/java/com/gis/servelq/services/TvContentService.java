@@ -3,9 +3,6 @@ package com.gis.servelq.services;
 import com.gis.servelq.Exceptions.BusinessException;
 import com.gis.servelq.Exceptions.ResourceNotFoundException;
 import com.gis.servelq.dto.TvContentResponseDTO;
-import com.gis.servelq.events.TokenEvent;
-import com.gis.servelq.events.TokenEventPublisher;
-import com.gis.servelq.events.TokenEventType;
 import com.gis.servelq.models.AppType;
 import com.gis.servelq.models.TvContent;
 import com.gis.servelq.repository.TvContentRepository;
@@ -20,8 +17,10 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.*;
 import java.nio.channels.FileChannel;
 import java.nio.file.*;
-import java.time.Instant;
-import java.util.*;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -45,37 +44,26 @@ public class TvContentService {
     private static final long MAX_VIDEO_SIZE = 10L * 1024 * 1024 * 1024; // 10GB
 
     private final TvContentRepository tvContentRepository;
-    private final TokenEventPublisher tokenEventPublisher;
     private final SocketService socketService;
-
+    private final Map<String, Object> uploadLocks = new ConcurrentHashMap<>();
     @Value("${app.base-url:http://localhost:8085}")
     private String baseUrl;
-
     @Value("${image.upload.dir}")
     private String uploadDir;
-
     @Value("${video.upload.dir:${image.upload.dir}/videos}")
     private String videoUploadDir;
-
     @Value("${video.chunk.dir:${image.upload.dir}/chunks}")
     private String chunkDir;
-
     @Value("${video.hls.dir:${image.upload.dir}/hls}")
     private String hlsDir;
-
     @Value("${video.ffmpeg-path:ffmpeg}")
     private String ffmpegPath;
-
     @Value("${video.archive.dir:${image.upload.dir}/archived/videos}")
     private String videoArchiveDir;
-
     @Value("${video.hls-archive.dir:${image.upload.dir}/archived/hls}")
     private String hlsArchiveDir;
-
     @Value("${image.archive.dir:${image.upload.dir}/archived/images}")
     private String imageArchiveDir;
-
-    private final Map<String, Object> uploadLocks = new ConcurrentHashMap<>();
 
     // ==================== QUERY METHODS ====================
 
@@ -153,11 +141,6 @@ public class TvContentService {
 
         deleteFilesForContent(content);
         tvContentRepository.deleteById(id);
-
-        tokenEventPublisher.publish(new TokenEvent(
-                TokenEventType.TV_MEDIA_CHANGED,
-                content.getBranchId(), null, null, null, Instant.now()
-        ));
     }
 
     private void deleteFilesForContent(TvContent content) {
@@ -213,8 +196,11 @@ public class TvContentService {
                 Files.walk(directory)
                         .sorted(Comparator.reverseOrder())
                         .forEach(path -> {
-                            try { Files.deleteIfExists(path); }
-                            catch (IOException e) { log.warn("Failed to delete: {}", e.getMessage()); }
+                            try {
+                                Files.deleteIfExists(path);
+                            } catch (IOException e) {
+                                log.warn("Failed to delete: {}", e.getMessage());
+                            }
                         });
             }
         } catch (IOException e) {
@@ -232,11 +218,6 @@ public class TvContentService {
         // Toggle active status instead of deactivating all others
         selected.setActive(!selected.getActive());
         TvContent saved = tvContentRepository.save(selected);
-
-        tokenEventPublisher.publish(new TokenEvent(
-                TokenEventType.TV_MEDIA_CHANGED,
-                branchId, null, null, null, Instant.now()
-        ));
 
         log.info("Content {} toggled to {} for branch {}",
                 saved.getId(), saved.getActive() ? "ACTIVE" : "INACTIVE", branchId);
@@ -258,11 +239,6 @@ public class TvContentService {
 
         archiveFilesAsync(content);
 
-        tokenEventPublisher.publish(new TokenEvent(
-                TokenEventType.TV_MEDIA_CHANGED,
-                content.getBranchId(), null, null, null, Instant.now()
-        ));
-
         return saved;
     }
 
@@ -278,10 +254,6 @@ public class TvContentService {
 
         unarchiveFilesAsync(content);
 
-        tokenEventPublisher.publish(new TokenEvent(
-                TokenEventType.TV_MEDIA_CHANGED,
-                content.getBranchId(), null, null, null, Instant.now()
-        ));
 
         return saved;
     }
@@ -639,11 +611,6 @@ public class TvContentService {
         content.setHlsUrl("/serveiq/api/tv-content/hls/" + contentId + "/master.m3u8");
         tvContentRepository.save(content);
 
-        tokenEventPublisher.publish(new TokenEvent(
-                TokenEventType.TV_MEDIA_CHANGED,
-                content.getBranchId(), null, null, null, Instant.now()
-        ));
-
         log.info("✅ HLS processing completed for {}: {}", contentId, content.getHlsUrl());
         socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
     }
@@ -734,13 +701,8 @@ public class TvContentService {
         TvContent image = tvContentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Image not found"));
         image.setActive(!image.getActive());
-        TvContent savedImage = tvContentRepository.save(image);
 
-        tokenEventPublisher.publish(new TokenEvent(
-                TokenEventType.COUNTER_DISPLAY_IMAGE_CHANGED,
-                branchId, null, null, null, Instant.now()
-        ));
-        return savedImage;
+        return tvContentRepository.save(image);
     }
 
     public void deleteImage(String id) throws IOException {

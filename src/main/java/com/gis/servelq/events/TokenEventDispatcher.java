@@ -62,11 +62,6 @@ public class TokenEventDispatcher {
                 socketService.notifyMeetingTV(event.getBranchId());
             }
 
-            case COUNTER_DISPLAY_IMAGE_CHANGED -> {
-                var media = tvContentService.getActiveImages(event.getBranchId());
-                socketService.notifyCounterDisplayImage(event.getBranchId(), media);
-            }
-
             case FEEDBACK_SUBMITTED -> {
                 var counterData = counterService.getCounterStatusDetails(event.getCounterId());
                 socketService.notifyCounterDisplay(event.getCounterId(), counterData);
