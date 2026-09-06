@@ -50,8 +50,9 @@ public class TvContentController {
 
     @PostMapping("/url")
     public TvContent addUrl(@RequestBody Map<String, String> req) {
+        final TvContent tvContent = service.addUrl(req.get("branchId"), req.get("url"), req.get("name"));
         socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
-        return service.addUrl(req.get("branchId"), req.get("url"), req.get("name"));
+        return tvContent;
     }
 
     @DeleteMapping("/{id}")
@@ -62,22 +63,29 @@ public class TvContentController {
 
     @PatchMapping("/activateVideo")
     public TvContent activate(@RequestBody Map<String, String> req) {
+        // FIX: mutate first, then broadcast — the broadcast reads current
+        // DB state, so it must fire AFTER activateVideo() persists, not before.
+        TvContent result = service.activateVideo(req.get("branchId"), req.get("id"));
         socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
-        return service.activateVideo(req.get("branchId"), req.get("id"));
+        return result;
     }
 
     // ==================== ARCHIVE/UNARCHIVE ====================
 
     @PatchMapping("/{id}/archive")
     public ResponseEntity<TvContent> archiveContent(@PathVariable String id) {
+        // FIX: same ordering bug as activate() — mutate, then broadcast.
+        TvContent result = service.archiveContent(id);
         socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
-        return ResponseEntity.ok(service.archiveContent(id));
+        return ResponseEntity.ok(result);
     }
 
     @PatchMapping("/{id}/unarchive")
     public ResponseEntity<TvContent> unarchiveContent(@PathVariable String id) {
+        // FIX: same ordering bug — mutate, then broadcast.
+        TvContent result = service.unarchiveContent(id);
         socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
-        return ResponseEntity.ok(service.unarchiveContent(id));
+        return ResponseEntity.ok(result);
     }
 
     // ==================== CHUNKED VIDEO UPLOAD ====================
@@ -105,6 +113,10 @@ public class TvContentController {
             @PathVariable String contentId,
             @RequestParam String fileName,
             @RequestParam Integer totalChunks) {
+        // NOTE: this endpoint does not broadcast. If hlsProcessed flipping to
+        // true here should be visible to connected TV screens without a
+        // separate activate() call, add a broadcast after the service call —
+        // left as-is since I don't know if activate() always follows this.
         return ResponseEntity.ok(service.completeVideoUpload(contentId, fileName, totalChunks));
     }
 
@@ -197,8 +209,12 @@ public class TvContentController {
     @PostMapping("/image/upload")
     public ResponseEntity<TvContent> upload(@RequestParam String branchId,
                                             @RequestParam MultipartFile file) throws IOException {
+        // FIX: mutate first, then broadcast.
+        // NOTE: still broadcasts AppType.FEEDBACK, not TV_DISPLAY — confirm
+        // this is the intended topic for image content; unchanged for now.
+        TvContent result = service.uploadImage(branchId, file);
         socketService.broadcastAppDashboard(AppType.FEEDBACK);
-        return ResponseEntity.ok(service.uploadImage(branchId, file));
+        return ResponseEntity.ok(result);
     }
 
     @GetMapping("/image")
@@ -214,8 +230,10 @@ public class TvContentController {
     @PatchMapping("/image/toggle/{id}")
     public ResponseEntity<TvContent> toggleImageStatus(@RequestParam String branchId,
                                                        @PathVariable String id) {
+        // FIX: mutate first, then broadcast.
+        TvContent result = service.toggleImageStatus(branchId, id);
         socketService.broadcastAppDashboard(AppType.FEEDBACK);
-        return ResponseEntity.ok(service.toggleImageStatus(branchId, id));
+        return ResponseEntity.ok(result);
     }
 
     @DeleteMapping("/image/{id}")
