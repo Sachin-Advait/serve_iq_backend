@@ -1,6 +1,9 @@
 package com.gis.servelq.events;
 
-import com.gis.servelq.services.*;
+import com.gis.servelq.services.AgentService;
+import com.gis.servelq.services.CounterService;
+import com.gis.servelq.services.SocketService;
+import com.gis.servelq.services.TvContentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.event.TransactionPhase;
@@ -13,7 +16,6 @@ public class TokenEventDispatcher {
     private final SocketService socketService;
     private final AgentService agentService;
     private final CounterService counterService;
-    private final TVDisplayService tvDisplayService;
     private final TvContentService tvContentService;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -63,11 +65,6 @@ public class TokenEventDispatcher {
             case COUNTER_DISPLAY_IMAGE_CHANGED -> {
                 var media = tvContentService.getActiveImages(event.getBranchId());
                 socketService.notifyCounterDisplayImage(event.getBranchId(), media);
-            }
-
-            case TV_MEDIA_CHANGED -> {
-                var media = tvContentService.getContentByBranch(event.getBranchId());
-                socketService.notifyBranchTVMedia(event.getBranchId(), media);
             }
 
             case FEEDBACK_SUBMITTED -> {

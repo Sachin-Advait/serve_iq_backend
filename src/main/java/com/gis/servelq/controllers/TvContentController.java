@@ -197,7 +197,7 @@ public class TvContentController {
     @PostMapping("/image/upload")
     public ResponseEntity<TvContent> upload(@RequestParam String branchId,
                                             @RequestParam MultipartFile file) throws IOException {
-        socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
+        socketService.broadcastAppDashboard(AppType.FEEDBACK);
         return ResponseEntity.ok(service.uploadImage(branchId, file));
     }
 
@@ -214,14 +214,14 @@ public class TvContentController {
     @PatchMapping("/image/toggle/{id}")
     public ResponseEntity<TvContent> toggleImageStatus(@RequestParam String branchId,
                                                        @PathVariable String id) {
-        socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
+        socketService.broadcastAppDashboard(AppType.FEEDBACK);
         return ResponseEntity.ok(service.toggleImageStatus(branchId, id));
     }
 
     @DeleteMapping("/image/{id}")
     public ResponseEntity<Void> deleteImage(@PathVariable String id) throws IOException {
         service.deleteImage(id);
-        socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
+        socketService.broadcastAppDashboard(AppType.FEEDBACK);
         return ResponseEntity.noContent().build();
     }
 }
