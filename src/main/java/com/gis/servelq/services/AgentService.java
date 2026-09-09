@@ -48,76 +48,82 @@ public class AgentService {
                 .toList();
     }
 
-    @Transactional
     public AgentCallResponseDTO callNextToken(String counterId) {
+        Token nextToken;
+        Counter counter;
+
         try {
-            Counter counter = counterRepository.findById(counterId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Counter not found"));
-
-            if (counter.getPaused()) {
-                throw new BusinessException("Counter is paused");
-            }
-
-            serviceRepository.findById(counter.getServiceId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Service not found"));
-
-            Optional<Token> optionalToken = tokenRepository.findNextToken(counterId);
-
-            if (optionalToken.isEmpty()) {
-                throw new ResourceNotFoundException("No tokens available");
-            }
-
-            Token nextToken = optionalToken.get();
-
-            nextToken.setStatus(TokenStatus.CALLING);
-            nextToken.setAssignedCounterId(counterId);
-            nextToken.setAssignedCounterName(counter.getName());
-            tokenRepository.save(nextToken);
-
-            counter.setStatus(CounterStatus.CALLING);
-            counterRepository.save(counter);
-
-            tokenEventPublisher.publish(new TokenEvent(
-                    TokenEventType.TOKEN_CALLED,
-                    nextToken.getBranchId(),
-                    nextToken.getId(),
-                    nextToken.getToken(),
-                    counterId,
-                    Instant.now()
-            ));
-
-            if (nextToken.getCounterIds() != null) {
-                for (String id : nextToken.getCounterIds()) {
-                    tokenEventPublisher.publish(new TokenEvent(
-                            TokenEventType.AGENT_QUEUE_CHANGED,
-                            nextToken.getBranchId(),
-                            null,
-                            null,
-                            id,
-                            Instant.now()
-                    ));
-                }
-            }
-            AgentCallResponseDTO response = AgentCallResponseDTO.fromEntity(nextToken);
-
-            // Log token called
-            auditLogService.log(
-                    AuditAction.TOKEN_CALLED,
-                    "Token",
-                    nextToken.getId(),
-                    nextToken.getToken(),
-                    "Token called to counter: " + counter.getName(),
-                    getCurrentUser(),
-                    nextToken.getBranchId(),
-                    request
-            );
-
-            return response;
+            // Short transaction: acquire lock, update status, release lock on commit
+            var claimed = claimNextToken(counterId);
+            nextToken = claimed.token();
+            counter = claimed.counter();
         } catch (PessimisticLockException | LockTimeoutException ex) {
-            throw new BusinessException(
-                    "Token is being acquired by another counter. Please try again."
-            );
+            throw new BusinessException("Token is being acquired by another counter. Please try again.");
         }
+
+        // Everything below runs with no row lock held
+        tokenEventPublisher.publish(new TokenEvent(
+                TokenEventType.TOKEN_CALLED,
+                nextToken.getBranchId(),
+                nextToken.getId(),
+                nextToken.getToken(),
+                counterId,
+                Instant.now()
+        ));
+
+        if (nextToken.getCounterIds() != null) {
+            for (String id : nextToken.getCounterIds()) {
+                tokenEventPublisher.publish(new TokenEvent(
+                        TokenEventType.AGENT_QUEUE_CHANGED,
+                        nextToken.getBranchId(),
+                        null,
+                        null,
+                        id,
+                        Instant.now()
+                ));
+            }
+        }
+
+        AgentCallResponseDTO response = AgentCallResponseDTO.fromEntity(nextToken);
+
+        auditLogService.log(
+                AuditAction.TOKEN_CALLED,
+                "Token",
+                nextToken.getId(),
+                nextToken.getToken(),
+                "Token called to counter: " + counter.getName(),
+                getCurrentUser(),
+                nextToken.getBranchId(),
+                request
+        );
+
+        return response;
+    }
+
+    @Transactional
+    public ClaimedToken claimNextToken(String counterId) {
+        Counter counter = counterRepository.findById(counterId)
+                .orElseThrow(() -> new ResourceNotFoundException("Counter not found"));
+
+        if (counter.getPaused()) {
+            throw new BusinessException("Counter is paused");
+        }
+
+        serviceRepository.findById(counter.getServiceId())
+                .orElseThrow(() -> new ResourceNotFoundException("Service not found"));
+
+        Token nextToken = tokenRepository.findNextToken(counterId)
+                .orElseThrow(() -> new ResourceNotFoundException("No tokens available"));
+
+        nextToken.setStatus(TokenStatus.CALLING);
+        nextToken.setAssignedCounterId(counterId);
+        nextToken.setAssignedCounterName(counter.getName());
+        tokenRepository.save(nextToken);
+
+        counter.setStatus(CounterStatus.CALLING);
+        counterRepository.save(counter);
+
+        return new ClaimedToken(nextToken, counter);
     }
 
     @Transactional
@@ -369,7 +375,6 @@ public class AgentService {
         return updated;
     }
 
-
     public Token noShow(String tokenId) {
         Token token = tokenRepository.findById(tokenId).orElseThrow(() -> new ResourceNotFoundException("Token not found"));
 
@@ -506,5 +511,8 @@ public class AgentService {
         );
 
         return updated;
+    }
+
+    record ClaimedToken(Token token, Counter counter) {
     }
 }

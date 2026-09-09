@@ -2,13 +2,9 @@ package com.gis.servelq.repository;
 
 import com.gis.servelq.models.Token;
 import com.gis.servelq.models.TokenStatus;
-import jakarta.persistence.LockModeType;
-import jakarta.persistence.QueryHint;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
@@ -40,11 +36,6 @@ public interface TokenRepository extends JpaRepository<Token, String> {
      */
     List<Token> findByStatusInAndAssignedCounterIdIn(List<TokenStatus> statuses, List<String> assignedCounterIds);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @QueryHints(@QueryHint(
-            name = "jakarta.persistence.lock.timeout",
-            value = "3000"
-    ))
     @Query(value = """
             SELECT *
             FROM tokens t
@@ -62,6 +53,7 @@ public interface TokenRepository extends JpaRepository<Token, String> {
                 t.is_transfer DESC,
                 t.created_at ASC
             LIMIT 1
+            FOR UPDATE SKIP LOCKED
             """, nativeQuery = true)
     Optional<Token> findNextToken(@Param("counterId") String counterId);
 
