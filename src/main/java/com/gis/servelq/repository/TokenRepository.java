@@ -26,7 +26,8 @@ public interface TokenRepository extends JpaRepository<Token, String> {
 
     List<Token> findTop20ByStatusAndAssignedCounterIdOrderByEndAtDesc(TokenStatus status, String assignedCounterId);
 
-    Optional<Token> findByStatusInAndAssignedCounterId(List<TokenStatus> statuses, String assignedCounterId);
+    List<Token> findByStatusInAndAssignedCounterIdOrderByCreatedAtDesc(
+            List<TokenStatus> statuses, String assignedCounterId);
 
     /**
      * Bulk version of findByStatusInAndAssignedCounterId — one query for the

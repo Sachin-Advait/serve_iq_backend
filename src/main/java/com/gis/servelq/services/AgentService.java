@@ -101,7 +101,7 @@ public class AgentService {
     }
 
     @Transactional
-    public ClaimedToken claimNextToken(String counterId) {
+    private ClaimedToken claimNextToken(String counterId) {
         Counter counter = counterRepository.findById(counterId)
                 .orElseThrow(() -> new ResourceNotFoundException("Counter not found"));
 

@@ -404,15 +404,22 @@ public class CounterService {
         response.setPaused(counter.getPaused());
         response.setStatus(counter.getStatus());
 
-        // Fetch currently serving token if counter is in active serving state
         if (counter.getStatus() == CounterStatus.SERVING ||
                 counter.getStatus() == CounterStatus.CALLING ||
                 counter.getStatus() == CounterStatus.COMPLETE) {
 
-            tokenRepository.findByStatusInAndAssignedCounterId(
+            List<Token> activeTokens = tokenRepository.findByStatusInAndAssignedCounterIdOrderByCreatedAtDesc(
                     List.of(TokenStatus.SERVING, TokenStatus.CALLING, TokenStatus.REVIEW),
                     counterId
-            ).ifPresentOrElse(token -> {
+            );
+
+            if (!activeTokens.isEmpty()) {
+                if (activeTokens.size() > 1) {
+                    log.warn("Counter {} has {} tokens in active statuses simultaneously — expected at most 1. Using most recent (id={}).",
+                            counterId, activeTokens.size(), activeTokens.get(0).getId());
+                }
+
+                Token token = activeTokens.get(0);
                 response.setTokenId(token.getId());
                 response.setTokenNumber(token.getToken());
                 response.setServiceId(token.getServiceId());
@@ -424,7 +431,9 @@ public class CounterService {
                                 response.setServiceCode(service.getCode());
                             });
                 }
-            }, response::clearTokenDetails);
+            } else {
+                response.clearTokenDetails();
+            }
         }
 
         return response;
