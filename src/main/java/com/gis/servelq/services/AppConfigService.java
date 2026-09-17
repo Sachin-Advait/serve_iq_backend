@@ -91,149 +91,6 @@ public class AppConfigService {
         return configRepository.save(config);
     }
 
-    public AppConfig saveConfig(AppType appType, AppConfig updated) {
-        AppConfig config = getConfig(appType);
-        boolean hasChanges = false;
-
-        if (updated.getBackgroundImage() != null) {
-            config.setBackgroundImage(updated.getBackgroundImage());
-            hasChanges = true;
-        }
-        if (updated.getAppLogo() != null) {
-            config.setAppLogo(updated.getAppLogo());
-            hasChanges = true;
-        }
-        if (updated.getBackgroundImageUrl() != null) {
-            config.setBackgroundImageUrl(updated.getBackgroundImageUrl());
-            hasChanges = true;
-        }
-        if (updated.getAppLogoUrl() != null) {
-            config.setAppLogoUrl(updated.getAppLogoUrl());
-            hasChanges = true;
-        }
-        if (updated.getAppLanguage() != null) {
-            config.setAppLanguage(updated.getAppLanguage());
-            hasChanges = true;
-        }
-        if (updated.getPrimaryColor() != null) {
-            config.setPrimaryColor(updated.getPrimaryColor());
-            hasChanges = true;
-        }
-        if (updated.getSecondaryColor() != null) {
-            config.setSecondaryColor(updated.getSecondaryColor());
-            hasChanges = true;
-        }
-
-        switch (appType) {
-            case TV_DISPLAY -> {
-                if (updated.getTickerEnabled() != null) {
-                    config.setTickerEnabled(updated.getTickerEnabled());
-                    hasChanges = true;
-                }
-                if (updated.getVideosEnabled() != null) {
-                    config.setVideosEnabled(updated.getVideosEnabled());
-                    hasChanges = true;
-                }
-                if (updated.getTickerSpeed() != null) {
-                    config.setTickerSpeed(updated.getTickerSpeed());
-                    hasChanges = true;
-                }
-                if (updated.getComponentOrder() != null) {
-                    config.setComponentOrder(new ArrayList<>(updated.getComponentOrder()));
-                    hasChanges = true;
-                }
-                if (updated.getFlickerTime() != null) {
-                    config.setFlickerTime(updated.getFlickerTime());
-                    hasChanges = true;
-                }
-            }
-            case FEEDBACK -> {
-                Boolean newImageCarousel = updated.getImageCarouselEnabled();
-                Boolean newFeedbackVideo = updated.getFeedbackVideoEnabled();
-
-                if (newImageCarousel != null && newFeedbackVideo != null) {
-                    if (newImageCarousel && newFeedbackVideo) {
-                        throw new BusinessException("Image Carousel and Video cannot both be enabled. Please choose one.");
-                    }
-                    config.setImageCarouselEnabled(newImageCarousel);
-                    config.setFeedbackVideoEnabled(newFeedbackVideo);
-                    hasChanges = true;
-                } else if (newImageCarousel != null) {
-                    config.setImageCarouselEnabled(newImageCarousel);
-                    if (newImageCarousel) {
-                        config.setFeedbackVideoEnabled(false);
-                    }
-                    hasChanges = true;
-                } else if (newFeedbackVideo != null) {
-                    config.setFeedbackVideoEnabled(newFeedbackVideo);
-                    if (newFeedbackVideo) {
-                        config.setImageCarouselEnabled(false);
-                    }
-                    hasChanges = true;
-                }
-
-                if (updated.getFlickerTime() != null) {
-                    config.setFlickerTime(updated.getFlickerTime());
-                    hasChanges = true;
-                }
-            }
-            case KIOSK -> {
-                // KIOSK PRINT FIELDS
-                if (updated.getKioskPrintEnabled() != null) {
-                    config.setKioskPrintEnabled(updated.getKioskPrintEnabled());
-                    hasChanges = true;
-                }
-                if (updated.getKioskPrintLanguage() != null) {
-                    config.setKioskPrintLanguage(updated.getKioskPrintLanguage());
-                    hasChanges = true;
-                }
-                if (updated.getKioskHeaderTitle() != null) {
-                    config.setKioskHeaderTitle(updated.getKioskHeaderTitle());
-                    hasChanges = true;
-                }
-                if (updated.getKioskHeaderSubtitle() != null) {
-                    config.setKioskHeaderSubtitle(updated.getKioskHeaderSubtitle());
-                    hasChanges = true;
-                }
-                if (updated.getKioskTokenTitle() != null) {
-                    config.setKioskTokenTitle(updated.getKioskTokenTitle());
-                    hasChanges = true;
-                }
-                if (updated.getKioskServiceLabel() != null) {
-                    config.setKioskServiceLabel(updated.getKioskServiceLabel());
-                    hasChanges = true;
-                }
-                if (updated.getKioskDateLabel() != null) {
-                    config.setKioskDateLabel(updated.getKioskDateLabel());
-                    hasChanges = true;
-                }
-                if (updated.getKioskTimeLabel() != null) {
-                    config.setKioskTimeLabel(updated.getKioskTimeLabel());
-                    hasChanges = true;
-                }
-                if (updated.getKioskWaitingMessage() != null) {
-                    config.setKioskWaitingMessage(updated.getKioskWaitingMessage());
-                    hasChanges = true;
-                }
-                if (updated.getKioskThankYouMessage() != null) {
-                    config.setKioskThankYouMessage(updated.getKioskThankYouMessage());
-                    hasChanges = true;
-                }
-            }
-        }
-
-        if (updated.getDefaultEnabled() != null) {
-            config.setDefaultEnabled(updated.getDefaultEnabled());
-            if (Boolean.TRUE.equals(updated.getDefaultEnabled())) {
-                setDefaultBackgroundImage(config, appType);
-            }
-        } else if (hasChanges) {
-            config.setDefaultEnabled(false);
-        }
-
-        return configRepository.save(config);
-    }
-
     public AppConfig updateFeedbackMediaMode(AppType appType, String mode) {
         if (appType != AppType.FEEDBACK) {
             throw new BusinessException("Media mode is only available for FEEDBACK");
@@ -575,15 +432,28 @@ public class AppConfigService {
                     .activeFeedbackVideo(null)
                     // KIOSK PRINT FIELDS
                     .kioskPrintEnabled(config.getKioskPrintEnabled())
-                    .kioskPrintLanguage(config.getKioskPrintLanguage())
-                    .kioskHeaderTitle(config.getKioskHeaderTitle())
-                    .kioskHeaderSubtitle(config.getKioskHeaderSubtitle())
-                    .kioskTokenTitle(config.getKioskTokenTitle())
-                    .kioskServiceLabel(config.getKioskServiceLabel())
-                    .kioskDateLabel(config.getKioskDateLabel())
-                    .kioskTimeLabel(config.getKioskTimeLabel())
-                    .kioskWaitingMessage(config.getKioskWaitingMessage())
-                    .kioskThankYouMessage(config.getKioskThankYouMessage())
+
+                    .kioskHeaderTitleEn(config.getKioskHeaderTitleEn())
+                    .kioskHeaderTitleAr(config.getKioskHeaderTitleAr())
+                    .kioskHeaderSubtitleEn(config.getKioskHeaderSubtitleEn())
+                    .kioskHeaderSubtitleAr(config.getKioskHeaderSubtitleAr())
+
+                    .kioskTokenTitleEn(config.getKioskTokenTitleEn())
+                    .kioskTokenTitleAr(config.getKioskTokenTitleAr())
+
+                    .kioskServiceLabelEn(config.getKioskServiceLabelEn())
+                    .kioskServiceLabelAr(config.getKioskServiceLabelAr())
+
+                    .kioskDateLabelEn(config.getKioskDateLabelEn())
+                    .kioskDateLabelAr(config.getKioskDateLabelAr())
+                    .kioskTimeLabelEn(config.getKioskTimeLabelEn())
+                    .kioskTimeLabelAr(config.getKioskTimeLabelAr())
+
+                    .kioskWaitingMessageEn(config.getKioskWaitingMessageEn())
+                    .kioskWaitingMessageAr(config.getKioskWaitingMessageAr())
+
+                    .kioskThankYouMessageEn(config.getKioskThankYouMessageEn())
+                    .kioskThankYouMessageAr(config.getKioskThankYouMessageAr())
                     .build();
         }
 
@@ -664,28 +534,34 @@ public class AppConfigService {
     }
 
     private void setDefaultKioskSettings(AppConfig config) {
-        // General
         config.setKioskPrintEnabled(true);
-        config.setKioskPrintLanguage("ENGLISH");
 
         // Header
-        config.setKioskHeaderTitle("Welcome");
-        config.setKioskHeaderSubtitle("Please take a ticket");
+        config.setKioskHeaderTitleEn("Welcome");
+        config.setKioskHeaderTitleAr("أهلاً وسهلاً");
+        config.setKioskHeaderSubtitleEn("Please take a ticket");
+        config.setKioskHeaderSubtitleAr("الرجاء أخذ تذكرة");
 
         // Token
-        config.setKioskTokenTitle("Your Token Number");
+        config.setKioskTokenTitleEn("Your Token Number");
+        config.setKioskTokenTitleAr("رقم تذكرتك");
 
         // Service
-        config.setKioskServiceLabel("Service");
+        config.setKioskServiceLabelEn("Service");
+        config.setKioskServiceLabelAr("الخدمة");
 
         // Date & Time
-        config.setKioskDateLabel("Date");
-        config.setKioskTimeLabel("Time");
+        config.setKioskDateLabelEn("Date");
+        config.setKioskDateLabelAr("التاريخ");
+        config.setKioskTimeLabelEn("Time");
+        config.setKioskTimeLabelAr("الوقت");
 
-        // Waiting message
-        config.setKioskWaitingMessage("Please wait for your turn");
+        // Waiting
+        config.setKioskWaitingMessageEn("Please wait for your turn");
+        config.setKioskWaitingMessageAr("الرجاء الانتظار حتى دورك");
 
         // Footer
-        config.setKioskThankYouMessage("Thank you for visiting");
+        config.setKioskThankYouMessageEn("Thank you for visiting");
+        config.setKioskThankYouMessageAr("شكراً لزيارتكم");
     }
 }

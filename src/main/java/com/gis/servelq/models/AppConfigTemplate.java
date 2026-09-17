@@ -50,27 +50,34 @@ public class AppConfigTemplate {
 
     // General
     private Boolean kioskPrintEnabled = true;
-    private String kioskPrintLanguage = "ENGLISH";
 
     // Header
-    private String kioskHeaderTitle;
-    private String kioskHeaderSubtitle;
+    private String kioskHeaderTitleEn;
+    private String kioskHeaderTitleAr;
+    private String kioskHeaderSubtitleEn;
+    private String kioskHeaderSubtitleAr;
 
     // Token
-    private String kioskTokenTitle;
+    private String kioskTokenTitleEn;
+    private String kioskTokenTitleAr;
 
     // Service
-    private String kioskServiceLabel;
+    private String kioskServiceLabelEn;
+    private String kioskServiceLabelAr;
 
     // Date & Time
-    private String kioskDateLabel;
-    private String kioskTimeLabel;
+    private String kioskDateLabelEn;
+    private String kioskDateLabelAr;
+    private String kioskTimeLabelEn;
+    private String kioskTimeLabelAr;
 
     // Waiting message
-    private String kioskWaitingMessage;
+    private String kioskWaitingMessageEn;
+    private String kioskWaitingMessageAr;
 
     // Footer
-    private String kioskThankYouMessage;
+    private String kioskThankYouMessageEn;
+    private String kioskThankYouMessageAr;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
