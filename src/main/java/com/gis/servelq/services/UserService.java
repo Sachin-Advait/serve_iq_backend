@@ -19,7 +19,10 @@ import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -65,10 +68,6 @@ public class UserService {
 
     // ==================== QUERY METHODS ====================
 
-    public Optional<User> findByEmail(String email) {
-        return userRepository.findByEmail(email);
-    }
-
     public List<User> getUsersByRole(UserRole role) {
         return userRepository.findByRole(role);
     }
@@ -88,7 +87,7 @@ public class UserService {
             int page, int size, String search, String role, String sortBy, String sortDirection) {
 
         size = size < 1 ? 10 : size;
-        page = page < 0 ? 0 : page;
+        page = Math.max(page, 0);
 
         Sort sort;
         if (sortBy != null && !sortBy.isEmpty()) {
@@ -106,7 +105,8 @@ public class UserService {
         if (role != null && !role.isEmpty() && !"all".equalsIgnoreCase(role)) {
             try {
                 roleEnum = UserRole.valueOf(role.toUpperCase());
-            } catch (IllegalArgumentException ignored) {}
+            } catch (IllegalArgumentException ignored) {
+            }
         }
 
         boolean hasSearch = search != null && !search.trim().isEmpty();

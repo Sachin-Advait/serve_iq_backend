@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -111,5 +112,12 @@ public class CounterController {
     @GetMapping("/display-board/branch/{branchId}")
     public ResponseEntity<List<CounterDisplayDTO>> getCounterDisplayBoard(@PathVariable String branchId) {
         return ResponseEntity.ok(counterService.getCounterDisplayBoard(branchId));
+    }
+
+    @PostMapping("/{counterId}/release")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    public ResponseEntity<?> release(@PathVariable String counterId,
+                                     @AuthenticationPrincipal AuthenticatedUser admin) {
+        return ResponseEntity.ok(counterService.forceReleaseCounter(counterId, admin));
     }
 }

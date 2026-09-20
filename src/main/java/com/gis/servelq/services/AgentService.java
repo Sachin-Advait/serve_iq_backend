@@ -36,10 +36,10 @@ public class AgentService {
     private final TokenRepository tokenRepository;
     private final CounterRepository counterRepository;
     private final ServiceRepository serviceRepository;
-    private final CounterService counterService;
     private final TokenEventPublisher tokenEventPublisher;
     private final AuditLogService auditLogService;
     private final HttpServletRequest request;
+    private final CounterService counterService;
 
     public List<TokenResponseDTO> getUpcomingTokensForCounter(String counterId) {
         return tokenRepository.findUpcomingTokensForCounter(counterId)
@@ -436,48 +436,6 @@ public class AgentService {
     }
 
     /**
-     * Logout for counter agents: if the caller is a USER (agent) with a counter
-     * assigned, close that counter. Other roles (admin/display/kiosk/receptionist)
-     * have nothing to close, so this is a no-op for them.
-     */
-    @Transactional
-    public void logout(AuthenticatedUser currentUser) {
-        if (currentUser == null) {
-            return;
-        }
-        if (!"USER".equals(currentUser.role()) || currentUser.counterId() == null) {
-            return;
-        }
-
-        Counter counter = counterRepository.findById(currentUser.counterId())
-                .orElseThrow(() -> new ResourceNotFoundException("Counter not found"));
-
-        counter.setStatus(CounterStatus.CLOSED);
-        counter.setPaused(false);
-        Counter updated = counterRepository.save(counter);
-
-        tokenEventPublisher.publish(new TokenEvent(
-                TokenEventType.COUNTER_STATUS_CHANGED,
-                counter.getBranchId(),
-                null,
-                null,
-                counter.getId(),
-                Instant.now()
-        ));
-
-        auditLogService.log(
-                AuditAction.COUNTER_STATUS_CHANGED,
-                "Counter",
-                updated.getId(),
-                updated.getName(),
-                "Counter closed on logout: " + updated.getName(),
-                currentUser,
-                updated.getBranchId(),
-                request
-        );
-    }
-
-    /**
      * Pause or resume a counter. Only the agent assigned to the counter, or an
      * ADMIN, may do this.
      */
@@ -511,6 +469,19 @@ public class AgentService {
         );
 
         return updated;
+    }
+
+    @Transactional
+    public void logout(AuthenticatedUser currentUser) {
+        if (currentUser == null || !"USER".equals(currentUser.role())) return;
+        counterService.logoutFromCounter(currentUser);
+    }
+
+
+    private void assertOwnsTokenCounter(Token token) {
+        if (token.getAssignedCounterId() != null) {
+            counterService.assertCanOperate(token.getAssignedCounterId(), getCurrentUser());
+        }
     }
 
     record ClaimedToken(Token token, Counter counter) {

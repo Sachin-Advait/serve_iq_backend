@@ -14,6 +14,9 @@ import java.util.Optional;
 
 @Repository
 public interface TokenRepository extends JpaRepository<Token, String> {
+
+    boolean existsByStatusInAndAssignedCounterId(List<TokenStatus> statuses, String assignedCounterId);
+    
     List<Token> findByBranchId(String branchId);
 
     long countByBranchId(String branchId);

@@ -29,6 +29,7 @@ public class CounterService {
 
     private static final List<TokenStatus> ACTIVE_TOKEN_STATUSES =
             List.of(TokenStatus.SERVING, TokenStatus.CALLING, TokenStatus.REVIEW);
+    private static final List<TokenStatus> IN_PROGRESS = List.of(TokenStatus.CALLING, TokenStatus.SERVING);
     private final CounterRepository counterRepository;
     private final BranchRepository branchRepository;
     private final ServiceRepository serviceRepository;
@@ -381,7 +382,7 @@ public class CounterService {
 
         // Unassign user from counter if exists
         if (StringUtils.hasText(counter.getUserId())) {
-            unassignUserFromCounter(counter.getUserId());
+            throw new BusinessException("Counter is in use by an agent; release it before changing its branch");
         }
 
         counterRepository.deleteById(counterId);
@@ -547,6 +548,8 @@ public class CounterService {
         }).collect(Collectors.toList());
     }
 
+    // ==================== COUNTER LOGIN / LOGOUT ====================
+
     /**
      * Helper method to clone counter for audit comparison
      */
@@ -562,5 +565,207 @@ public class CounterService {
         clone.setServiceId(original.getServiceId());
         clone.setStatus(original.getStatus());
         return clone;
+    }
+
+    private User loadAgent(AuthenticatedUser currentUser) {
+        if (currentUser == null) throw new BusinessException("Not authenticated");
+        User user = userRepository.findById(currentUser.id())   // adjust accessor name if needed
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        if (user.getRole() != UserRole.USER) {
+            throw new BusinessException("Only counter agents can log in to a counter");
+        }
+        return user;
+    }
+
+    @Transactional(readOnly = true)
+    public List<CounterOptionDTO> getCounterOptions(AuthenticatedUser currentUser) {
+        User me = loadAgent(currentUser);
+        List<Counter> counters = counterRepository.findByBranchIdOrderByCreatedAtAsc(me.getBranchId())
+                .stream()
+                .filter(c -> Boolean.TRUE.equals(c.getEnabled()))
+                .toList();
+
+        List<String> occupantIds = counters.stream().map(Counter::getUserId)
+                .filter(StringUtils::hasText).distinct().toList();
+        List<String> serviceIds = counters.stream().map(Counter::getServiceId)
+                .filter(StringUtils::hasText).distinct().toList();
+
+        Map<String, String> userNameById = userRepository.findAllById(occupantIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> Objects.toString(u.getName(), "Another agent")));
+        Map<String, String> serviceNameById = serviceRepository.findAllById(serviceIds).stream()
+                .collect(Collectors.toMap(Services::getId, Services::getName));
+
+        return counters.stream().map(c -> {
+            boolean occupied = StringUtils.hasText(c.getUserId());
+            CounterOptionDTO dto = new CounterOptionDTO();
+            dto.setId(c.getId());
+            dto.setCode(c.getCode());
+            dto.setName(c.getName());
+            dto.setServiceName(serviceNameById.get(c.getServiceId()));
+            dto.setOccupied(occupied);
+            dto.setMine(occupied && c.getUserId().equals(me.getId()));
+            dto.setOccupiedByName(occupied ? userNameById.getOrDefault(c.getUserId(), "Another agent") : null);
+            return dto;
+        }).toList();
+    }
+
+    /**
+     * Agent picks a counter. Atomic: only one agent can win a counter.
+     * Same agent re-logging in (crash, second device) is allowed and doesn't reset a busy counter.
+     */
+    @Transactional
+    public User claimCounter(String counterId, boolean attachOnly, AuthenticatedUser currentUser) {
+        User user = loadAgent(currentUser);
+        Counter counter = counterRepository.findById(counterId)
+                .orElseThrow(() -> new ResourceNotFoundException("Counter not found with id: " + counterId));
+
+        if (!Boolean.TRUE.equals(counter.getEnabled())) {
+            throw new BusinessException("Counter " + counter.getName() + " is disabled");
+        }
+        if (StringUtils.hasText(user.getBranchId()) && !user.getBranchId().equals(counter.getBranchId())) {
+            throw new BusinessException("Counter " + counter.getName() + " belongs to a different branch");
+        }
+
+        boolean ownedByMe = Objects.equals(counter.getUserId(), user.getId());
+
+        if (attachOnly) {
+            if (!ownedByMe) {
+                throw new BusinessException("You are not logged in at counter " + counter.getName());
+            }
+            if (!counterId.equals(user.getCounterId())) {
+                user.setCounterId(counterId);
+                userRepository.save(user);
+            }
+            return user;
+        }
+
+        String userId = user.getId();
+        String previousCounterId = user.getCounterId();
+
+        if (StringUtils.hasText(previousCounterId) && !previousCounterId.equals(counterId)) {
+            assertCanLeave(previousCounterId, userId);
+        }
+        int claimed = counterRepository.claimIfFree(counterId, userId);
+        if (claimed == 0) {
+            Counter current = counterRepository.findById(counterId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Counter not found with id: " + counterId));
+            String who = StringUtils.hasText(current.getUserId())
+                    ? userRepository.findById(current.getUserId()).map(User::getName).orElse("Another agent")
+                    : "Another agent";
+            throw new BusinessException(who + " is already logged in with this counter");
+        }
+
+        // The bulk update cleared the persistence context, so reload.
+        Counter fresh = counterRepository.findById(counterId)
+                .orElseThrow(() -> new ResourceNotFoundException("Counter not found with id: " + counterId));
+        if (!ownedByMe || fresh.getStatus() == CounterStatus.CLOSED) {
+            fresh.setStatus(CounterStatus.IDLE);
+            fresh.setPaused(false);
+            counterRepository.save(fresh);
+        }
+
+        // An agent holds at most one counter: release the previous one (only if still theirs).
+        if (StringUtils.hasText(previousCounterId) && !previousCounterId.equals(counterId)) {
+            releaseIfOwner(previousCounterId, userId,
+                    "Counter released: agent moved to counter " + fresh.getName(), currentUser);
+        }
+
+        User me = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        me.setCounterId(counterId);
+        userRepository.save(me);
+
+        publishCounterChanged(fresh);
+        auditLogService.log(
+                AuditAction.COUNTER_STATUS_CHANGED, "Counter", fresh.getId(), fresh.getName(),
+                "Agent " + me.getName() + " logged in to counter " + fresh.getName(),
+                currentUser, fresh.getBranchId(), request);
+
+        return me;
+    }
+
+    private void assertCanLeave(String counterId, String userId) {
+        Counter c = counterRepository.findById(counterId).orElse(null);
+        if (c == null || !Objects.equals(c.getUserId(), userId)) return;
+        if (tokenRepository.existsByStatusInAndAssignedCounterId(IN_PROGRESS, counterId)) {
+            throw new BusinessException("Finish, hold or transfer the current token before leaving this counter");
+        }
+    }
+
+    /**
+     * Logout: release whatever counter this agent holds.
+     */
+    @Transactional
+    public void logoutFromCounter(AuthenticatedUser currentUser) {
+        if (currentUser == null) return;
+        User user = userRepository.findById(currentUser.id()).orElse(null);
+        if (user == null) return;
+
+        List<Counter> held = counterRepository.findByUserId(user.getId());
+        for (Counter c : held) assertCanLeave(c.getId(), user.getId());
+        for (Counter c : held) releaseIfOwner(c.getId(), user.getId(), "Counter closed on logout", currentUser);
+
+        if (user.getCounterId() != null) {
+            user.setCounterId(null);
+            userRepository.save(user);
+        }
+    }
+
+    /**
+     * Admin escape hatch for a counter stuck on an agent who crashed / left without logging out.
+     */
+    @Transactional
+    public CounterResponseDTO forceReleaseCounter(String counterId, AuthenticatedUser admin) {
+        Counter counter = counterRepository.findById(counterId)
+                .orElseThrow(() -> new ResourceNotFoundException("Counter not found with id: " + counterId));
+
+        String occupantId = counter.getUserId();
+        if (StringUtils.hasText(occupantId)) {
+            releaseIfOwner(counterId, occupantId, "Counter force-released by admin", admin);
+            userRepository.findById(occupantId).ifPresent(u -> {
+                if (counterId.equals(u.getCounterId())) {
+                    u.setCounterId(null);
+                    userRepository.save(u);
+                }
+            });
+        }
+        return convertToResponse(counter);
+    }
+
+    /**
+     * Only clears the counter if it is still held by this user (guards against stale tokens/devices).
+     */
+    private void releaseIfOwner(String counterId, String userId, String reason, AuthenticatedUser actor) {
+        counterRepository.findById(counterId).ifPresent(counter -> {
+            if (!Objects.equals(counter.getUserId(), userId)) return;
+
+            counter.setUserId(null);
+            counter.setStatus(CounterStatus.CLOSED);
+            counter.setPaused(false);
+            counterRepository.save(counter);
+
+            publishCounterChanged(counter);
+            auditLogService.log(
+                    AuditAction.COUNTER_STATUS_CHANGED, "Counter", counter.getId(), counter.getName(),
+                    reason + ": " + counter.getName(), actor, counter.getBranchId(), request);
+        });
+    }
+
+    private void publishCounterChanged(Counter c) {
+        tokenEventPublisher.publish(new TokenEvent(
+                TokenEventType.COUNTER_STATUS_CHANGED, c.getBranchId(), null, null, c.getId(), Instant.now()));
+    }
+
+    /**
+     * USER-role agents may only operate the counter they currently hold. Staff roles are unrestricted.
+     */
+    public void assertCanOperate(String counterId, AuthenticatedUser actor) {
+        if (actor == null) throw new BusinessException("Not authenticated");
+        if (!"USER".equals(actor.role())) return;
+        Counter counter = counterRepository.findById(counterId)
+                .orElseThrow(() -> new ResourceNotFoundException("Counter not found"));
+        if (!actor.isSameUser(counter.getUserId())) {
+            throw new BusinessException("You are not logged in at counter " + counter.getName());
+        }
     }
 }
