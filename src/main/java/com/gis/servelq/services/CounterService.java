@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -577,23 +578,24 @@ public class CounterService {
         return user;
     }
 
+
     @Transactional(readOnly = true)
-    public List<CounterOptionDTO> getCounterOptions(AuthenticatedUser currentUser) {
-        User me = loadAgent(currentUser);
-        List<Counter> counters = counterRepository.findByBranchIdOrderByCreatedAtAsc(me.getBranchId())
-                .stream()
+    public List<CounterOptionDTO> getPublicCounterList() {
+        List<Counter> counters = counterRepository.findAll().stream()
                 .filter(c -> Boolean.TRUE.equals(c.getEnabled()))
+                .sorted(Comparator.comparing(Counter::getCode))
                 .toList();
 
         List<String> occupantIds = counters.stream().map(Counter::getUserId)
                 .filter(StringUtils::hasText).distinct().toList();
-        List<String> serviceIds = counters.stream().map(Counter::getServiceId)
+        List<String> branchIds = counters.stream().map(Counter::getBranchId)
                 .filter(StringUtils::hasText).distinct().toList();
 
         Map<String, String> userNameById = userRepository.findAllById(occupantIds).stream()
                 .collect(Collectors.toMap(User::getId, u -> Objects.toString(u.getName(), "Another agent")));
-        Map<String, String> serviceNameById = serviceRepository.findAllById(serviceIds).stream()
-                .collect(Collectors.toMap(Services::getId, Services::getName));
+        Map<String, String> branchNameById = branchRepository.findAllById(branchIds).stream()
+                .collect(Collectors.toMap(Branch::getId, b -> Objects.toString(b.getName(), "")));
+        // adjust Branch::getId / getName if your entity differs
 
         return counters.stream().map(c -> {
             boolean occupied = StringUtils.hasText(c.getUserId());
@@ -601,9 +603,9 @@ public class CounterService {
             dto.setId(c.getId());
             dto.setCode(c.getCode());
             dto.setName(c.getName());
-            dto.setServiceName(serviceNameById.get(c.getServiceId()));
+            dto.setBranchId(c.getBranchId());
+            dto.setBranchName(branchNameById.get(c.getBranchId()));
             dto.setOccupied(occupied);
-            dto.setMine(occupied && c.getUserId().equals(me.getId()));
             dto.setOccupiedByName(occupied ? userNameById.getOrDefault(c.getUserId(), "Another agent") : null);
             return dto;
         }).toList();

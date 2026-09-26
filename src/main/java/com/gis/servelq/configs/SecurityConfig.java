@@ -41,6 +41,7 @@ public class SecurityConfig {
                         .requestMatchers("/serveiq/api/auth/login").permitAll()
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
                         .requestMatchers("/serveiq/ws/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/serveiq/api/auth/counters").permitAll()
 
                         // Public: TV content streaming (HLS + direct stream + images)
                         .requestMatchers(HttpMethod.GET, "/serveiq/api/tv-content/stream/**").permitAll()

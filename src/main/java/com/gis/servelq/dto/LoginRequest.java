@@ -10,4 +10,6 @@ public class LoginRequest {
     @NotBlank
     private String password;
     private String fcmToken;
+
+    private String counterId;
 }

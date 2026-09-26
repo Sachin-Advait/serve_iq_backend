@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -34,73 +35,59 @@ public class AuthController {
     private final CounterService counterService;
     private final JwtService jwtService;
 
-    /**
-     * Admin only - see SecurityConfig.
-     */
     @PostMapping("/register")
     public UserResponseDTO register(@Valid @RequestBody RegisterRequest dto,
                                     @AuthenticationPrincipal AuthenticatedUser admin) {
         return new UserResponseDTO(userService.registerUser(dto, admin));
     }
 
-    @PostMapping("/login")
-    public ResponseEntity<LoginResponseDTO> login(@Valid @RequestBody LoginRequest dto) {
+    @GetMapping("/counters")
+    public List<CounterOptionDTO> counters() {
+        return counterService.getPublicCounterList();
+    }
 
-        // Try AD first, then PostgreSQL fallback
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest dto) {
+
         AdAuthService.AuthResult authResult = adAuthService.authenticate(dto.getEmail(), dto.getPassword());
 
         if (!authResult.isSuccess()) {
-            // Log failed login attempt
             auditLogService.log(
-                    AuditAction.LOGIN_FAILED,
-                    "User",
-                    null,
-                    dto.getEmail(),
+                    AuditAction.LOGIN_FAILED, "User", null, dto.getEmail(),
                     "Failed login attempt for email: " + dto.getEmail(),
-                    null,
-                    null,
-                    request
-            );
+                    null, null, request);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
         User user = authResult.getUser();
 
-        // Update FCM token if provided
+        if (user.getRole() == UserRole.USER) {
+            if (!StringUtils.hasText(dto.getCounterId())) {
+                return ResponseEntity.badRequest().body("Please select a counter");
+            }
+            AuthenticatedUser actor = new AuthenticatedUser(
+                    user.getId(), user.getEmail(), user.getRole().name(),
+                    user.getBranchId(), user.getCounterId());
+            try {
+                user = counterService.claimCounter(dto.getCounterId(), false, actor);
+            } catch (RuntimeException e) {
+                return ResponseEntity.badRequest().body(e.getMessage());
+            }
+        }
+
         if (dto.getFcmToken() != null && user.getRole() != UserRole.ADMIN) {
             user.setFcmToken(dto.getFcmToken());
             userRepository.save(user);
         }
 
-        // Log successful login
         auditLogService.log(
-                AuditAction.LOGIN,
-                "User",
-                user.getId(),
-                user.getName(),
+                AuditAction.LOGIN, "User", user.getId(), user.getName(),
                 "User logged in successfully",
                 new AuthenticatedUser(user.getId(), user.getEmail(), user.getRole().name(),
                         user.getBranchId(), user.getCounterId()),
-                user.getBranchId(),
-                request
-        );
+                user.getBranchId(), request);
 
-        return ResponseEntity.ok(new LoginResponseDTO(
-                authResult.getToken(),
-                authResult.getExpiresIn(),
-                new UserResponseDTO(user)));
-    }
-
-    @GetMapping("/counter-options")
-    public List<CounterOptionDTO> counterOptions(@AuthenticationPrincipal AuthenticatedUser current) {
-        return counterService.getCounterOptions(current);
-    }
-
-    @PostMapping("/counter-login")
-    public ResponseEntity<LoginResponseDTO> counterLogin(@Valid @RequestBody CounterLoginRequest dto,
-                                                         @AuthenticationPrincipal AuthenticatedUser current) {
-        User user = counterService.claimCounter(dto.getCounterId(), dto.isAttachOnly(), current);
-        String token = jwtService.generateToken(user);   // user.counterId is now the chosen counter
+        String token = jwtService.generateToken(user);
         return ResponseEntity.ok(new LoginResponseDTO(
                 token, jwtService.getExpirationMinutes() * 60, new UserResponseDTO(user)));
     }
