@@ -67,14 +67,14 @@ public class SecurityConfig {
                         .requestMatchers("/serveiq/api/branches/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/serveiq/api/whatsapp/**").hasRole("ADMIN")
                         .requestMatchers("/serveiq/api/admin/ad-sync/**").hasRole("ADMIN")
-
+                        .requestMatchers("/serveiq/api/health-check").permitAll()
                         // Serving customers
                         .requestMatchers("/serveiq/api/agent/**")
                         .hasAnyRole("ADMIN", "MANAGER", "USER", "RECEPTIONIST")
                         .requestMatchers("/serveiq/api/counters/**")
                         .hasAnyRole("ADMIN", "MANAGER", "USER", "RECEPTIONIST", "DISPLAY", "FEEDBACK")
-
                         .anyRequest().authenticated())
+
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
