@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
@@ -32,7 +33,6 @@ public class FeedbackService {
     private final TokenEventPublisher tokenEventPublisher;
     private final AuditLogService auditLogService;
     private final HttpServletRequest request;
-
 
     @Transactional
     public Feedback createFeedback(Feedback feedback, AuthenticatedUser user) {
@@ -74,8 +74,15 @@ public class FeedbackService {
         return saved;
     }
 
-    /** Paged - this returned the entire table, newest first is what the UI wants. */
-    public Page<Feedback> getAll(Pageable pageable) {
+    /**
+     * Paged feedback, newest first.
+     * - If start & end are both null → returns everything.
+     * - If both are provided       → returns only rows whose createdAt is in [start, end).
+     */
+    public Page<Feedback> getAll(LocalDateTime start, LocalDateTime end, Pageable pageable) {
+        if (start != null && end != null) {
+            return feedbackRepository.findByCreatedAtBetweenOrderByCreatedAtDesc(start, end, pageable);
+        }
         return feedbackRepository.findAllByOrderByCreatedAtDesc(pageable);
     }
 
@@ -99,9 +106,8 @@ public class FeedbackService {
     }
 
     /**
-     * Was findAll() into memory followed by three separate stream passes to
-     * count three values, so the cost grew with every piece of feedback ever
-     * left. One GROUP BY does the same work in the database.
+     * All-time feedback summary counts (HAPPY / NEUTRAL / SAD).
+     * Always computed across the whole table — no date filtering.
      */
     public Map<String, Long> getFeedbackSummary() {
         Map<Feedback.MoodRating, Long> counts = new EnumMap<>(Feedback.MoodRating.class);
@@ -110,9 +116,9 @@ public class FeedbackService {
         }
 
         Map<String, Long> summary = new HashMap<>();
-        summary.put("totalHappy", counts.getOrDefault(Feedback.MoodRating.HAPPY, 0L));
+        summary.put("totalHappy",   counts.getOrDefault(Feedback.MoodRating.HAPPY,   0L));
         summary.put("totalNeutral", counts.getOrDefault(Feedback.MoodRating.NEUTRAL, 0L));
-        summary.put("totalSad", counts.getOrDefault(Feedback.MoodRating.SAD, 0L));
+        summary.put("totalSad",     counts.getOrDefault(Feedback.MoodRating.SAD,     0L));
         return summary;
     }
 }

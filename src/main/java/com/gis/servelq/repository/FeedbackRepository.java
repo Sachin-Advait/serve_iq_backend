@@ -6,6 +6,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface FeedbackRepository extends JpaRepository<Feedback, String> {
@@ -19,4 +20,15 @@ public interface FeedbackRepository extends JpaRepository<Feedback, String> {
     List<Object[]> countByRating();
 
     Page<Feedback> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
+    // ==================== NEW: DATE FILTERING (list only) ====================
+
+    /**
+     * Paged feedback between two timestamps, newest first.
+     */
+    Page<Feedback> findByCreatedAtBetweenOrderByCreatedAtDesc(
+            LocalDateTime start,
+            LocalDateTime end,
+            Pageable pageable
+    );
 }
