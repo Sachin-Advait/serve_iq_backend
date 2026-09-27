@@ -59,8 +59,8 @@ public class AppConfigService {
         config.setId(UUID.randomUUID().toString());
         config.setAppType(appType.name());
         config.setAppLanguage("ENGLISH");
-        config.setPrimaryColor("#3E321A");
-        config.setSecondaryColor("#9E9B46");
+        config.setPrimaryColor("#3B3121");
+        config.setSecondaryColor("#FFFFFF");
         config.setDefaultEnabled(true);
 
         String logoUrl = getDefaultLogoUrl();
@@ -73,6 +73,8 @@ public class AppConfigService {
                 config.setTickerSpeed(30);
                 config.setVideosEnabled(true);
                 config.setFlickerTime(5);
+                config.setSecondaryColor("#14100B");
+                config.setForegroundFontColor("#FFFFFF");
                 config.setComponentOrder(new ArrayList<>(List.of("ROOMS", "COUNTERS", "VIDEOS", "TICKER")));
                 setDefaultBackgroundImage(config, appType);
             }
@@ -270,8 +272,8 @@ public class AppConfigService {
 
         config.setDefaultEnabled(true);
         config.setAppLanguage("ENGLISH");
-        config.setPrimaryColor("#3E321A");
-        config.setSecondaryColor("#9E9B46");
+        config.setPrimaryColor("#3B3121");
+        config.setSecondaryColor("#FFFFFF");
 
         String logoUrl = getDefaultLogoUrl();
         config.setAppLogoUrl(logoUrl);
@@ -283,6 +285,8 @@ public class AppConfigService {
                 config.setTickerSpeed(30);
                 config.setVideosEnabled(true);
                 config.setFlickerTime(5);
+                config.setSecondaryColor("#14100B");
+                config.setForegroundFontColor("#FFFFFF");
                 config.setComponentOrder(new ArrayList<>(List.of("ROOMS", "COUNTERS", "VIDEOS", "TICKER")));
                 setDefaultBackgroundImage(config, appType);
             }
@@ -354,6 +358,7 @@ public class AppConfigService {
                     .defaultEnabled(config.getDefaultEnabled())
                     .primaryColor(config.getPrimaryColor())
                     .secondaryColor(config.getSecondaryColor())
+                    .foregroundFontColor(config.getForegroundFontColor())
                     .tickerEnabled(config.getTickerEnabled())
                     .tickerSpeed(config.getTickerSpeed())
                     .videosEnabled(config.getVideosEnabled())
@@ -396,6 +401,7 @@ public class AppConfigService {
                     .defaultEnabled(config.getDefaultEnabled())
                     .primaryColor(config.getPrimaryColor())
                     .secondaryColor(config.getSecondaryColor())
+                    .foregroundFontColor(null)
                     .tickerEnabled(null)
                     .tickerSpeed(null)
                     .videosEnabled(null)
@@ -419,6 +425,7 @@ public class AppConfigService {
                     .defaultEnabled(config.getDefaultEnabled())
                     .primaryColor(config.getPrimaryColor())
                     .secondaryColor(config.getSecondaryColor())
+                    .foregroundFontColor(null)
                     .tickerEnabled(null)
                     .tickerSpeed(null)
                     .videosEnabled(null)
@@ -466,6 +473,7 @@ public class AppConfigService {
                 .defaultEnabled(config.getDefaultEnabled())
                 .primaryColor(config.getPrimaryColor())
                 .secondaryColor(config.getSecondaryColor())
+                .foregroundFontColor(null)
                 .tickerEnabled(null)
                 .tickerSpeed(null)
                 .videosEnabled(null)

@@ -24,6 +24,7 @@ public class TemplateRequestDTO {
     private Boolean videosEnabled;
     private Integer flickerTime;
     private List<String> componentOrder;
+    private String foregroundFontColor;
 
     // Feedback fields
     private Boolean imageCarouselEnabled;

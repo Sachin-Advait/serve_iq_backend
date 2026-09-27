@@ -35,6 +35,7 @@ public class AppConfigTemplate {
     private Integer tickerSpeed;
     private Boolean videosEnabled;
     private Integer flickerTime;
+    private String foregroundFontColor;
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "app_config_template_component_order", joinColumns = @JoinColumn(name = "template_id"))

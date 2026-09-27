@@ -147,6 +147,7 @@ public class TemplateService {
         if (request.getDefaultEnabled() != null) template.setDefaultEnabled(request.getDefaultEnabled());
         if (request.getPrimaryColor() != null) template.setPrimaryColor(request.getPrimaryColor());
         if (request.getSecondaryColor() != null) template.setSecondaryColor(request.getSecondaryColor());
+        if (request.getForegroundFontColor() != null) template.setForegroundFontColor(request.getForegroundFontColor());
         if (request.getTickerEnabled() != null) template.setTickerEnabled(request.getTickerEnabled());
         if (request.getTickerSpeed() != null) template.setTickerSpeed(request.getTickerSpeed());
         if (request.getVideosEnabled() != null) template.setVideosEnabled(request.getVideosEnabled());
@@ -214,6 +215,8 @@ public class TemplateService {
             activeTemplate.setPrimaryColor(updatedConfig.getPrimaryColor());
         if (updatedConfig.getSecondaryColor() != null)
             activeTemplate.setSecondaryColor(updatedConfig.getSecondaryColor());
+        if (updatedConfig.getForegroundFontColor() != null)
+            activeTemplate.setForegroundFontColor(updatedConfig.getForegroundFontColor());
         if (updatedConfig.getTickerEnabled() != null)
             activeTemplate.setTickerEnabled(updatedConfig.getTickerEnabled());
         if (updatedConfig.getTickerSpeed() != null)
@@ -304,6 +307,7 @@ public class TemplateService {
         if (request.getDefaultEnabled() != null) template.setDefaultEnabled(request.getDefaultEnabled());
         if (request.getPrimaryColor() != null) template.setPrimaryColor(request.getPrimaryColor());
         if (request.getSecondaryColor() != null) template.setSecondaryColor(request.getSecondaryColor());
+        if (request.getForegroundFontColor() != null) template.setForegroundFontColor(request.getForegroundFontColor());
         if (request.getTickerEnabled() != null) template.setTickerEnabled(request.getTickerEnabled());
         if (request.getTickerSpeed() != null) template.setTickerSpeed(request.getTickerSpeed());
         if (request.getVideosEnabled() != null) template.setVideosEnabled(request.getVideosEnabled());
@@ -512,6 +516,7 @@ public class TemplateService {
         config.setDefaultEnabled(template.getDefaultEnabled());
         config.setPrimaryColor(template.getPrimaryColor());
         config.setSecondaryColor(template.getSecondaryColor());
+        config.setForegroundFontColor(template.getForegroundFontColor());
         config.setTickerEnabled(template.getTickerEnabled());
         config.setTickerSpeed(template.getTickerSpeed());
         config.setVideosEnabled(template.getVideosEnabled());
@@ -569,6 +574,7 @@ public class TemplateService {
         template.setDefaultEnabled(config.getDefaultEnabled());
         template.setPrimaryColor(config.getPrimaryColor());
         template.setSecondaryColor(config.getSecondaryColor());
+        template.setForegroundFontColor(config.getForegroundFontColor());
         template.setTickerEnabled(config.getTickerEnabled());
         template.setTickerSpeed(config.getTickerSpeed());
         template.setVideosEnabled(config.getVideosEnabled());
@@ -619,6 +625,7 @@ public class TemplateService {
         target.setDefaultEnabled(source.getDefaultEnabled());
         target.setPrimaryColor(source.getPrimaryColor());
         target.setSecondaryColor(source.getSecondaryColor());
+        target.setForegroundFontColor(source.getForegroundFontColor());
         target.setTickerEnabled(source.getTickerEnabled());
         target.setTickerSpeed(source.getTickerSpeed());
         target.setVideosEnabled(source.getVideosEnabled());

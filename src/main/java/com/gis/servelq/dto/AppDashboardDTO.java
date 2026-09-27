@@ -27,6 +27,7 @@ public class AppDashboardDTO {
     private List<String> componentOrder;
     private List<BreakingNews> tickers;
     private List<TvContent> activeVideos;
+    private String foregroundFontColor;
 
     // Feedback fields
     private Boolean imageCarouselEnabled;

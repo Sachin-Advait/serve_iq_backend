@@ -22,14 +22,15 @@ public class AppConfig {
     private String appLogoUrl;
     private String appLanguage = "ENGLISH";
     private Boolean defaultEnabled;
-    private String primaryColor = "#3e321a";
-    private String secondaryColor = "#9E9B46";
+    private String primaryColor = "#3B3121";
+    private String secondaryColor = "#FFFFFF";
 
     // ==================== TV DISPLAY FIELDS ====================
     private Boolean tickerEnabled;
     private Integer tickerSpeed;
     private Boolean videosEnabled;      // TV: Enable video playback
     private Integer flickerTime;        // TV: Rotation time in seconds
+    private String foregroundFontColor;
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "app_config_component_order", joinColumns = @JoinColumn(name = "config_id"))
