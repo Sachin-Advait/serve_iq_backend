@@ -369,7 +369,10 @@ public class CounterService {
         Counter counter = counterRepository.findById(counterId)
                 .orElseThrow(() -> new ResourceNotFoundException("Counter not found with id: " + counterId));
 
-        // Audit log before deletion
+        if (StringUtils.hasText(counter.getUserId())) {
+            throw new BusinessException("Counter is in use by an agent; release it before deleting");
+        }
+
         auditLogService.log(
                 AuditAction.COUNTER_DELETED,
                 "Counter",
@@ -380,12 +383,6 @@ public class CounterService {
                 counter.getBranchId(),
                 request
         );
-
-        // Unassign user from counter if exists
-        if (StringUtils.hasText(counter.getUserId())) {
-            throw new BusinessException("Counter is in use by an agent; release it before changing its branch");
-        }
-
         counterRepository.deleteById(counterId);
         log.info("Counter deleted successfully: {} (ID: {})", counter.getName(), counterId);
     }
@@ -721,6 +718,15 @@ public class CounterService {
         Counter counter = counterRepository.findById(counterId)
                 .orElseThrow(() -> new ResourceNotFoundException("Counter not found with id: " + counterId));
 
+        tokenRepository.findByStatusInAndAssignedCounterIdOrderByCreatedAtDesc(IN_PROGRESS, counterId)
+                .forEach(t -> {
+                    t.setStatus(TokenStatus.WAITING);
+                    t.setAssignedCounterId(null);
+                    t.setAssignedCounterName(null);
+                    t.setStartAt(null);
+                    tokenRepository.save(t);
+                });
+
         String occupantId = counter.getUserId();
         if (StringUtils.hasText(occupantId)) {
             releaseIfOwner(counterId, occupantId, "Counter force-released by admin", admin);
@@ -743,7 +749,7 @@ public class CounterService {
 
             counter.setUserId(null);
             counter.setStatus(CounterStatus.CLOSED);
-            counter.setPaused(false);
+            counter.setPaused(true);
             counterRepository.save(counter);
 
             publishCounterChanged(counter);
