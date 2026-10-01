@@ -10,18 +10,15 @@ import java.time.LocalDateTime;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class CounterDisplayDTO {
 
-    private String counterId;
-    private String counterCode;
     private String counterName;
     private Boolean enabled;
     private Boolean paused;
     private CounterStatus counterStatus;
 
-    private String tokenId;
     private String tokenNumber;
 
-    private String serviceId;
     private String serviceName;
+    private String arabicService;
 
     private LocalDateTime calledAt;
 }

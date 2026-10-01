@@ -515,6 +515,9 @@ public class CounterService {
         Map<String, String> serviceNameById = serviceRepository.findAllById(serviceIds).stream()
                 .collect(Collectors.toMap(Services::getId, Services::getName));
 
+        Map<String, String> arabicServiceNameById = serviceRepository.findAllById(serviceIds).stream()
+                .collect(Collectors.toMap(Services::getId, Services::getArabicName));
+
         Map<String, Token> activeTokenByCounter = tokenRepository
                 .findByStatusInAndAssignedCounterIdIn(ACTIVE_TOKEN_STATUSES, counterIds)
                 .stream()
@@ -526,8 +529,6 @@ public class CounterService {
 
         return counters.stream().map(counter -> {
             CounterDisplayDTO dto = new CounterDisplayDTO();
-            dto.setCounterId(counter.getId());
-            dto.setCounterCode(counter.getCode());
             dto.setCounterName(counter.getName());
             dto.setEnabled(counter.getEnabled());
             dto.setPaused(counter.getPaused());
@@ -535,14 +536,13 @@ public class CounterService {
 
             Token activeToken = activeTokenByCounter.get(counter.getId());
             if (activeToken != null) {
-                dto.setTokenId(activeToken.getId());
                 dto.setTokenNumber(activeToken.getToken());
                 dto.setCalledAt(activeToken.getStartAt());
-                dto.setServiceId(activeToken.getServiceId());
                 dto.setServiceName(serviceNameById.get(activeToken.getServiceId()));
+                dto.setArabicService(arabicServiceNameById.get(activeToken.getServiceId()));
             } else {
-                dto.setServiceId(counter.getServiceId());
                 dto.setServiceName(serviceNameById.get(counter.getServiceId()));
+                dto.setArabicService(arabicServiceNameById.get(counter.getServiceId()));
             }
 
             return dto;
@@ -764,7 +764,7 @@ public class CounterService {
 
             counter.setUserId(null);
             counter.setStatus(CounterStatus.CLOSED);
-            counter.setPaused(true);
+            counter.setPaused(false);
             counterRepository.save(counter);
 
             publishCounterChanged(counter);
