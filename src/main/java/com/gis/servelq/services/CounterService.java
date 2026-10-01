@@ -327,6 +327,9 @@ public class CounterService {
         Counter counter = counterRepository.findById(counterId)
                 .orElseThrow(() -> new ResourceNotFoundException("Counter not found with id: " + counterId));
 
+        if (paused) {
+            assertNoTokenInProgress(counterId, "pause");
+        }
         counter.setPaused(paused);
 
         // Update status based on pause state
@@ -687,7 +690,19 @@ public class CounterService {
         Counter c = counterRepository.findById(counterId).orElse(null);
         if (c == null || !Objects.equals(c.getUserId(), userId)) return;
         if (tokenRepository.existsByStatusInAndAssignedCounterId(IN_PROGRESS, counterId)) {
-            throw new BusinessException("Finish, hold or transfer the current token before leaving this counter");
+            throw new BusinessException("You still have a token in progress at counter " + c.getName()
+                    + ". Log in to that counter to finish, hold or transfer it before moving to another counter");
+        }
+    }
+
+    /**
+     * A counter that is calling/serving a token must not be paused: pausing overwrites
+     * the SERVING status and hides the live token from the counter and display board.
+     */
+    public void assertNoTokenInProgress(String counterId, String action) {
+        if (tokenRepository.existsByStatusInAndAssignedCounterId(IN_PROGRESS, counterId)) {
+            throw new BusinessException("Cannot " + action + " the counter while a token is being called or served. "
+                    + "Finish, hold or transfer it first");
         }
     }
 

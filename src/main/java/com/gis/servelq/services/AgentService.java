@@ -444,6 +444,11 @@ public class AgentService {
         Counter counter = counterRepository.findById(counterId)
                 .orElseThrow(() -> new ResourceNotFoundException("Counter not found"));
 
+        counterService.assertCanOperate(counterId, currentUser);
+        if (paused) {
+            counterService.assertNoTokenInProgress(counterId, "pause");
+        }
+
         counter.setPaused(paused);
         counter.setStatus(paused ? CounterStatus.PAUSED : CounterStatus.IDLE);
         Counter updated = counterRepository.save(counter);

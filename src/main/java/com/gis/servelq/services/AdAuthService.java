@@ -158,6 +158,12 @@ public class AdAuthService {
      * it should never block login.
      */
     private void activateUserCounter(User user) {
+        // Counter agents get their counter state handled by CounterService.claimCounter
+        // (which preserves a counter that is mid-call/serving). Resetting it here would
+        // flip a busy counter to IDLE before the claim runs.
+        if (user.getRole() == UserRole.USER) {
+            return;
+        }
         String counterId = user.getCounterId();
         if (counterId == null || counterId.isBlank()) {
             return;
