@@ -4,11 +4,13 @@ import jakarta.servlet.ReadListener;
 import jakarta.servlet.ServletInputStream;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
+import org.springframework.util.StreamUtils;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
@@ -36,18 +38,11 @@ public class CachingRequestWrapper extends HttpServletRequestWrapper {
             this.body = new byte[0];
             this.parameterMap = Collections.unmodifiableMap(new HashMap<>(request.getParameterMap()));
         } else {
-            // For non-multipart requests, cache the body
-            StringBuilder stringBuilder = new StringBuilder();
-            try (BufferedReader bufferedReader = request.getReader()) {
-                String line;
-                while ((line = bufferedReader.readLine()) != null) {
-                    if (stringBuilder.length() > 0) {
-                        stringBuilder.append('\n');
-                    }
-                    stringBuilder.append(line);
-                }
-            }
-            this.body = stringBuilder.toString().getBytes(StandardCharsets.UTF_8);
+            // For non-multipart requests, cache the raw bytes. Going through
+            // getReader() here would decode the body before CharacterEncodingFilter
+            // has run, so Tomcat falls back to ISO-8859-1 and Arabic (any non-Latin
+            // text) arrives at the controllers as mojibake.
+            this.body = StreamUtils.copyToByteArray(request.getInputStream());
             this.parameterMap = Collections.unmodifiableMap(new HashMap<>(request.getParameterMap()));
         }
     }
@@ -90,7 +85,7 @@ public class CachingRequestWrapper extends HttpServletRequestWrapper {
             // For multipart, delegate to original request
             return super.getReader();
         }
-        return new BufferedReader(new InputStreamReader(getInputStream(), StandardCharsets.UTF_8));
+        return new BufferedReader(new InputStreamReader(getInputStream(), bodyCharset()));
     }
 
     @Override
@@ -118,7 +113,12 @@ public class CachingRequestWrapper extends HttpServletRequestWrapper {
     }
 
     public String getBodyAsString() {
-        return new String(body, StandardCharsets.UTF_8);
+        return new String(body, bodyCharset());
+    }
+
+    private Charset bodyCharset() {
+        String encoding = getCharacterEncoding();
+        return encoding != null ? Charset.forName(encoding) : StandardCharsets.UTF_8;
     }
 
     public boolean isMultipartRequest() {
