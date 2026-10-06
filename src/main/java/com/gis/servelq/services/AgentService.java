@@ -48,12 +48,15 @@ public class AgentService {
                 .toList();
     }
 
+    // Must be transactional: TokenEventDispatcher is an AFTER_COMMIT listener, so events
+    // published outside a transaction are silently dropped (TV never got TOKEN_CALLED).
+    // The FOR UPDATE SKIP LOCKED row lock is held until this method commits.
+    @Transactional
     public AgentCallResponseDTO callNextToken(String counterId) {
         Token nextToken;
         Counter counter;
 
         try {
-            // Short transaction: acquire lock, update status, release lock on commit
             var claimed = claimNextToken(counterId);
             nextToken = claimed.token();
             counter = claimed.counter();
@@ -61,7 +64,7 @@ public class AgentService {
             throw new BusinessException("Token is being acquired by another counter. Please try again.");
         }
 
-        // Everything below runs with no row lock held
+        // Dispatched to sockets after commit
         tokenEventPublisher.publish(new TokenEvent(
                 TokenEventType.TOKEN_CALLED,
                 nextToken.getBranchId(),
@@ -100,7 +103,6 @@ public class AgentService {
         return response;
     }
 
-    @Transactional
     private ClaimedToken claimNextToken(String counterId) {
         Counter counter = counterRepository.findById(counterId)
                 .orElseThrow(() -> new ResourceNotFoundException("Counter not found"));
