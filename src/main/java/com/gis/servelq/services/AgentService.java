@@ -115,6 +115,16 @@ public class AgentService {
         Token nextToken = tokenRepository.findNextToken(counterId)
                 .orElseThrow(() -> new ResourceNotFoundException("No tokens available"));
 
+        // The previous visitor never submitted feedback, so their token is
+        // still REVIEW on this counter. The agent has moved on: close it out
+        // so it doesn't linger as this counter's "current" token on the TV.
+        tokenRepository.findByStatusInAndAssignedCounterIdOrderByCreatedAtDesc(
+                        List.of(TokenStatus.REVIEW), counterId)
+                .forEach(t -> {
+                    t.setStatus(TokenStatus.DONE);
+                    tokenRepository.save(t);
+                });
+
         nextToken.setStatus(TokenStatus.CALLING);
         nextToken.setAssignedCounterId(counterId);
         nextToken.setAssignedCounterName(counter.getName());

@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -415,13 +416,13 @@ public class CounterService {
                     counterId
             );
 
-            if (!activeTokens.isEmpty()) {
-                if (activeTokens.size() > 1) {
-                    log.warn("Counter {} has {} tokens in active statuses simultaneously — expected at most 1. Using most recent (id={}).",
-                            counterId, activeTokens.size(), activeTokens.get(0).getId());
-                }
+            if (activeTokens.size() > 1) {
+                log.warn("Counter {} has {} tokens in active statuses simultaneously — expected at most 1.",
+                        counterId, activeTokens.size());
+            }
 
-                Token token = activeTokens.get(0);
+            Token token = pickCurrentToken(counter, activeTokens);
+            if (token != null) {
                 response.setTokenId(token.getId());
                 response.setTokenNumber(token.getToken());
                 response.setServiceId(token.getServiceId());
@@ -518,14 +519,10 @@ public class CounterService {
         Map<String, String> arabicServiceNameById = serviceRepository.findAllById(serviceIds).stream()
                 .collect(Collectors.toMap(Services::getId, Services::getArabicName));
 
-        Map<String, Token> activeTokenByCounter = tokenRepository
+        Map<String, List<Token>> activeTokensByCounter = tokenRepository
                 .findByStatusInAndAssignedCounterIdIn(ACTIVE_TOKEN_STATUSES, counterIds)
                 .stream()
-                .collect(Collectors.toMap(
-                        Token::getAssignedCounterId,
-                        t -> t,
-                        (first, second) -> first
-                ));
+                .collect(Collectors.groupingBy(Token::getAssignedCounterId));
 
         return counters.stream().map(counter -> {
             CounterDisplayDTO dto = new CounterDisplayDTO();
@@ -534,7 +531,8 @@ public class CounterService {
             dto.setPaused(counter.getPaused());
             dto.setCounterStatus(counter.getStatus());
 
-            Token activeToken = activeTokenByCounter.get(counter.getId());
+            Token activeToken = pickCurrentToken(counter,
+                    activeTokensByCounter.getOrDefault(counter.getId(), List.of()));
             if (activeToken != null) {
                 dto.setTokenNumber(activeToken.getToken());
                 dto.setCalledAt(activeToken.getStartAt());
@@ -547,6 +545,34 @@ public class CounterService {
 
             return dto;
         }).collect(Collectors.toList());
+    }
+
+    /**
+     * Picks the token a counter is actually on out of its SERVING / CALLING /
+     * REVIEW tokens. A counter should only ever hold one, but a REVIEW token
+     * stays REVIEW until the visitor submits feedback, so when they walk away
+     * it lingers on the counter after the agent has moved on. Picking an
+     * arbitrary one made the TV show that old token instead of the one being
+     * served.
+     *
+     * SERVING wins over CALLING, which wins over REVIEW, and the newest wins
+     * within a status. A REVIEW token only counts while the counter itself is
+     * in COMPLETE, i.e. it is the visitor who was just served.
+     */
+    private Token pickCurrentToken(Counter counter, List<Token> tokens) {
+        return tokens.stream()
+                .filter(t -> t.getStatus() != TokenStatus.REVIEW
+                        || counter.getStatus() == CounterStatus.COMPLETE)
+                .min(Comparator
+                        .comparingInt((Token t) -> ACTIVE_TOKEN_STATUSES.indexOf(t.getStatus()))
+                        .thenComparing(CounterService::lastActivity, Comparator.reverseOrder()))
+                .orElse(null);
+    }
+
+    private static LocalDateTime lastActivity(Token t) {
+        if (t.getEndAt() != null) return t.getEndAt();
+        if (t.getStartAt() != null) return t.getStartAt();
+        return t.getCreatedAt() != null ? t.getCreatedAt() : LocalDateTime.MIN;
     }
 
     // ==================== COUNTER LOGIN / LOGOUT ====================
