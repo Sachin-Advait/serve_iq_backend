@@ -690,7 +690,10 @@ public class CounterService {
         Counter fresh = counterRepository.findById(counterId)
                 .orElseThrow(() -> new ResourceNotFoundException("Counter not found with id: " + counterId));
         if (!ownedByMe || fresh.getStatus() == CounterStatus.CLOSED) {
-            fresh.setStatus(CounterStatus.IDLE);
+            // A token can still be calling/serving here (e.g. the counter was force-released
+            // mid-call). Reflect it instead of showing IDLE: an IDLE counter with a live token
+            // let the agent try to log out, the logout was refused and the counter stayed held.
+            fresh.setStatus(statusForTokenInProgress(counterId));
             fresh.setPaused(false);
             counterRepository.save(fresh);
         }
@@ -713,6 +716,13 @@ public class CounterService {
                 currentUser, fresh.getBranchId(), request);
 
         return me;
+    }
+
+    private CounterStatus statusForTokenInProgress(String counterId) {
+        List<Token> live = tokenRepository.findByStatusInAndAssignedCounterIdOrderByCreatedAtDesc(IN_PROGRESS, counterId);
+        if (live.stream().anyMatch(t -> t.getStatus() == TokenStatus.SERVING)) return CounterStatus.SERVING;
+        if (!live.isEmpty()) return CounterStatus.CALLING;
+        return CounterStatus.IDLE;
     }
 
     private void assertCanLeave(String counterId, String userId) {

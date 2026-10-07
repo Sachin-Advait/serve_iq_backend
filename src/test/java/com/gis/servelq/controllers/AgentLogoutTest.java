@@ -42,6 +42,7 @@ class AgentLogoutTest {
     @Autowired BranchRepository branches;
     @Autowired TokenRepository tokens;
     @Autowired JwtService jwt;
+    @Autowired com.gis.servelq.services.CounterService counterService;
 
     @Test
     void logoutReleasesCounter() throws Exception {
@@ -85,6 +86,22 @@ class AgentLogoutTest {
                 .andExpect(status().isOk());
 
         assertThat(counters.findById(c.getId()).orElseThrow().getStatus()).isEqualTo(CounterStatus.IDLE);
+    }
+
+    @Test
+    void loginToACounterLeftWithACallingTokenDoesNotShowIdle() throws Exception {
+        Fixture f = agentAtCounter();
+        Counter c = counters.findById(f.counter.getId()).orElseThrow();
+        c.setUserId(null);
+        c.setStatus(CounterStatus.CLOSED);
+        counters.save(c);
+        token(f, "A004", TokenStatus.CALLING);
+
+        var actor = new com.gis.servelq.security.AuthenticatedUser(f.agent.getId(), f.agent.getEmail(),
+                "USER", f.branch.getId(), null);
+        counterService.claimCounter(c.getId(), false, actor);
+
+        assertThat(counters.findById(c.getId()).orElseThrow().getStatus()).isEqualTo(CounterStatus.CALLING);
     }
 
     private record Fixture(Branch branch, Counter counter, User agent, String jwt) {
