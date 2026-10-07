@@ -41,13 +41,13 @@ public class TVDisplayService {
         List<Token> latestCalled = tokenRepository.findLatestCalledTokens(
                 branchId, PageRequest.of(0, 4));
 
-        List<Token> nowServing = tokenRepository.findByBranchIdAndStatusOrderByPriorityAscCreatedAtAsc(
+        List<Token> nowServing = tokenRepository.findTodayByBranchIdAndStatus(
                 branchId, TokenStatus.SERVING, PageRequest.of(0, MAX_SERVING));
 
-        List<Token> upcoming = tokenRepository.findByBranchIdAndStatusOrderByPriorityAscCreatedAtAsc(
+        List<Token> upcoming = tokenRepository.findTodayByBranchIdAndStatus(
                 branchId, TokenStatus.WAITING, PageRequest.of(0, MAX_LIST));
 
-        List<Token> hold = tokenRepository.findByBranchIdAndStatusOrderByPriorityAscCreatedAtAsc(
+        List<Token> hold = tokenRepository.findTodayByBranchIdAndStatus(
                 branchId, TokenStatus.HOLD, PageRequest.of(0, MAX_LIST));
 
         Map<TokenStatus, Long> counts = new EnumMap<>(TokenStatus.class);
