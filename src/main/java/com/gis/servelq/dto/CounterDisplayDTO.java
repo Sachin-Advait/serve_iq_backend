@@ -1,13 +1,14 @@
 package com.gis.servelq.dto;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.gis.servelq.models.CounterStatus;
 import lombok.Data;
 
 import java.time.LocalDateTime;
 
+// Nulls must be sent, not dropped: when a token is held, transferred or marked
+// no-show the counter has no token any more, and a missing tokenNumber /
+// calledAt left the meeting TV still showing the old token.
 @Data
-@JsonInclude(JsonInclude.Include.NON_NULL)
 public class CounterDisplayDTO {
 
     private String counterName;

@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -295,18 +296,16 @@ public class AgentService {
             token.setIsTransfer(true);
             token.setTransferFrom(fromCounterId);
 
-            // -----------------------------------------
-            // REMOVE OLD COUNTER FROM counterIds LIST
-            // -----------------------------------------
-            if (token.getCounterIds() != null && fromCounterId != null) {
-                token.getCounterIds().remove(fromCounterId);
+            // Work on a mutable copy: StringListConverter returns List.of() for an
+            // empty column, and remove/add on that threw and failed the transfer.
+            List<String> counterIds = token.getCounterIds() != null
+                    ? new ArrayList<>(token.getCounterIds())
+                    : new ArrayList<>();
+            if (fromCounterId != null) {
+                counterIds.remove(fromCounterId);
             }
-            // -----------------------------------------
-
-            // ADD NEW COUNTER IF YOU WANT (optional)
-            if (token.getCounterIds() != null) {
-                token.getCounterIds().add(toCounter.getId());
-            }
+            counterIds.add(toCounter.getId());
+            token.setCounterIds(counterIds);
 
             // Set the assigned counter to new one
             token.setAssignedCounterId(toCounter.getId());
