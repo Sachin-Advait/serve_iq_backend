@@ -46,6 +46,7 @@ public class AppConfigTemplate {
     // ==================== FEEDBACK FIELDS ====================
     private Boolean imageCarouselEnabled;
     private Boolean feedbackVideoEnabled;
+    private Integer feedbackIdleTimeout;
 
     // ==================== KIOSK PRINT FIELDS ====================
 

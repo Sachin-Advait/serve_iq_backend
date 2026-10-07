@@ -39,6 +39,13 @@ public class FeedbackController {
         return service.createFeedback(f, user);
     }
 
+    // ==================== TIMEOUT (no rating given) ====================
+
+    @PostMapping("/timeout")
+    public void feedbackTimeout(@RequestBody FeedbackRequestDto dto) {
+        service.expireFeedback(dto.getTokenId(), dto.getCounterCode());
+    }
+
     // ==================== LIST (with optional date filter) ====================
 
     /**

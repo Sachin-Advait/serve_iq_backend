@@ -155,6 +155,7 @@ public class TemplateService {
         if (request.getComponentOrder() != null) template.setComponentOrder(new ArrayList<>(request.getComponentOrder()));
         if (request.getImageCarouselEnabled() != null) template.setImageCarouselEnabled(request.getImageCarouselEnabled());
         if (request.getFeedbackVideoEnabled() != null) template.setFeedbackVideoEnabled(request.getFeedbackVideoEnabled());
+        if (request.getFeedbackIdleTimeout() != null) template.setFeedbackIdleTimeout(request.getFeedbackIdleTimeout());
 
         // ==================== KIOSK PRINT FIELDS - BILINGUAL ====================
         if (request.getKioskPrintEnabled() != null) template.setKioskPrintEnabled(request.getKioskPrintEnabled());
@@ -231,6 +232,8 @@ public class TemplateService {
             activeTemplate.setImageCarouselEnabled(updatedConfig.getImageCarouselEnabled());
         if (updatedConfig.getFeedbackVideoEnabled() != null)
             activeTemplate.setFeedbackVideoEnabled(updatedConfig.getFeedbackVideoEnabled());
+        if (updatedConfig.getFeedbackIdleTimeout() != null)
+            activeTemplate.setFeedbackIdleTimeout(updatedConfig.getFeedbackIdleTimeout());
 
         // ==================== KIOSK PRINT FIELDS - BILINGUAL ====================
         if (updatedConfig.getKioskPrintEnabled() != null)
@@ -315,6 +318,7 @@ public class TemplateService {
         if (request.getComponentOrder() != null) template.setComponentOrder(new ArrayList<>(request.getComponentOrder()));
         if (request.getImageCarouselEnabled() != null) template.setImageCarouselEnabled(request.getImageCarouselEnabled());
         if (request.getFeedbackVideoEnabled() != null) template.setFeedbackVideoEnabled(request.getFeedbackVideoEnabled());
+        if (request.getFeedbackIdleTimeout() != null) template.setFeedbackIdleTimeout(request.getFeedbackIdleTimeout());
 
         // ==================== KIOSK PRINT FIELDS - BILINGUAL ====================
         if (request.getKioskPrintEnabled() != null) template.setKioskPrintEnabled(request.getKioskPrintEnabled());
@@ -559,6 +563,7 @@ public class TemplateService {
 
         config.setImageCarouselEnabled(template.getImageCarouselEnabled());
         config.setFeedbackVideoEnabled(template.getFeedbackVideoEnabled());
+        config.setFeedbackIdleTimeout(template.getFeedbackIdleTimeout());
 
         config.setDefaultEnabled(template.isDefault());
 
@@ -583,6 +588,7 @@ public class TemplateService {
                 new ArrayList<>(config.getComponentOrder()) : null);
         template.setImageCarouselEnabled(config.getImageCarouselEnabled());
         template.setFeedbackVideoEnabled(config.getFeedbackVideoEnabled());
+        template.setFeedbackIdleTimeout(config.getFeedbackIdleTimeout());
 
         // ==================== KIOSK PRINT FIELDS - BILINGUAL ====================
         template.setKioskPrintEnabled(config.getKioskPrintEnabled());
@@ -634,6 +640,7 @@ public class TemplateService {
                 new ArrayList<>(source.getComponentOrder()) : null);
         target.setImageCarouselEnabled(source.getImageCarouselEnabled());
         target.setFeedbackVideoEnabled(source.getFeedbackVideoEnabled());
+        target.setFeedbackIdleTimeout(source.getFeedbackIdleTimeout());
 
         // ==================== KIOSK PRINT FIELDS - BILINGUAL ====================
         target.setKioskPrintEnabled(source.getKioskPrintEnabled());

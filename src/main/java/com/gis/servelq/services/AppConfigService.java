@@ -35,6 +35,7 @@ public class AppConfigService {
             "image/jpeg", "image/png", "image/webp", "image/gif"
     );
     private static final String[] IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif"};
+    public static final int DEFAULT_FEEDBACK_IDLE_TIMEOUT = 30;
 
     private final AppConfigRepository configRepository;
     private final BreakingNewsRepository newsRepository;
@@ -82,6 +83,7 @@ public class AppConfigService {
                 config.setImageCarouselEnabled(true);
                 config.setFeedbackVideoEnabled(false);
                 config.setFlickerTime(5);
+                config.setFeedbackIdleTimeout(DEFAULT_FEEDBACK_IDLE_TIMEOUT);
                 setDefaultBackgroundImage(config, appType);
             }
             case KIOSK -> {
@@ -294,6 +296,7 @@ public class AppConfigService {
                 config.setImageCarouselEnabled(true);
                 config.setFeedbackVideoEnabled(false);
                 config.setFlickerTime(5);
+                config.setFeedbackIdleTimeout(DEFAULT_FEEDBACK_IDLE_TIMEOUT);
                 setDefaultBackgroundImage(config, appType);
             }
             case KIOSK -> {
@@ -411,6 +414,8 @@ public class AppConfigService {
                     .activeVideos(null)
                     .imageCarouselEnabled(config.getImageCarouselEnabled())
                     .feedbackVideoEnabled(config.getFeedbackVideoEnabled())
+                    .feedbackIdleTimeout(config.getFeedbackIdleTimeout() != null
+                            ? config.getFeedbackIdleTimeout() : DEFAULT_FEEDBACK_IDLE_TIMEOUT)
                     .activeImages(activeImages)
                     .activeFeedbackVideo(activeFeedbackVideo)
                     .build();

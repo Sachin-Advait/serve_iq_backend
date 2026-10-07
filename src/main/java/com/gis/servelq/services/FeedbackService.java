@@ -75,6 +75,41 @@ public class FeedbackService {
     }
 
     /**
+     * Feedback screen timed out with no rating: close the token and free the counter
+     * the same way a submitted rating does, without storing a feedback row.
+     * No-op if the counter has already moved on (agent called the next token, etc.).
+     */
+    @Transactional
+    public void expireFeedback(String tokenId, String counterCode) {
+        Counter counter = counterRepository.findByCode(counterCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Counter not found"));
+
+        Token token = tokenRepository.findById(tokenId)
+                .orElseThrow(() -> new ResourceNotFoundException("Token not found"));
+
+        if (counter.getStatus() != CounterStatus.COMPLETE
+                || token.getStatus() != TokenStatus.REVIEW
+                || !counter.getId().equals(token.getAssignedCounterId())) {
+            return;
+        }
+
+        token.setStatus(TokenStatus.DONE);
+        tokenRepository.save(token);
+
+        counter.setStatus(CounterStatus.IDLE);
+        counterRepository.save(counter);
+
+        tokenEventPublisher.publish(new TokenEvent(
+                TokenEventType.FEEDBACK_SUBMITTED,
+                token.getBranchId(),
+                token.getId(),
+                token.getToken(),
+                counter.getId(),
+                Instant.now()
+        ));
+    }
+
+    /**
      * Paged feedback, newest first.
      * - If start & end are both null → returns everything.
      * - If both are provided       → returns only rows whose createdAt is in [start, end).
