@@ -146,8 +146,16 @@ public interface TokenRepository extends JpaRepository<Token, String> {
               AND t.startAt IS NOT NULL
               AND t.endAt IS NOT NULL
               AND t.status = 'DONE'
+              AND t.tokenDate = :tokenDate
             """)
-    Double getAvgServiceTimeSecondsByCounter(@Param("counterId") String counterId);
+    Double getAvgServiceTimeSecondsByCounter(@Param("counterId") String counterId,
+                                             @Param("tokenDate") LocalDate tokenDate);
+
+    // Today only: an all-time average was dragged up by old tokens left open
+    // for hours, so agents saw values like 400 minutes.
+    default Double getAvgServiceTimeSecondsByCounter(String counterId) {
+        return getAvgServiceTimeSecondsByCounter(counterId, LocalDate.now());
+    }
 
     long countByBranchIdAndCreatedAtBetween(String branchId, LocalDateTime start, LocalDateTime end);
 
