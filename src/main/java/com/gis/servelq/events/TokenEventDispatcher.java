@@ -18,7 +18,11 @@ public class TokenEventDispatcher {
     private final CounterService counterService;
     private final TvContentService tvContentService;
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    // fallbackExecution: some publishers run with no transaction (e.g.
+    // TokenService.generateToken, whose insert already committed in TokenIssuer's
+    // REQUIRES_NEW transaction). Without it those events were silently dropped,
+    // so kiosk tokens never reached the agent's upcoming list or the TV.
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onEvent(TokenEvent event) {
 
         switch (event.getType()) {
