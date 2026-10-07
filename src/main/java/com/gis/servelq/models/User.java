@@ -44,6 +44,10 @@ public class User {
     @Column(name = "is_active")
     private Boolean active = true;
 
+    // Login tokens issued before this moment are rejected (set on admin force release).
+    @Column(name = "tokens_valid_after")
+    private LocalDateTime tokensValidAfter;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

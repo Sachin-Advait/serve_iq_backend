@@ -24,6 +24,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String BEARER = "Bearer ";
 
     private final JwtService jwtService;
+    private final TokenRevocationService tokenRevocationService;
 
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request,
@@ -36,7 +37,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 && SecurityContextHolder.getContext().getAuthentication() == null) {
 
             Claims claims = jwtService.parse(header.substring(BEARER.length()).trim());
-            if (claims != null) {
+            if (claims != null
+                    && !tokenRevocationService.isRevoked(claims.getSubject(), claims.getIssuedAt())) {
                 String role = claims.get("role", String.class);
                 AuthenticatedUser principal = new AuthenticatedUser(
                         claims.getSubject(),

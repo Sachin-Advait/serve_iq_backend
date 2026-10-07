@@ -9,6 +9,7 @@ import com.gis.servelq.events.TokenEventType;
 import com.gis.servelq.models.*;
 import com.gis.servelq.repository.*;
 import com.gis.servelq.security.AuthenticatedUser;
+import com.gis.servelq.security.TokenRevocationService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +44,7 @@ public class CounterService {
     private final AuditLogService auditLogService;
     private final HttpServletRequest request;
     private final CounterServiceLinker counterServiceLinker;
+    private final TokenRevocationService tokenRevocationService;
 
     /**
      * Creates a Counter entity from request DTO
@@ -836,6 +838,10 @@ public class CounterService {
         String occupantId = counter.getUserId();
         if (StringUtils.hasText(occupantId)) {
             releaseIfOwner(counterId, occupantId, "Counter force-released by admin", admin, releasedStatus);
+            // Sign the agent out everywhere: their next request gets 403 and the
+            // app sends them to the login page instead of leaving them on a
+            // counter they no longer hold.
+            tokenRevocationService.revokeAll(occupantId);
             userRepository.findById(occupantId).ifPresent(u -> {
                 if (counterId.equals(u.getCounterId())) {
                     u.setCounterId(null);
