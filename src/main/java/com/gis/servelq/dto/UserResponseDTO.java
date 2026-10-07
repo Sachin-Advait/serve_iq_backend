@@ -21,6 +21,8 @@ public class UserResponseDTO {
     // notifications to someone else's device.
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String fcmToken;
+    @JsonProperty("active")
+    private Boolean active;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -32,6 +34,7 @@ public class UserResponseDTO {
         this.branchId = user.getBranchId();
         if (user.getCounterId() != null) this.counterId = user.getCounterId();
         this.fcmToken = user.getFcmToken();
+        this.active = user.getActive();
         this.createdAt = user.getCreatedAt();
         this.updatedAt = user.getUpdatedAt();
     }
