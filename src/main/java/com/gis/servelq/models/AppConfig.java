@@ -47,6 +47,7 @@ public class AppConfig {
     // Feedback media mode (mutually exclusive)
     private Boolean imageCarouselEnabled;  // Show rotating images on feedback screen
     private Boolean feedbackVideoEnabled;  // Show video on feedback screen
+    private Integer feedbackIdleTimeout;   // Seconds before an unanswered feedback screen returns the counter to IDLE
 
     // ==================== KIOSK PRINT FIELDS ====================
 

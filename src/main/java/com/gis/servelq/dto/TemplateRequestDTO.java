@@ -29,6 +29,7 @@ public class TemplateRequestDTO {
     // Feedback fields
     private Boolean imageCarouselEnabled;
     private Boolean feedbackVideoEnabled;
+    private Integer feedbackIdleTimeout;
 
     // ==================== KIOSK PRINT FIELDS ====================
     private Boolean kioskPrintEnabled;

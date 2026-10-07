@@ -32,6 +32,7 @@ public class AppDashboardDTO {
     // Feedback fields
     private Boolean imageCarouselEnabled;
     private Boolean feedbackVideoEnabled;
+    private Integer feedbackIdleTimeout;
     private List<TvContent> activeImages;
     private List<TvContent> activeFeedbackVideo;
 

@@ -56,6 +56,7 @@ public class SecurityConfig {
                         // Walk-up kiosk
                         .requestMatchers(HttpMethod.POST, "/serveiq/api/tokens/generate").permitAll()
                         .requestMatchers(HttpMethod.POST, "/serveiq/api/feedback").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/serveiq/api/feedback/timeout").permitAll()
                         .requestMatchers(HttpMethod.GET, "/serveiq/api/tv-display/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/serveiq/api/news/breaking-news").permitAll()
                         .requestMatchers(HttpMethod.GET, "/serveiq/api/news/images/**").permitAll()
