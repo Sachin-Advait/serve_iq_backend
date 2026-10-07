@@ -526,7 +526,10 @@ public class CounterService {
 
         return counters.stream().map(counter -> {
             CounterDisplayDTO dto = new CounterDisplayDTO();
-            dto.setCounterName(counter.getName());
+            String name = counter.getName();
+            dto.setCounterName(name != null && name.contains(" ")
+                    ? name.substring(name.indexOf(" ") + 1)
+                    : name);
             dto.setEnabled(counter.getEnabled());
             dto.setPaused(counter.getPaused());
             dto.setCounterStatus(counter.getStatus());
