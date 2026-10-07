@@ -762,37 +762,55 @@ public class CounterService {
         Counter counter = counterRepository.findById(counterId)
                 .orElseThrow(() -> new ResourceNotFoundException("Counter not found with id: " + counterId));
 
-        tokenRepository.findByStatusInAndAssignedCounterIdOrderByCreatedAtDesc(IN_PROGRESS, counterId)
-                .forEach(t -> {
-                    t.setStatus(TokenStatus.WAITING);
-                    t.setAssignedCounterId(null);
-                    t.setAssignedCounterName(null);
-                    t.setStartAt(null);
-                    tokenRepository.save(t);
-                });
+        // A token being called/served here is marked No Show (same as the agent's No Show action)
+        // and the counter is left IDLE instead of CLOSED.
+        List<Token> inProgress = tokenRepository
+                .findByStatusInAndAssignedCounterIdOrderByCreatedAtDesc(IN_PROGRESS, counterId);
+        for (Token t : inProgress) {
+            t.setStatus(TokenStatus.NO_SHOW);
+            Token updated = tokenRepository.save(t);
+            tokenEventPublisher.publish(new TokenEvent(
+                    TokenEventType.TOKEN_NO_SHOW, updated.getBranchId(), updated.getId(),
+                    updated.getToken(), counterId, Instant.now()));
+            auditLogService.log(
+                    AuditAction.TOKEN_NO_SHOW, "Token", updated.getId(), updated.getToken(),
+                    "Customer no-show: counter " + counter.getName() + " force-released by admin",
+                    admin, updated.getBranchId(), request);
+        }
+        CounterStatus releasedStatus = inProgress.isEmpty() ? CounterStatus.CLOSED : CounterStatus.IDLE;
 
         String occupantId = counter.getUserId();
         if (StringUtils.hasText(occupantId)) {
-            releaseIfOwner(counterId, occupantId, "Counter force-released by admin", admin);
+            releaseIfOwner(counterId, occupantId, "Counter force-released by admin", admin, releasedStatus);
             userRepository.findById(occupantId).ifPresent(u -> {
                 if (counterId.equals(u.getCounterId())) {
                     u.setCounterId(null);
                     userRepository.save(u);
                 }
             });
+        } else if (!inProgress.isEmpty()) {
+            counter.setStatus(CounterStatus.IDLE);
+            counter.setPaused(false);
+            counterRepository.save(counter);
+            publishCounterChanged(counter);
         }
-        return convertToResponse(counter);
+        return convertToResponse(counterRepository.findById(counterId).orElse(counter));
     }
 
     /**
      * Only clears the counter if it is still held by this user (guards against stale tokens/devices).
      */
     private void releaseIfOwner(String counterId, String userId, String reason, AuthenticatedUser actor) {
+        releaseIfOwner(counterId, userId, reason, actor, CounterStatus.CLOSED);
+    }
+
+    private void releaseIfOwner(String counterId, String userId, String reason, AuthenticatedUser actor,
+                                CounterStatus releasedStatus) {
         counterRepository.findById(counterId).ifPresent(counter -> {
             if (!Objects.equals(counter.getUserId(), userId)) return;
 
             counter.setUserId(null);
-            counter.setStatus(CounterStatus.CLOSED);
+            counter.setStatus(releasedStatus);
             counter.setPaused(false);
             counterRepository.save(counter);
 
