@@ -387,6 +387,8 @@ public class AgentService {
         return updated;
     }
 
+    // Transactional so TOKEN_NO_SHOW reaches TokenEventDispatcher's AFTER_COMMIT listener.
+    @Transactional
     public Token noShow(String tokenId) {
         Token token = tokenRepository.findById(tokenId).orElseThrow(() -> new ResourceNotFoundException("Token not found"));
 
