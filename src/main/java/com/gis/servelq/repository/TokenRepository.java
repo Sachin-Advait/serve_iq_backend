@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -21,11 +22,26 @@ public interface TokenRepository extends JpaRepository<Token, String> {
 
     long countByBranchId(String branchId);
 
-    List<Token> findByBranchIdAndStatusOrderByPriorityAscCreatedAtAsc(
-            String branchId, TokenStatus status, Pageable pageable);
+    // The live queue (agent app, TV board, waiting counts) only covers the
+    // current business day. Tokens left WAITING/HOLD/CALLING from an earlier
+    // day stay in the table for reports but must not show up in the queue, so
+    // every queue read below is scoped to tokenDate. The no-date defaults pass
+    // LocalDate.now(), the same clock TokenIssuer stamps tokenDate with.
 
-    @Query("SELECT t.status, COUNT(t) FROM Token t WHERE t.branchId = :branchId GROUP BY t.status")
-    List<Object[]> countByStatusForBranch(@Param("branchId") String branchId);
+    List<Token> findByBranchIdAndStatusAndTokenDateOrderByPriorityAscCreatedAtAsc(
+            String branchId, TokenStatus status, LocalDate tokenDate, Pageable pageable);
+
+    default List<Token> findTodayByBranchIdAndStatus(String branchId, TokenStatus status, Pageable pageable) {
+        return findByBranchIdAndStatusAndTokenDateOrderByPriorityAscCreatedAtAsc(
+                branchId, status, LocalDate.now(), pageable);
+    }
+
+    @Query("SELECT t.status, COUNT(t) FROM Token t WHERE t.branchId = :branchId AND t.tokenDate = :tokenDate GROUP BY t.status")
+    List<Object[]> countByStatusForBranch(@Param("branchId") String branchId, @Param("tokenDate") LocalDate tokenDate);
+
+    default List<Object[]> countByStatusForBranch(String branchId) {
+        return countByStatusForBranch(branchId, LocalDate.now());
+    }
 
     List<Token> findTop20ByStatusAndAssignedCounterIdOrderByEndAtDesc(TokenStatus status, String assignedCounterId);
 
@@ -44,6 +60,7 @@ public interface TokenRepository extends JpaRepository<Token, String> {
             SELECT *
             FROM tokens t
             WHERE t.status = 'WAITING'
+              AND t.token_date = :tokenDate
               AND (
                     t.counter_ids IS NULL
                     OR t.counter_ids = ''
@@ -59,7 +76,11 @@ public interface TokenRepository extends JpaRepository<Token, String> {
             LIMIT 1
             FOR UPDATE SKIP LOCKED
             """, nativeQuery = true)
-    Optional<Token> findNextToken(@Param("counterId") String counterId);
+    Optional<Token> findNextToken(@Param("counterId") String counterId, @Param("tokenDate") LocalDate tokenDate);
+
+    default Optional<Token> findNextToken(String counterId) {
+        return findNextToken(counterId, LocalDate.now());
+    }
 
     Optional<Token> findFirstByAssignedCounterIdAndStatus(String assignedCounterId, TokenStatus status);
 
@@ -67,14 +88,22 @@ public interface TokenRepository extends JpaRepository<Token, String> {
             SELECT t FROM Token t
             WHERE t.branchId = :branchId
               AND t.status = com.gis.servelq.models.TokenStatus.CALLING
+              AND t.tokenDate = :tokenDate
             ORDER BY t.startAt DESC
             """)
-    List<Token> findLatestCalledTokens(@Param("branchId") String branchId, Pageable pageable);
+    List<Token> findLatestCalledTokens(@Param("branchId") String branchId,
+                                       @Param("tokenDate") LocalDate tokenDate,
+                                       Pageable pageable);
+
+    default List<Token> findLatestCalledTokens(String branchId, Pageable pageable) {
+        return findLatestCalledTokens(branchId, LocalDate.now(), pageable);
+    }
 
     @Query("""
             SELECT t FROM Token t
             WHERE (t.status = com.gis.servelq.models.TokenStatus.WAITING
                    OR t.status = com.gis.servelq.models.TokenStatus.HOLD)
+              AND t.tokenDate = :tokenDate
               AND (
                     t.counterIds IS NULL
                     OR t.counterIds = ''
@@ -88,7 +117,12 @@ public interface TokenRepository extends JpaRepository<Token, String> {
                 CASE WHEN t.isTransfer = true THEN 0 ELSE 1 END ASC,
                 t.createdAt ASC
             """)
-    List<Token> findUpcomingTokensForCounter(@Param("counterId") String counterId);
+    List<Token> findUpcomingTokensForCounter(@Param("counterId") String counterId,
+                                             @Param("tokenDate") LocalDate tokenDate);
+
+    default List<Token> findUpcomingTokensForCounter(String counterId) {
+        return findUpcomingTokensForCounter(counterId, LocalDate.now());
+    }
 
     @Query("""
             SELECT MAX(t.tokenSeq)
@@ -119,8 +153,14 @@ public interface TokenRepository extends JpaRepository<Token, String> {
 
     List<Token> findByBranchIdAndCreatedAtBetween(String branchId, LocalDateTime start, LocalDateTime end);
 
-    @Query("SELECT COUNT(t) FROM Token t WHERE t.serviceId = :serviceId AND t.status = :status")
-    long countByServiceIdAndStatus(@Param("serviceId") String serviceId, @Param("status") TokenStatus status);
+    @Query("SELECT COUNT(t) FROM Token t WHERE t.serviceId = :serviceId AND t.status = :status AND t.tokenDate = :tokenDate")
+    long countByServiceIdAndStatus(@Param("serviceId") String serviceId,
+                                   @Param("status") TokenStatus status,
+                                   @Param("tokenDate") LocalDate tokenDate);
+
+    default long countByServiceIdAndStatus(String serviceId, TokenStatus status) {
+        return countByServiceIdAndStatus(serviceId, status, LocalDate.now());
+    }
 
     @Query("SELECT COUNT(t) FROM Token t WHERE t.assignedCounterId = :counterId AND t.status = :status")
     long countByAssignedCounterIdAndStatus(@Param("counterId") String counterId, @Param("status") TokenStatus status);
