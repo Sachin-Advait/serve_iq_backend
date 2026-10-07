@@ -211,8 +211,9 @@ public class DashboardService {
             if (!counter.getEnabled()) continue;
 
             // Get waiting tokens for this counter's service
-            long waitingTokens = tokenRepository
-                    .countByServiceIdAndStatus(counter.getServiceId(), TokenStatus.WAITING);
+            long waitingTokens = CounterServiceLinker.serviceIdsOf(counter).stream()
+                    .mapToLong(id -> tokenRepository.countByServiceIdAndStatus(id, TokenStatus.WAITING))
+                    .sum();
 
             // Get current serving tokens
             long servingTokens = tokenRepository

@@ -19,10 +19,12 @@ import org.springframework.util.StringUtils;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -40,6 +42,7 @@ public class CounterService {
     private final TokenEventPublisher tokenEventPublisher;
     private final AuditLogService auditLogService;
     private final HttpServletRequest request;
+    private final CounterServiceLinker counterServiceLinker;
 
     /**
      * Creates a Counter entity from request DTO
@@ -53,11 +56,6 @@ public class CounterService {
         counter.setEnabled(request.getEnabled() != null ? request.getEnabled() : true);
         counter.setPaused(request.getPaused() != null ? request.getPaused() : false);
         counter.setStatus(request.getStatus() != null ? request.getStatus() : CounterStatus.IDLE);
-
-        // Only set serviceId if provided
-        if (StringUtils.hasText(request.getServiceId())) {
-            counter.setServiceId(request.getServiceId());
-        }
 
         // Only set userId if provided
         if (StringUtils.hasText(request.getUserId())) {
@@ -104,12 +102,22 @@ public class CounterService {
         Double avgSeconds = getAverageServiceTimeMinutesByCounter(counter.getId());
         CounterResponseDTO response = CounterResponseDTO.fromEntity(counter, username, avgSeconds);
 
-        // Enrich with service information
-        if (StringUtils.hasText(counter.getServiceId())) {
-            serviceRepository.findById(counter.getServiceId()).ifPresent(service -> {
-                response.setServiceName(service.getName());
-                response.setServiceCode(service.getCode());
-            });
+        // Enrich with service information; serviceName/serviceCode describe the first service
+        List<String> serviceIds = CounterServiceLinker.serviceIdsOf(counter);
+        if (!serviceIds.isEmpty()) {
+            Map<String, Services> servicesById = serviceRepository.findAllById(serviceIds).stream()
+                    .collect(Collectors.toMap(Services::getId, s -> s));
+            List<Services> services = serviceIds.stream()
+                    .map(servicesById::get)
+                    .filter(Objects::nonNull)
+                    .toList();
+            response.setServiceId(serviceIds.get(0));
+            response.setServiceIds(services.stream().map(Services::getId).toList());
+            response.setServiceNames(services.stream().map(Services::getName).toList());
+            if (!services.isEmpty()) {
+                response.setServiceName(services.get(0).getName());
+                response.setServiceCode(services.get(0).getCode());
+            }
         }
 
         return response;
@@ -137,6 +145,12 @@ public class CounterService {
         // Create and save counter
         Counter counter = getCounter(request);
         Counter saved = counterRepository.save(counter);
+
+        List<String> serviceIds = requestedServiceIds(request.getServiceIds(), request.getServiceId());
+        if (serviceIds != null && !serviceIds.isEmpty()) {
+            counterServiceLinker.setCounterServices(saved, serviceIds);
+            saved = counterRepository.save(saved);
+        }
 
         // Assign user to counter if userId is provided
         if (StringUtils.hasText(request.getUserId())) {
@@ -230,15 +244,14 @@ public class CounterService {
             counter.setBranchId(counterRequest.getBranchId());
         }
 
-        // Handle service change
-        if (counterRequest.getServiceId() != null) {
-            if (StringUtils.hasText(counterRequest.getServiceId())) {
-                serviceRepository.findById(counterRequest.getServiceId())
-                        .orElseThrow(() -> new ResourceNotFoundException("Service not found with id: " + counterRequest.getServiceId()));
-                counter.setServiceId(counterRequest.getServiceId());
-            } else {
-                counter.setServiceId(null);
-            }
+        // Handle service change. serviceIds replaces the whole list; a lone
+        // serviceId from an older client that matches the current first
+        // service is left alone so it doesn't wipe the counter's other services.
+        boolean unchangedLegacyServiceId = counterRequest.getServiceIds() == null
+                && Objects.equals(counterRequest.getServiceId(), counter.getServiceId());
+        List<String> serviceIds = requestedServiceIds(counterRequest.getServiceIds(), counterRequest.getServiceId());
+        if (serviceIds != null && !unchangedLegacyServiceId) {
+            counterServiceLinker.setCounterServices(counter, serviceIds);
         }
 
         // Handle user assignment change
@@ -377,6 +390,8 @@ public class CounterService {
             throw new BusinessException("Counter is in use by an agent; release it before deleting");
         }
 
+        counterServiceLinker.unlinkCounter(counter);
+
         auditLogService.log(
                 AuditAction.COUNTER_DELETED,
                 "Counter",
@@ -477,6 +492,21 @@ public class CounterService {
     }
 
     /**
+     * The service list a create/update request asks for: serviceIds when sent,
+     * otherwise the single serviceId (blank meaning none), or null when the
+     * request doesn't touch services at all.
+     */
+    private static List<String> requestedServiceIds(List<String> serviceIds, String serviceId) {
+        if (serviceIds != null) {
+            return serviceIds;
+        }
+        if (serviceId != null) {
+            return StringUtils.hasText(serviceId) ? List.of(serviceId) : List.of();
+        }
+        return null;
+    }
+
+    /**
      * Helper method to validate counter request
      */
     private void validateCounterRequest(CounterRequest request) {
@@ -507,22 +537,25 @@ public class CounterService {
                 .map(Counter::getId)
                 .collect(Collectors.toList());
 
-        List<String> serviceIds = counters.stream()
-                .map(Counter::getServiceId)
-                .filter(Objects::nonNull)
-                .distinct()
-                .collect(Collectors.toList());
-
-        Map<String, String> serviceNameById = serviceRepository.findAllById(serviceIds).stream()
-                .collect(Collectors.toMap(Services::getId, Services::getName));
-
-        Map<String, String> arabicServiceNameById = serviceRepository.findAllById(serviceIds).stream()
-                .collect(Collectors.toMap(Services::getId, Services::getArabicName));
-
         Map<String, List<Token>> activeTokensByCounter = tokenRepository
                 .findByStatusInAndAssignedCounterIdIn(ACTIVE_TOKEN_STATUSES, counterIds)
                 .stream()
                 .collect(Collectors.groupingBy(Token::getAssignedCounterId));
+
+        List<String> serviceIds = Stream.concat(
+                        counters.stream().flatMap(c -> CounterServiceLinker.serviceIdsOf(c).stream()),
+                        activeTokensByCounter.values().stream().flatMap(List::stream).map(Token::getServiceId))
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+
+        List<Services> services = serviceRepository.findAllById(serviceIds);
+        Map<String, String> serviceNameById = new HashMap<>();
+        Map<String, String> arabicServiceNameById = new HashMap<>();
+        for (Services service : services) {
+            serviceNameById.put(service.getId(), service.getName());
+            arabicServiceNameById.put(service.getId(), service.getArabicName());
+        }
 
         return counters.stream().map(counter -> {
             CounterDisplayDTO dto = new CounterDisplayDTO();
@@ -542,8 +575,10 @@ public class CounterService {
                 dto.setServiceName(serviceNameById.get(activeToken.getServiceId()));
                 dto.setArabicService(arabicServiceNameById.get(activeToken.getServiceId()));
             } else {
-                dto.setServiceName(serviceNameById.get(counter.getServiceId()));
-                dto.setArabicService(arabicServiceNameById.get(counter.getServiceId()));
+                // Idle counter: list every service it handles
+                List<String> ids = CounterServiceLinker.serviceIdsOf(counter);
+                dto.setServiceName(joinNames(ids, serviceNameById));
+                dto.setArabicService(joinNames(ids, arabicServiceNameById));
             }
 
             return dto;
@@ -572,6 +607,14 @@ public class CounterService {
                 .orElse(null);
     }
 
+    private static String joinNames(List<String> ids, Map<String, String> namesById) {
+        String joined = ids.stream()
+                .map(namesById::get)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.joining(" / "));
+        return joined.isEmpty() ? null : joined;
+    }
+
     private static LocalDateTime lastActivity(Token t) {
         if (t.getEndAt() != null) return t.getEndAt();
         if (t.getStartAt() != null) return t.getStartAt();
@@ -593,6 +636,7 @@ public class CounterService {
         clone.setBranchId(original.getBranchId());
         clone.setUserId(original.getUserId());
         clone.setServiceId(original.getServiceId());
+        clone.setServiceIds(original.getServiceIds());
         clone.setStatus(original.getStatus());
         return clone;
     }

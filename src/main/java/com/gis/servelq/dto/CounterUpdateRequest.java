@@ -3,6 +3,8 @@ package com.gis.servelq.dto;
 import com.gis.servelq.models.CounterStatus;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class CounterUpdateRequest {
     private String code;
@@ -13,5 +15,6 @@ public class CounterUpdateRequest {
     private Boolean paused;
     private CounterStatus status = CounterStatus.IDLE;
     private String serviceId;
+    private List<String> serviceIds;
 }
 

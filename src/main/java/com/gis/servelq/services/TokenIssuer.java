@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * A single attempt at issuing a token, in its own transaction.
@@ -34,6 +35,7 @@ public class TokenIssuer {
     private final ServiceRepository serviceRepository;
     private final BranchRepository branchRepository;
     private final CategoryService categoryService;
+    private final CounterServiceLinker counterServiceLinker;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Token issueOnce(TokenRequest request) {
@@ -65,7 +67,8 @@ public class TokenIssuer {
 
         token.setStatus(TokenStatus.WAITING);
         token.setMobileNumber(request.getMobileNumber());
-        token.setCounterIds(service.getCounterIds());
+        List<String> counterIds = counterServiceLinker.countersForService(service);
+        token.setCounterIds(counterIds.isEmpty() ? null : counterIds);
 
         // saveAndFlush so a duplicate sequence surfaces here, inside this
         // transaction, instead of at commit time where the caller cannot retry.

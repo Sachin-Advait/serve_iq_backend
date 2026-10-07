@@ -5,6 +5,7 @@ import com.gis.servelq.models.CounterStatus;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class CounterResponseDTO {
@@ -20,6 +21,8 @@ public class CounterResponseDTO {
     private String serviceId;
     private String serviceName;  // NEW
     private String serviceCode;  // NEW
+    private List<String> serviceIds = List.of();
+    private List<String> serviceNames = List.of();
     private Double avgSeconds;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

@@ -11,6 +11,7 @@ import com.gis.servelq.security.AuthenticatedUser;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -23,7 +24,9 @@ public class ServiceManagementService {
     private final BranchRepository branchRepository;
     private final AuditLogService auditLogService;
     private final HttpServletRequest request;
+    private final CounterServiceLinker counterServiceLinker;
 
+    @Transactional
     public Services createService(ServiceRequest serviceRequest, AuthenticatedUser user) {
         serviceRepository.findByCodeAndBranchId(serviceRequest.getCode(), serviceRequest.getBranchId())
                 .ifPresent(s -> {
@@ -47,9 +50,14 @@ public class ServiceManagementService {
         newService.setParentId(serviceRequest.getParentId());
         newService.setEnabled(serviceRequest.getEnabled());
         newService.setBranchId(serviceRequest.getBranchId());
-        newService.setCounterIds(serviceRequest.getCounterIds());
 
         newService = serviceRepository.save(newService);
+
+        // Link counters once the service has an id, so both sides are updated
+        if (serviceRequest.getCounterIds() != null && !serviceRequest.getCounterIds().isEmpty()) {
+            counterServiceLinker.setServiceCounters(newService, serviceRequest.getCounterIds());
+            newService = serviceRepository.save(newService);
+        }
 
         if (parent != null) {
             List<String> childList = parent.getChildren();
@@ -104,6 +112,7 @@ public class ServiceManagementService {
                 .stream().map(ServiceResponseDTO::fromEntity).collect(Collectors.toList());
     }
 
+    @Transactional
     public Services updateService(String id, ServiceUpdateRequest updateRequest, AuthenticatedUser user) {
         Services service = serviceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Service not found"));
@@ -124,7 +133,9 @@ public class ServiceManagementService {
         if (updateRequest.getName() != null) service.setName(updateRequest.getName());
         if (updateRequest.getArabicName() != null) service.setArabicName(updateRequest.getArabicName());
         if (updateRequest.getParentId() != null) service.setParentId(updateRequest.getParentId());
-        if (updateRequest.getCounterIds() != null) service.setCounterIds(updateRequest.getCounterIds());
+        if (updateRequest.getCounterIds() != null) {
+            counterServiceLinker.setServiceCounters(service, updateRequest.getCounterIds());
+        }
         if (updateRequest.getEnabled() != null) service.setEnabled(updateRequest.getEnabled());
         if (updateRequest.getBranchId() != null) service.setBranchId(updateRequest.getBranchId());
 
@@ -168,9 +179,12 @@ public class ServiceManagementService {
     }
 
     // HARD DELETE
+    @Transactional
     public void deleteService(String id, AuthenticatedUser user) {
         Services service = serviceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Service not found"));
+
+        counterServiceLinker.unlinkService(service);
 
         // Log before deletion
         auditLogService.log(

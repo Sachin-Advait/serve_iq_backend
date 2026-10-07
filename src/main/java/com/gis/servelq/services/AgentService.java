@@ -112,8 +112,9 @@ public class AgentService {
             throw new BusinessException("Counter is paused");
         }
 
-        serviceRepository.findById(counter.getServiceId())
-                .orElseThrow(() -> new ResourceNotFoundException("Service not found"));
+        if (CounterServiceLinker.serviceIdsOf(counter).isEmpty()) {
+            throw new BusinessException("No service is assigned to this counter");
+        }
 
         Token nextToken = tokenRepository.findNextToken(counterId)
                 .orElseThrow(() -> new ResourceNotFoundException("No tokens available"));
