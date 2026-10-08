@@ -17,6 +17,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -41,6 +42,7 @@ public class AuditLogService {
     public void log(AuditAction action, String entityType, String entityId,
                     String entityName, String description, AuthenticatedUser user,
                     String branchId, HttpServletRequest request) {
+        request = inRequest(request);
         String ipAddress = request != null ? getClientIp(request) : null;
         String userAgent = request != null ? request.getHeader("User-Agent") : null;
 
@@ -66,6 +68,7 @@ public class AuditLogService {
                                String entityName, String description, Object oldValue,
                                Object newValue, AuthenticatedUser user, String branchId,
                                HttpServletRequest request) {
+        request = inRequest(request);
         String ipAddress = request != null ? getClientIp(request) : null;
         String userAgent = request != null ? request.getHeader("User-Agent") : null;
 
@@ -171,5 +174,13 @@ public class AuditLogService {
             return request.getRemoteAddr();
         }
         return xfHeader.split(",")[0].trim();
+    }
+
+    /**
+     * Services inject a request-scoped proxy; outside an HTTP request (scheduled jobs)
+     * touching it throws, so treat it as no request.
+     */
+    private static HttpServletRequest inRequest(HttpServletRequest request) {
+        return RequestContextHolder.getRequestAttributes() != null ? request : null;
     }
 }

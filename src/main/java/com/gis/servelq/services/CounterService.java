@@ -815,6 +815,23 @@ public class CounterService {
      */
     @Transactional
     public CounterResponseDTO forceReleaseCounter(String counterId, AuthenticatedUser admin) {
+        return forceRelease(counterId, admin, "force-released by admin");
+    }
+
+    /**
+     * Daily sign-out (see DailyLogoutScheduler): releases every held counter the same way
+     * an admin force release does, then invalidates every user's login tokens.
+     */
+    @Transactional
+    public int signOutEveryone() {
+        List<Counter> held = counterRepository.findByUserIdIsNotNull();
+        for (Counter c : held) forceRelease(c.getId(), null, "released by the daily sign-out");
+        userRepository.clearAllCounterIds();
+        tokenRevocationService.revokeAllUsers();
+        return held.size();
+    }
+
+    private CounterResponseDTO forceRelease(String counterId, AuthenticatedUser admin, String how) {
         Counter counter = counterRepository.findById(counterId)
                 .orElseThrow(() -> new ResourceNotFoundException("Counter not found with id: " + counterId));
 
@@ -830,14 +847,14 @@ public class CounterService {
                     updated.getToken(), counterId, Instant.now()));
             auditLogService.log(
                     AuditAction.TOKEN_NO_SHOW, "Token", updated.getId(), updated.getToken(),
-                    "Customer no-show: counter " + counter.getName() + " force-released by admin",
+                    "Customer no-show: counter " + counter.getName() + " " + how,
                     admin, updated.getBranchId(), request);
         }
         CounterStatus releasedStatus = inProgress.isEmpty() ? CounterStatus.CLOSED : CounterStatus.IDLE;
 
         String occupantId = counter.getUserId();
         if (StringUtils.hasText(occupantId)) {
-            releaseIfOwner(counterId, occupantId, "Counter force-released by admin", admin, releasedStatus);
+            releaseIfOwner(counterId, occupantId, "Counter " + how, admin, releasedStatus);
             // Sign the agent out everywhere: their next request gets 403 and the
             // app sends them to the login page instead of leaving them on a
             // counter they no longer hold.

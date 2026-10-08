@@ -45,6 +45,14 @@ public class TokenRevocationService {
         cache.put(userId, new CachedCutoff(Optional.of(now), System.currentTimeMillis()));
     }
 
+    /** Signs every user out: any token issued before now is rejected. */
+    public void revokeAllUsers() {
+        LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+        userRepository.revokeAllTokens(now);
+        // Other instances pick the new cutoff up when their cache entries expire.
+        cache.clear();
+    }
+
     public boolean isRevoked(String userId, Date issuedAt) {
         if (userId == null) return false;
         Optional<LocalDateTime> cutoff = cutoff(userId);
