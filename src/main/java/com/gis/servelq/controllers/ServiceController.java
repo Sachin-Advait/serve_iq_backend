@@ -34,16 +34,28 @@ public class ServiceController {
         return ResponseEntity.ok(serviceManagementService.getServiceById(id));
     }
 
-    // READ: Main services
+    // READ: Main services (consumer/kiosk — enabled only)
     @GetMapping("/branch/main/{branchId}")
     public ResponseEntity<List<ServiceResponseDTO>> getMainServices(@PathVariable String branchId) {
         return ResponseEntity.ok(serviceManagementService.getMainServices(branchId));
     }
 
-    // READ: Sub-services
+    // READ: Main services (admin — includes disabled)
+    @GetMapping("/admin/branch/main/{branchId}")
+    public ResponseEntity<List<ServiceResponseDTO>> getAllMainServices(@PathVariable String branchId) {
+        return ResponseEntity.ok(serviceManagementService.getAllMainServices(branchId));
+    }
+
+    // READ: Sub-services (consumer/kiosk — enabled only)
     @GetMapping("/subservices/{parentId}")
     public ResponseEntity<List<ServiceResponseDTO>> getSubServices(@PathVariable String parentId) {
         return ResponseEntity.ok(serviceManagementService.getSubServices(parentId));
+    }
+
+    // READ: Sub-services (admin — includes disabled)
+    @GetMapping("/admin/subservices/{parentId}")
+    public ResponseEntity<List<ServiceResponseDTO>> getAllSubServices(@PathVariable String parentId) {
+        return ResponseEntity.ok(serviceManagementService.getAllSubServices(parentId));
     }
 
     // READ: all services in a branch

@@ -94,15 +94,27 @@ public class ServiceManagementService {
         return ServiceResponseDTO.fromEntity(service);
     }
 
-    // READ: Main
+    // READ: Main (consumer/kiosk — enabled only)
     public List<ServiceResponseDTO> getMainServices(String branchId) {
         return serviceRepository.findMainServicesByBranchId(branchId)
                 .stream().map(ServiceResponseDTO::fromEntity).collect(Collectors.toList());
     }
 
-    // READ: Sub
+    // READ: Main (admin — includes disabled)
+    public List<ServiceResponseDTO> getAllMainServices(String branchId) {
+        return serviceRepository.findAllMainServicesByBranchId(branchId)
+                .stream().map(ServiceResponseDTO::fromEntity).collect(Collectors.toList());
+    }
+
+    // READ: Sub (consumer/kiosk — enabled only)
     public List<ServiceResponseDTO> getSubServices(String parentId) {
         return serviceRepository.findByParentIdAndEnabledTrue(parentId)
+                .stream().map(ServiceResponseDTO::fromEntity).collect(Collectors.toList());
+    }
+
+    // READ: Sub (admin — includes disabled)
+    public List<ServiceResponseDTO> getAllSubServices(String parentId) {
+        return serviceRepository.findByParentId(parentId)
                 .stream().map(ServiceResponseDTO::fromEntity).collect(Collectors.toList());
     }
 
@@ -185,6 +197,18 @@ public class ServiceManagementService {
                 .orElseThrow(() -> new RuntimeException("Service not found"));
 
         counterServiceLinker.unlinkService(service);
+
+        // If this service has a parent, remove it from the parent's children list
+        if (service.getParentId() != null && !service.getParentId().isEmpty()) {
+            serviceRepository.findById(service.getParentId()).ifPresent(parent -> {
+                List<String> children = parent.getChildren();
+                if (children != null && children.contains(service.getId())) {
+                    children.remove(service.getId());
+                    parent.setChildren(children);
+                    serviceRepository.save(parent);
+                }
+            });
+        }
 
         // Log before deletion
         auditLogService.log(

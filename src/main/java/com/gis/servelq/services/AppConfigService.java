@@ -35,7 +35,7 @@ public class AppConfigService {
             "image/jpeg", "image/png", "image/webp", "image/gif"
     );
     private static final String[] IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif"};
-    public static final int DEFAULT_FEEDBACK_IDLE_TIMEOUT = 30;
+    public static final int DEFAULT_FEEDBACK_IDLE_TIMEOUT = 8;
 
     private final AppConfigRepository configRepository;
     private final BreakingNewsRepository newsRepository;

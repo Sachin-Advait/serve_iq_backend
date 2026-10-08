@@ -14,10 +14,15 @@ public interface ServiceRepository extends JpaRepository<Services, String> {
 
     List<Services> findByBranchId(String branchId);
 
+    // Consumer/kiosk — enabled only (UNCHANGED)
     List<Services> findByParentIdAndEnabledTrue(String parentId);
+
+    // Admin — all sub-services regardless of enabled
+    List<Services> findByParentId(String parentId);
 
     Optional<Services> findByCodeAndBranchId(String code, String branchId);
 
+    // Consumer/kiosk — enabled only main services (UNCHANGED)
     @Query("""
                 SELECT s FROM Services s
                 WHERE s.branchId = :branchId
@@ -25,4 +30,12 @@ public interface ServiceRepository extends JpaRepository<Services, String> {
                   AND (s.parentId IS NULL OR s.parentId = '')
             """)
     List<Services> findMainServicesByBranchId(@Param("branchId") String branchId);
+
+    // Admin — all main services regardless of enabled
+    @Query("""
+                SELECT s FROM Services s
+                WHERE s.branchId = :branchId
+                  AND (s.parentId IS NULL OR s.parentId = '')
+            """)
+    List<Services> findAllMainServicesByBranchId(@Param("branchId") String branchId);
 }
