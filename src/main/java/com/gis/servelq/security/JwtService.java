@@ -60,8 +60,7 @@ public class JwtService {
         }
 
         boolean nonExpiring = user.getRole() == UserRole.DISPLAY || user.getRole() == UserRole.KIOSK
-                || user.getRole() == UserRole.RECEPTIONIST || user.getRole() == UserRole.USER
-                || user.getRole() == UserRole.FEEDBACK;
+                || user.getRole() == UserRole.RECEPTIONIST || user.getRole() == UserRole.FEEDBACK;
 
         var builder = Jwts.builder()
                 .claims(claims)
