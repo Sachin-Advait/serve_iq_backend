@@ -61,6 +61,8 @@ public class TokenEventDispatcher {
             }
 
             case COUNTER_STATUS_CHANGED -> {
+                // The TV's counter grid shows paused/closed counters too
+                socketService.notifyBranchTV(event.getBranchId());
                 var data = counterService.getCounterStatusDetails(event.getCounterId());
                 socketService.notifyCounterDisplay(event.getCounterId(), data);
                 socketService.notifyMeetingTV(event.getBranchId());

@@ -2,17 +2,21 @@ package com.gis.servelq.services;
 
 import com.gis.servelq.dto.TVDisplayResponseDTO;
 import com.gis.servelq.models.Branch;
+import com.gis.servelq.models.Counter;
 import com.gis.servelq.models.Token;
 import com.gis.servelq.models.TokenStatus;
 import com.gis.servelq.repository.BranchRepository;
+import com.gis.servelq.repository.CounterRepository;
 import com.gis.servelq.repository.TokenRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
+import java.util.Comparator;
 import java.util.EnumMap;
-import java.util.Map;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -25,6 +29,7 @@ public class TVDisplayService {
 
     private final TokenRepository tokenRepository;
     private final BranchRepository branchRepository;
+    private final CounterRepository counterRepository;
 
     public TVDisplayResponseDTO getTVDisplayData(String branchId) {
 
@@ -79,6 +84,8 @@ public class TVDisplayService {
             return dt;
         }).collect(Collectors.toList()));
 
+        response.setCounters(counterTiles(branchId));
+
         response.setUpcomingTokens(upcoming.stream()
                 .map(Token::getToken)
                 .collect(Collectors.toList()));
@@ -93,5 +100,39 @@ public class TVDisplayService {
         response.setServedToday(completedCount);
 
         return response;
+    }
+
+    // One tile per enabled counter: the token it is calling or serving, or
+    // idle / closed. A counter with no agent logged in, or paused, is closed.
+    private List<TVDisplayResponseDTO.CounterTile> counterTiles(String branchId) {
+        List<Counter> counters = counterRepository.findByBranchIdOrderByCreatedAtAsc(branchId).stream()
+                .filter(c -> !Boolean.FALSE.equals(c.getEnabled()))
+                .sorted(Comparator.comparing(c -> c.getCode() != null ? c.getCode() : "",
+                        Comparator.comparing(String::length).thenComparing(Comparator.naturalOrder())))
+                .toList();
+        if (counters.isEmpty()) return List.of();
+
+        Map<String, Token> active = new HashMap<>();
+        for (Token t : tokenRepository.findByStatusInAndAssignedCounterIdIn(
+                List.of(TokenStatus.CALLING, TokenStatus.SERVING),
+                counters.stream().map(Counter::getId).toList())) {
+            active.put(t.getAssignedCounterId(), t);
+        }
+
+        return counters.stream().map(c -> {
+            TVDisplayResponseDTO.CounterTile tile = new TVDisplayResponseDTO.CounterTile();
+            tile.setCounter(c.getName());
+            tile.setCode(c.getCode());
+            Token t = active.get(c.getId());
+            if (t != null) {
+                tile.setToken(t.getToken());
+                tile.setStatus(t.getStatus().name());
+            } else if (Boolean.TRUE.equals(c.getPaused()) || c.getUserId() == null) {
+                tile.setStatus("CLOSED");
+            } else {
+                tile.setStatus("IDLE");
+            }
+            return tile;
+        }).toList();
     }
 }

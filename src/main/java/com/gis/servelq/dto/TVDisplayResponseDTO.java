@@ -10,6 +10,8 @@ public class TVDisplayResponseDTO {
     private List<DisplayToken> nowServing;
     private List<String> upcomingTokens;
     private List<String> holdTokens;
+    // Every counter in the branch, for the TV's "Current counters" grid
+    private List<CounterTile> counters;
     private String branchName;
 
     private long waiting;
@@ -22,5 +24,14 @@ public class TVDisplayResponseDTO {
         private String token;
         private String counter;
         private String service;
+    }
+
+    @Data
+    public static class CounterTile {
+        private String counter;
+        private String code;
+        // CALLING, SERVING, IDLE or CLOSED (disabled, paused or no agent)
+        private String status;
+        private String token;
     }
 }
