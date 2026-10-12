@@ -54,13 +54,15 @@ class TokenServiceRetryTest {
     @Mock private HttpServletRequest request;
     @Mock private ServiceRepository serviceRepository;
     @Mock private BranchService branchService;
+    @Mock private TicketCapacityService ticketCapacityService;
 
     private TokenService tokenService;
 
     @BeforeEach
     void setUp() {
         tokenService = new TokenService(tokenRepository, tokenIssuer, smsService,
-                tokenEventPublisher, auditLogService, request, serviceRepository, branchService);
+                tokenEventPublisher, auditLogService, request, serviceRepository, branchService,
+                ticketCapacityService);
 
         Services service = new Services();
         service.setId("service-1");

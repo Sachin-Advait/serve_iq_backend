@@ -40,6 +40,7 @@ public class TokenService {
     private final HttpServletRequest request;
     private final ServiceRepository serviceRepository;
     private final BranchService branchService;
+    private final TicketCapacityService ticketCapacityService;
 
     /**
      * Issues a token, retrying if another kiosk grabbed the same sequence number
@@ -61,9 +62,9 @@ public class TokenService {
         Services service = serviceRepository.findById(request.getServiceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Service not found"));
 
-        branchService.assertTicketIssuingOpen(
-                request.getBranchId() != null ? request.getBranchId() : service.getBranchId(),
-                request.getLanguage());
+        String branchId = request.getBranchId() != null ? request.getBranchId() : service.getBranchId();
+        branchService.assertTicketIssuingOpen(branchId, request.getLanguage());
+        ticketCapacityService.assertQueueFitsBeforeClosing(branchId, service.getId(), request.getLanguage());
 
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             try {

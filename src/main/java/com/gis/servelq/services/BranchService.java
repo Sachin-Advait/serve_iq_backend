@@ -44,6 +44,7 @@ public class BranchService {
         response.setTicketIssuingEnabled(branch.getTicketIssuingEnabled());
         response.setTicketIssuingStart(branch.getTicketIssuingStart());
         response.setTicketIssuingEnd(branch.getTicketIssuingEnd());
+        response.setOfficeCloseTime(branch.getOfficeCloseTime());
         response.setTicketStopMessageEn(branch.getTicketStopMessageEn());
         response.setTicketStopMessageAr(branch.getTicketStopMessageAr());
         return response;
@@ -158,6 +159,7 @@ public class BranchService {
         branch.setTicketIssuingEnabled(body.getEnabled() == null || body.getEnabled());
         branch.setTicketIssuingStart(body.getStart());
         branch.setTicketIssuingEnd(body.getEnd());
+        branch.setOfficeCloseTime(body.getOfficeCloseTime());
         branch.setTicketStopMessageEn(blankToNull(body.getMessageEn()));
         branch.setTicketStopMessageAr(blankToNull(body.getMessageAr()));
         Branch saved = branchRepository.save(branch);
@@ -168,12 +170,15 @@ public class BranchService {
         String hours = saved.getTicketIssuingStart() != null
                 ? " (hours " + saved.getTicketIssuingStart() + "-" + saved.getTicketIssuingEnd() + ")"
                 : "";
+        String close = saved.getOfficeCloseTime() != null
+                ? ", office closes " + saved.getOfficeCloseTime()
+                : "";
         auditLogService.log(
                 AuditAction.TICKET_ISSUING_CHANGED,
                 "Branch",
                 saved.getId(),
                 saved.getName(),
-                state + hours,
+                state + hours + close,
                 user,
                 saved.getId(),
                 request

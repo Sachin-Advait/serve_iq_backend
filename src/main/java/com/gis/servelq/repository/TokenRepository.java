@@ -173,4 +173,18 @@ public interface TokenRepository extends JpaRepository<Token, String> {
 
     @Query("SELECT COUNT(t) FROM Token t WHERE t.assignedCounterId = :counterId AND t.status = :status")
     long countByAssignedCounterIdAndStatus(@Param("counterId") String counterId, @Param("status") TokenStatus status);
+
+    // Average service time for a service over tokens dated from :fromDate,
+    // used to estimate when the waiting queue will clear.
+    @Query("""
+            SELECT AVG(TIMESTAMPDIFF(SECOND, t.startAt, t.endAt))
+            FROM Token t
+            WHERE t.serviceId = :serviceId
+              AND t.startAt IS NOT NULL
+              AND t.endAt IS NOT NULL
+              AND t.status IN (com.gis.servelq.models.TokenStatus.DONE, com.gis.servelq.models.TokenStatus.REVIEW)
+              AND t.tokenDate >= :fromDate
+            """)
+    Double getAvgServiceSecondsForService(@Param("serviceId") String serviceId,
+                                          @Param("fromDate") LocalDate fromDate);
 }

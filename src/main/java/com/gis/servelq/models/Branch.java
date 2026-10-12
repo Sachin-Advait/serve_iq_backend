@@ -40,6 +40,11 @@ public class Branch {
     @Column(name = "ticket_issuing_end")
     private LocalTime ticketIssuingEnd;
 
+    // When set, issuing stops once the waiting queue for a service can't be
+    // served before this time (see TicketCapacityService).
+    @Column(name = "office_close_time")
+    private LocalTime officeCloseTime;
+
     @Column(name = "ticket_stop_message_en", length = 500)
     private String ticketStopMessageEn;
 

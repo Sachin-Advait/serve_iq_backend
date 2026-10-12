@@ -13,6 +13,8 @@ public class TicketIssuingRequest {
     private LocalTime start;
     @JsonFormat(pattern = "HH:mm")
     private LocalTime end;
+    @JsonFormat(pattern = "HH:mm")
+    private LocalTime officeCloseTime;
     private String messageEn;
     private String messageAr;
 }

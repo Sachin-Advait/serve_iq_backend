@@ -23,6 +23,8 @@ public class BranchResponseDTO {
     private LocalTime ticketIssuingStart;
     @JsonFormat(pattern = "HH:mm")
     private LocalTime ticketIssuingEnd;
+    @JsonFormat(pattern = "HH:mm")
+    private LocalTime officeCloseTime;
     private String ticketStopMessageEn;
     private String ticketStopMessageAr;
 
