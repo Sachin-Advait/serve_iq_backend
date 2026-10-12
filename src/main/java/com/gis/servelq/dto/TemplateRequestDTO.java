@@ -25,6 +25,7 @@ public class TemplateRequestDTO {
     private Integer flickerTime;
     private List<String> componentOrder;
     private String foregroundFontColor;
+    private String accentColor;
 
     // Feedback fields
     private Boolean imageCarouselEnabled;

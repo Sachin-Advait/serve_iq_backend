@@ -28,6 +28,7 @@ public class AppDashboardDTO {
     private List<BreakingNews> tickers;
     private List<TvContent> activeVideos;
     private String foregroundFontColor;
+    private String accentColor;
 
     // Feedback fields
     private Boolean imageCarouselEnabled;

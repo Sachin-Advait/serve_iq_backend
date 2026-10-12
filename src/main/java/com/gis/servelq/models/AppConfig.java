@@ -31,6 +31,7 @@ public class AppConfig {
     private Boolean videosEnabled;      // TV: Enable video playback
     private Integer flickerTime;        // TV: Rotation time in seconds
     private String foregroundFontColor;
+    private String accentColor;
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "app_config_component_order", joinColumns = @JoinColumn(name = "config_id"))
