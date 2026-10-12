@@ -3,6 +3,7 @@ package com.gis.servelq.controllers;
 import com.gis.servelq.dto.BranchRequest;
 import com.gis.servelq.dto.BranchResponseDTO;
 import com.gis.servelq.dto.BranchUpdateRequest;
+import com.gis.servelq.dto.TicketIssuingRequest;
 import com.gis.servelq.security.AuthenticatedUser;
 import com.gis.servelq.services.BranchService;
 import jakarta.validation.Valid;
@@ -68,6 +69,14 @@ public class BranchController {
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
+    }
+
+    // Stop/resume ticket issuing and set issuing hours
+    @PutMapping("/{id}/ticket-issuing")
+    public ResponseEntity<BranchResponseDTO> updateTicketIssuing(@PathVariable String id,
+                                                                 @RequestBody TicketIssuingRequest body,
+                                                                 @AuthenticationPrincipal AuthenticatedUser user) {
+        return ResponseEntity.ok(branchService.updateTicketIssuing(id, body, user));
     }
 
     // Delete branch

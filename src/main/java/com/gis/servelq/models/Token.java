@@ -86,6 +86,10 @@ public class Token {
     private Boolean isTransfer = false;
     private String transferFrom;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "transfer_reason")
+    private TransferReason transferReason;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

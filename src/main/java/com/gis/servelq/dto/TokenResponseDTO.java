@@ -30,6 +30,7 @@ public class TokenResponseDTO {
 
     private String transferCounterName;
     private Boolean isTransfer;
+    private String transferReason;
 
     private Long unassignedTokenCount;
     private String qrValue;
@@ -57,6 +58,8 @@ public class TokenResponseDTO {
 
         dto.setTransferCounterName(token.getTransferFrom());
         dto.setIsTransfer(token.getIsTransfer());
+        if (token.getTransferReason() != null)
+            dto.setTransferReason(token.getTransferReason().name());
 
         dto.setCounterId(token.getAssignedCounterId());
         dto.setCounterName(token.getAssignedCounterName());

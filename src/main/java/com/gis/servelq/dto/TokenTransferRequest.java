@@ -6,4 +6,5 @@ import lombok.Data;
 public class TokenTransferRequest {
     private String tokenId;
     private String toCounterId;
+    private String reason;
 }

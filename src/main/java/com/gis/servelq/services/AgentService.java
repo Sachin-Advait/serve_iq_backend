@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -119,15 +120,7 @@ public class AgentService {
         Token nextToken = tokenRepository.findNextToken(counterId)
                 .orElseThrow(() -> new ResourceNotFoundException("No tokens available"));
 
-        // The previous visitor never submitted feedback, so their token is
-        // still REVIEW on this counter. The agent has moved on: close it out
-        // so it doesn't linger as this counter's "current" token on the TV.
-        tokenRepository.findByStatusInAndAssignedCounterIdOrderByCreatedAtDesc(
-                        List.of(TokenStatus.REVIEW), counterId)
-                .forEach(t -> {
-                    t.setStatus(TokenStatus.DONE);
-                    tokenRepository.save(t);
-                });
+        closeOutReviewTokens(counterId);
 
         nextToken.setStatus(TokenStatus.CALLING);
         nextToken.setAssignedCounterId(counterId);
@@ -138,6 +131,96 @@ public class AgentService {
         counterRepository.save(counter);
 
         return new ClaimedToken(nextToken, counter);
+    }
+
+    // The previous visitor never submitted feedback, so their token is
+    // still REVIEW on this counter. The agent has moved on: close it out
+    // so it doesn't linger as this counter's "current" token on the TV.
+    private void closeOutReviewTokens(String counterId) {
+        tokenRepository.findByStatusInAndAssignedCounterIdOrderByCreatedAtDesc(
+                        List.of(TokenStatus.REVIEW), counterId)
+                .forEach(t -> {
+                    t.setStatus(TokenStatus.DONE);
+                    tokenRepository.save(t);
+                });
+    }
+
+    /**
+     * Calls back a visitor who was marked no-show and has returned (procedure
+     * 9.e). Any counter that serves the token's service can call it, so the
+     * token moves to the calling counter.
+     */
+    @Transactional
+    public AgentCallResponseDTO callNoShowToken(String tokenId, String counterId) {
+        Token token = tokenRepository.findById(tokenId)
+                .orElseThrow(() -> new ResourceNotFoundException("Token not found"));
+
+        if (token.getStatus() != TokenStatus.NO_SHOW) {
+            throw new BusinessException("Token cannot be called from status: " + token.getStatus());
+        }
+        if (!LocalDate.now().equals(token.getTokenDate())) {
+            throw new BusinessException("Only today's no-show tokens can be called back");
+        }
+
+        Counter counter = counterRepository.findById(counterId)
+                .orElseThrow(() -> new ResourceNotFoundException("Counter not found"));
+        if (Boolean.TRUE.equals(counter.getPaused())) {
+            throw new BusinessException("Counter is paused");
+        }
+        counterService.assertNoTokenInProgress(counterId, "call a no-show token at");
+
+        closeOutReviewTokens(counterId);
+
+        String previousCounterName = token.getAssignedCounterName();
+        token.setStatus(TokenStatus.CALLING);
+        token.setAssignedCounterId(counterId);
+        token.setAssignedCounterName(counter.getName());
+        token.setStartAt(null);
+        token.setEndAt(null);
+        tokenRepository.save(token);
+
+        counter.setStatus(CounterStatus.CALLING);
+        counterRepository.save(counter);
+
+        tokenEventPublisher.publish(new TokenEvent(
+                TokenEventType.TOKEN_CALLED,
+                token.getBranchId(),
+                token.getId(),
+                token.getToken(),
+                counterId,
+                Instant.now()
+        ));
+        publishQueueChanged(token);
+
+        auditLogService.log(
+                AuditAction.TOKEN_REACTIVATED,
+                "Token",
+                token.getId(),
+                token.getToken(),
+                "No-show token called back to counter " + counter.getName()
+                        + (previousCounterName != null ? " (marked no-show at " + previousCounterName + ")" : ""),
+                getCurrentUser(),
+                token.getBranchId(),
+                request
+        );
+
+        return AgentCallResponseDTO.fromEntity(token);
+    }
+
+    // Refreshes the agent queue (upcoming, hold and no-show lists) on every
+    // counter the token can be served at.
+    private void publishQueueChanged(Token token) {
+        if (token.getCounterIds() == null) return;
+        for (String id : token.getCounterIds()) {
+            tokenEventPublisher.publish(new TokenEvent(
+                    TokenEventType.AGENT_QUEUE_CHANGED,
+                    token.getBranchId(),
+                    null,
+                    null,
+                    id,
+                    Instant.now()
+            ));
+        }
     }
 
     @Transactional
@@ -281,6 +364,8 @@ public class AgentService {
         Token token = tokenRepository.findById(request.getTokenId())
                 .orElseThrow(() -> new ResourceNotFoundException("Token not found"));
 
+        TransferReason reason = parseTransferReason(request.getReason());
+
         if (token.getStatus() == TokenStatus.SERVING || token.getStatus() == TokenStatus.CALLING) {
             Counter toCounter = counterRepository.findById(request.getToCounterId())
                     .orElseThrow(() -> new ResourceNotFoundException("Target counter not found"));
@@ -296,6 +381,7 @@ public class AgentService {
 
             token.setIsTransfer(true);
             token.setTransferFrom(fromCounterId);
+            token.setTransferReason(reason);
 
             // Work on a mutable copy: StringListConverter returns List.of() for an
             // empty column, and remove/add on that threw and failed the transfer.
@@ -338,7 +424,8 @@ public class AgentService {
                     "Token",
                     updated.getId(),
                     updated.getToken(),
-                    "Token transferred from counter " + fromCounter.getName() + " to " + toCounter.getName(),
+                    "Token transferred from counter " + fromCounter.getName() + " to " + toCounter.getName()
+                            + ". Reason: " + reason.getLabel(),
                     getCurrentUser(),
                     updated.getBranchId(),
                     this.request
@@ -346,6 +433,17 @@ public class AgentService {
             return updated;
         } else {
             throw new ResourceNotFoundException("Token cannot be transferred from status: " + token.getStatus());
+        }
+    }
+
+    private TransferReason parseTransferReason(String reason) {
+        if (reason == null || reason.isBlank()) {
+            throw new BusinessException("Select a reason for the transfer");
+        }
+        try {
+            return TransferReason.valueOf(reason.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new BusinessException("Unknown transfer reason: " + reason);
         }
     }
 
@@ -393,7 +491,7 @@ public class AgentService {
         Token token = tokenRepository.findById(tokenId).orElseThrow(() -> new ResourceNotFoundException("Token not found"));
 
         if (token.getStatus() != TokenStatus.SERVING) {
-            throw new ResourceNotFoundException("Token cannot be Hold from status: " + token.getStatus());
+            throw new ResourceNotFoundException("Token cannot be marked no-show from status: " + token.getStatus());
         }
 
         Counter counter = counterRepository.findById(token.getAssignedCounterId())
@@ -413,6 +511,8 @@ public class AgentService {
                 counter.getId(),
                 Instant.now()
         ));
+        // Other counters for this service list no-show tokens too.
+        publishQueueChanged(token);
         auditLogService.log(
                 AuditAction.TOKEN_NO_SHOW,
                 "Token",

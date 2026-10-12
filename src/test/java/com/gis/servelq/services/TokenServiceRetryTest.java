@@ -1,12 +1,15 @@
 package com.gis.servelq.services;
 
 import com.gis.servelq.Exceptions.BusinessException;
+import com.gis.servelq.Exceptions.TicketIssuingClosedException;
 import com.gis.servelq.dto.TokenRequest;
 import com.gis.servelq.events.TokenEvent;
 import com.gis.servelq.events.TokenEventPublisher;
 import com.gis.servelq.events.TokenEventType;
+import com.gis.servelq.models.Services;
 import com.gis.servelq.models.Token;
 import com.gis.servelq.models.TokenStatus;
+import com.gis.servelq.repository.ServiceRepository;
 import com.gis.servelq.repository.TokenRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,11 +22,12 @@ import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
@@ -44,22 +48,24 @@ class TokenServiceRetryTest {
 
     @Mock private TokenRepository tokenRepository;
     @Mock private TokenIssuer tokenIssuer;
-    @Mock private WhatsAppService whatsAppService;
+    @Mock private SmsService smsService;
     @Mock private TokenEventPublisher tokenEventPublisher;
     @Mock private AuditLogService auditLogService;
     @Mock private HttpServletRequest request;
+    @Mock private ServiceRepository serviceRepository;
+    @Mock private BranchService branchService;
 
     private TokenService tokenService;
 
     @BeforeEach
     void setUp() {
-        tokenService = new TokenService(tokenRepository, tokenIssuer, whatsAppService,
-                tokenEventPublisher, auditLogService, request);
+        tokenService = new TokenService(tokenRepository, tokenIssuer, smsService,
+                tokenEventPublisher, auditLogService, request, serviceRepository, branchService);
 
-        // Mock audit log service to do nothing (it's @Async)
-        doNothing().when(auditLogService).log(
-                any(), any(), any(), any(), any(), any(), any(), any()
-        );
+        Services service = new Services();
+        service.setId("service-1");
+        service.setBranchId("branch-1");
+        lenient().when(serviceRepository.findById("service-1")).thenReturn(Optional.of(service));
     }
 
     private TokenRequest request(boolean greenToken) {
@@ -82,6 +88,7 @@ class TokenServiceRetryTest {
         t.setBranchId("branch-1");
         t.setServiceId("service-1");
         t.setServiceName("Accounts");
+        t.setMobileNumber("91234567");
         t.setStatus(TokenStatus.WAITING);
         t.setCounterIds(List.of("counter-1", "counter-2"));
         return t;
@@ -142,27 +149,31 @@ class TokenServiceRetryTest {
                 .hasSize(2);
     }
 
-    /**
-     * The Twilio call used to happen inside the transaction, before commit. It
-     * has to be the async variant so the caller is not held behind an HTTP round
-     * trip to Twilio.
-     */
     @Test
-    void greenTokenSendsTheWhatsAppNotificationAsynchronously() {
+    void greenTokenSendsTheReceiptSmsAsynchronously() {
         when(tokenIssuer.issueOnce(any())).thenReturn(issued("A001", 1));
 
         tokenService.generateToken(request(true));
 
-        verify(whatsAppService).sendTokenNotificationAsync("91234567", "A001");
-        verify(whatsAppService, never()).sendMessage(anyString(), anyString());
+        verify(smsService).sendReceiptSmsAsync(any());
     }
 
     @Test
-    void noNotificationWhenGreenTokenIsNotRequested() {
+    void noSmsWhenGreenTokenIsNotRequested() {
         when(tokenIssuer.issueOnce(any())).thenReturn(issued("A001", 1));
 
         tokenService.generateToken(request(false));
 
-        verifyNoInteractions(whatsAppService);
+        verifyNoInteractions(smsService);
+    }
+
+    @Test
+    void issuesNothingWhileTicketIssuingIsClosed() {
+        doThrow(new TicketIssuingClosedException("Ticket issuing has stopped"))
+                .when(branchService).assertTicketIssuingOpen(eq("branch-1"), any());
+
+        assertThatThrownBy(() -> tokenService.generateToken(request(false)))
+                .isInstanceOf(TicketIssuingClosedException.class);
+        verifyNoInteractions(tokenIssuer);
     }
 }

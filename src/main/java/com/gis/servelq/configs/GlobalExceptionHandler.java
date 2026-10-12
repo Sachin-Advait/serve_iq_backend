@@ -2,6 +2,7 @@ package com.gis.servelq.configs;
 
 import com.gis.servelq.Exceptions.BusinessException;
 import com.gis.servelq.Exceptions.ResourceNotFoundException;
+import com.gis.servelq.Exceptions.TicketIssuingClosedException;
 import com.gis.servelq.dto.ApiResponseDTO;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
@@ -59,6 +60,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponseDTO<?>> handleNotFound(ResourceNotFoundException ex) {
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
+                .body(new ApiResponseDTO<>(false, ex.getMessage(), null));
+    }
+
+    @ExceptionHandler(TicketIssuingClosedException.class)
+    public ResponseEntity<ApiResponseDTO<?>> handleTicketIssuingClosed(TicketIssuingClosedException ex) {
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
                 .body(new ApiResponseDTO<>(false, ex.getMessage(), null));
     }
 

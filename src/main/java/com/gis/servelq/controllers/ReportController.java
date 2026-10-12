@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 
 @RestController
@@ -134,5 +135,19 @@ public class ReportController {
         CounterUtilizationDTO utilization = reportService.getCounterUtilization(branchId, date);
         return ResponseEntity.ok(new ApiResponseDTO<>(true,
                 "Counter utilization report generated successfully", utilization));
+    }
+
+    /**
+     * Monthly report with findings and suggested corrective actions
+     * Example: /api/reports/monthly?branchId=BR001&month=2026-10
+     */
+    @GetMapping("/monthly")
+    public ResponseEntity<ApiResponseDTO<MonthlyReportDTO>> getMonthlyReport(
+            @RequestParam String branchId,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM") YearMonth month) {
+
+        MonthlyReportDTO report = reportService.getMonthlyReport(branchId, month);
+        return ResponseEntity.ok(new ApiResponseDTO<>(true,
+                "Monthly report generated successfully", report));
     }
 }

@@ -102,7 +102,8 @@ public interface TokenRepository extends JpaRepository<Token, String> {
     @Query("""
             SELECT t FROM Token t
             WHERE (t.status = com.gis.servelq.models.TokenStatus.WAITING
-                   OR t.status = com.gis.servelq.models.TokenStatus.HOLD)
+                   OR t.status = com.gis.servelq.models.TokenStatus.HOLD
+                   OR t.status = com.gis.servelq.models.TokenStatus.NO_SHOW)
               AND t.tokenDate = :tokenDate
               AND (
                     t.counterIds IS NULL
