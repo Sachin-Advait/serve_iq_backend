@@ -74,9 +74,9 @@ public class AppConfigService {
                 config.setTickerSpeed(30);
                 config.setVideosEnabled(true);
                 config.setFlickerTime(5);
-                config.setPrimaryColor("#C9A25E");   // gold
-                config.setSecondaryColor("#3B3121"); // brown
-                config.setForegroundFontColor("#FFFFFF");
+                config.setPrimaryColor("#D9B26B");        // gold
+                config.setSecondaryColor("#221A12");      // dark brown
+                config.setForegroundFontColor("#F6EAD0"); // cream
                 config.setComponentOrder(new ArrayList<>(List.of("ROOMS", "COUNTERS", "VIDEOS", "TICKER")));
                 setDefaultBackgroundImage(config, appType);
             }
@@ -288,9 +288,9 @@ public class AppConfigService {
                 config.setTickerSpeed(30);
                 config.setVideosEnabled(true);
                 config.setFlickerTime(5);
-                config.setPrimaryColor("#C9A25E");   // gold
-                config.setSecondaryColor("#3B3121"); // brown
-                config.setForegroundFontColor("#FFFFFF");
+                config.setPrimaryColor("#D9B26B");        // gold
+                config.setSecondaryColor("#221A12");      // dark brown
+                config.setForegroundFontColor("#F6EAD0"); // cream
                 config.setComponentOrder(new ArrayList<>(List.of("ROOMS", "COUNTERS", "VIDEOS", "TICKER")));
                 setDefaultBackgroundImage(config, appType);
             }
