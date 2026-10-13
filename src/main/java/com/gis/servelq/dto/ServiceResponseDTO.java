@@ -14,6 +14,8 @@ public class ServiceResponseDTO {
     private String code;
     private String name;
     private String arabicName;
+    private String description;
+    private String arabicDescription;
     private String parentId;
     private List<String> childrenIds = List.of();
     private List<String> counterIds = List.of();
@@ -28,6 +30,8 @@ public class ServiceResponseDTO {
         dto.setCode(service.getCode());
         dto.setName(service.getName());
         dto.setArabicName(service.getArabicName());
+        dto.setDescription(service.getDescription());
+        dto.setArabicDescription(service.getArabicDescription());
         dto.setParentId(service.getParentId());
 
         if (service.getChildren() != null && !service.getChildren().isEmpty()) {

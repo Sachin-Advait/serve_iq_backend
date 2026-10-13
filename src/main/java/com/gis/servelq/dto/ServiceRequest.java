@@ -15,6 +15,8 @@ public class ServiceRequest {
 
     @NotBlank
     private String arabicName;
+    private String description;
+    private String arabicDescription;
     private String parentId;
     private List<String> counterIds;
     private Boolean enabled = true;

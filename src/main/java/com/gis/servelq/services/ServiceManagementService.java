@@ -47,6 +47,8 @@ public class ServiceManagementService {
         newService.setCode(serviceRequest.getCode());
         newService.setName(serviceRequest.getName());
         newService.setArabicName(serviceRequest.getArabicName());
+        newService.setDescription(blankToNull(serviceRequest.getDescription()));
+        newService.setArabicDescription(blankToNull(serviceRequest.getArabicDescription()));
         newService.setParentId(serviceRequest.getParentId());
         newService.setEnabled(serviceRequest.getEnabled());
         newService.setBranchId(serviceRequest.getBranchId());
@@ -144,6 +146,11 @@ public class ServiceManagementService {
         // Update only non-null fields
         if (updateRequest.getName() != null) service.setName(updateRequest.getName());
         if (updateRequest.getArabicName() != null) service.setArabicName(updateRequest.getArabicName());
+        // An empty string clears a description; null leaves it unchanged
+        if (updateRequest.getDescription() != null) service.setDescription(blankToNull(updateRequest.getDescription()));
+        if (updateRequest.getArabicDescription() != null) {
+            service.setArabicDescription(blankToNull(updateRequest.getArabicDescription()));
+        }
         if (updateRequest.getParentId() != null) service.setParentId(updateRequest.getParentId());
         if (updateRequest.getCounterIds() != null) {
             counterServiceLinker.setServiceCounters(service, updateRequest.getCounterIds());
@@ -232,11 +239,17 @@ public class ServiceManagementService {
         clone.setCode(original.getCode());
         clone.setName(original.getName());
         clone.setArabicName(original.getArabicName());
+        clone.setDescription(original.getDescription());
+        clone.setArabicDescription(original.getArabicDescription());
         clone.setParentId(original.getParentId());
         clone.setEnabled(original.getEnabled());
         clone.setCounterIds(original.getCounterIds());
         clone.setChildren(original.getChildren());
         clone.setBranchId(original.getBranchId());
         return clone;
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 }

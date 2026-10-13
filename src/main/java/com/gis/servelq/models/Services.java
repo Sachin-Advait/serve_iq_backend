@@ -28,6 +28,12 @@ public class Services {
     @NotBlank
     private String arabicName;
 
+    @Column(name = "description", length = 1000)
+    private String description;
+
+    @Column(name = "arabic_description", length = 1000)
+    private String arabicDescription;
+
     @Column(name = "parent_id")
     private String parentId;
 
