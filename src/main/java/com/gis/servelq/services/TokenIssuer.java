@@ -56,7 +56,7 @@ public class TokenIssuer {
         ).orElse(0) + 1;
 
         Token token = new Token();
-        token.setToken(resolveTokenPrefix(service.getCode(), priority) + String.format("%03d", nextSeq));
+        token.setToken(resolveTokenPrefix(mainServiceCode(service), priority) + String.format("%03d", nextSeq));
         token.setTokenSeq(nextSeq);
         token.setTokenDate(today);
         token.setPriority(priority);
@@ -75,6 +75,21 @@ public class TokenIssuer {
         // saveAndFlush so a duplicate sequence surfaces here, inside this
         // transaction, instead of at commit time where the caller cannot retry.
         return tokenRepository.saveAndFlush(token);
+    }
+
+    /**
+     * Sub-services take their main service's letter (A, B, ...), so a ticket
+     * for a sub-service of "A" is A0xx rather than the sub-service's own code.
+     */
+    private String mainServiceCode(Services service) {
+        Services current = service;
+        // Bounded walk up the parent chain, in case of bad data (a cycle).
+        for (int depth = 0; depth < 10 && current.getParentId() != null; depth++) {
+            Services parent = serviceRepository.findById(current.getParentId()).orElse(null);
+            if (parent == null) break;
+            current = parent;
+        }
+        return current.getCode();
     }
 
     private String resolveTokenPrefix(String serviceCode, int priority) {
