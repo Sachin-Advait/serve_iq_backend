@@ -33,10 +33,23 @@ public interface UserRepository extends JpaRepository<User, String> {
                            Pageable pageable);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("UPDATE User u SET u.tokensValidAfter = :cutoff")
-    int revokeAllTokens(@Param("cutoff") LocalDateTime cutoff);
+    // Device accounts (TV, kiosk, feedback screen) are left signed in: they
+    // log in once and have nobody to log them back in each morning.
+    @Query("UPDATE User u SET u.tokensValidAfter = :cutoff WHERE u.role NOT IN :skip")
+    int revokeTokensExcept(@Param("cutoff") LocalDateTime cutoff,
+                           @Param("skip") java.util.Collection<UserRole> skip);
+
+    default int revokeAllTokens(LocalDateTime cutoff) {
+        return revokeTokensExcept(cutoff, java.util.List.of(UserRole.DISPLAY, UserRole.KIOSK, UserRole.FEEDBACK));
+    }
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("UPDATE User u SET u.counterId = NULL WHERE u.counterId IS NOT NULL")
-    int clearAllCounterIds();
+    // A feedback screen's counterId is its fixed assignment, not a held
+    // counter, so the daily sign-out keeps it.
+    @Query("UPDATE User u SET u.counterId = NULL WHERE u.counterId IS NOT NULL AND u.role <> :keep")
+    int clearCounterIdsExcept(@Param("keep") UserRole keep);
+
+    default int clearAllCounterIds() {
+        return clearCounterIdsExcept(UserRole.FEEDBACK);
+    }
 }
