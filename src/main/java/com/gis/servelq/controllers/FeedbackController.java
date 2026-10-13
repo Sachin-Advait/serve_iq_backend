@@ -32,7 +32,6 @@ public class FeedbackController {
         Feedback f = new Feedback();
         f.setTokenId(dto.getTokenId());
         f.setCounterCode(dto.getCounterCode());
-        f.setAgentName(dto.getAgentName());
         f.setRating(dto.getRating());
         f.setReview(dto.getReview());
 

@@ -8,7 +8,6 @@ public class FeedbackRequestDto {
 
     private String tokenId;
     private String counterCode;
-    private String agentName;
 
     private MoodRating rating;
     private String review;

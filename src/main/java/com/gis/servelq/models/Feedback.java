@@ -17,6 +17,8 @@ public class Feedback {
 
     private String tokenId;
     private String counterCode;
+    // Agent logged in at the counter when the rating arrived; set by the server, not the client.
+    private String agentId;
     private String agentName;
 
     @Enumerated(EnumType.STRING)

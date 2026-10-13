@@ -6,6 +6,7 @@ import com.gis.servelq.events.TokenEventPublisher;
 import com.gis.servelq.events.TokenEventType;
 import com.gis.servelq.models.*;
 import com.gis.servelq.repository.CounterRepository;
+import com.gis.servelq.repository.UserRepository;
 import com.gis.servelq.repository.FeedbackRepository;
 import com.gis.servelq.repository.TokenRepository;
 import com.gis.servelq.security.AuthenticatedUser;
@@ -29,6 +30,7 @@ public class FeedbackService {
 
     private final FeedbackRepository feedbackRepository;
     private final CounterRepository counterRepository;
+    private final UserRepository userRepository;
     private final TokenRepository tokenRepository;
     private final TokenEventPublisher tokenEventPublisher;
     private final AuditLogService auditLogService;
@@ -53,6 +55,13 @@ public class FeedbackService {
             counter.setStatus(CounterStatus.IDLE);
             counterRepository.save(counter);
         }
+
+        // Credit the rating to whoever is logged in at this counter right now. The feedback
+        // app has no idea who the agent is (agents change seats day to day), so whatever
+        // name it sends is ignored.
+        feedback.setAgentId(counter.getUserId());
+        feedback.setAgentName(counter.getUserId() == null ? null
+                : userRepository.findById(counter.getUserId()).map(User::getName).orElse(null));
 
         Feedback saved = feedbackRepository.save(feedback);
 
