@@ -10,7 +10,7 @@ public class TokenRequest {
     private String serviceId;
     @NotBlank
     private String branchId;
-    @NotNull
+    // Optional: only needed for a green (SMS) ticket.
     private String mobileNumber;
     @NotNull
     private Boolean greenToken;

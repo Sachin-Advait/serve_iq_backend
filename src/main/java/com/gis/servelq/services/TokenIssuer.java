@@ -66,7 +66,9 @@ public class TokenIssuer {
         token.setServiceName(service.getName());
 
         token.setStatus(TokenStatus.WAITING);
-        token.setMobileNumber(request.getMobileNumber());
+        // No number (paper ticket) is stored as null rather than "".
+        String mobile = request.getMobileNumber();
+        token.setMobileNumber(mobile == null || mobile.isBlank() ? null : mobile.trim());
         List<String> counterIds = counterServiceLinker.countersForService(service);
         token.setCounterIds(counterIds.isEmpty() ? null : counterIds);
 
