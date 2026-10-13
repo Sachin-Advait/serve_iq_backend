@@ -33,14 +33,15 @@ public interface UserRepository extends JpaRepository<User, String> {
                            Pageable pageable);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    // Device accounts (TV, kiosk, feedback screen) are left signed in: they
-    // log in once and have nobody to log them back in each morning.
+    // Device accounts (TV, kiosk, feedback screen) and receptionists are left
+    // signed in; devices log in once and have nobody to log them back in.
     @Query("UPDATE User u SET u.tokensValidAfter = :cutoff WHERE u.role NOT IN :skip")
     int revokeTokensExcept(@Param("cutoff") LocalDateTime cutoff,
                            @Param("skip") java.util.Collection<UserRole> skip);
 
     default int revokeAllTokens(LocalDateTime cutoff) {
-        return revokeTokensExcept(cutoff, java.util.List.of(UserRole.DISPLAY, UserRole.KIOSK, UserRole.FEEDBACK));
+        return revokeTokensExcept(cutoff, java.util.List.of(UserRole.DISPLAY, UserRole.KIOSK, UserRole.FEEDBACK,
+                UserRole.RECEPTIONIST));
     }
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
