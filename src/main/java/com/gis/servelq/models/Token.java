@@ -69,7 +69,7 @@ public class Token {
     @NotNull
     private TokenStatus status = TokenStatus.WAITING;
 
-    @NotBlank
+    // Optional: only a green (SMS) ticket has a number; paper tickets store null.
     @Column(name = "mobile_number")
     private String mobileNumber;
 

@@ -135,6 +135,16 @@ class AgentLogoutTest {
         assertThat(users.findById(f.agent.getId()).orElseThrow().getTokensValidAfter()).isNull();
     }
 
+    @Test
+    void paperTicketWithoutMobileNumberSaves() {
+        Fixture f = agentAtCounter();
+        Token t = token(f, "A005", TokenStatus.WAITING);
+        t.setMobileNumber(null);
+        tokens.saveAndFlush(t);
+
+        assertThat(tokens.findById(t.getId()).orElseThrow().getMobileNumber()).isNull();
+    }
+
     private Counter counter(Branch b) {
         String suffix = UUID.randomUUID().toString().substring(0, 8);
         Counter c = new Counter();
