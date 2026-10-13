@@ -18,6 +18,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
 import java.util.List;
@@ -33,6 +34,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final AuditLogService auditLogService;
     private final HttpServletRequest request;
+    private final CounterService counterService;
 
     // ==================== REGISTRATION ====================
 
@@ -183,15 +185,23 @@ public class UserService {
 
     // ==================== UPDATE METHODS ====================
 
+    @Transactional
     public User updateUser(String id, User userDetails, AuthenticatedUser currentUser) {
         return userRepository.findById(id).map(user -> {
             User oldUser = cloneUser(user);
 
             if (userDetails.getName() != null) user.setName(userDetails.getName());
             if (userDetails.getBranchId() != null) user.setBranchId(userDetails.getBranchId());
+            boolean counterChanged = userDetails.getCounterId() != null
+                    && !userDetails.getCounterId().equals(user.getCounterId());
             if (userDetails.getCounterId() != null) user.setCounterId(userDetails.getCounterId());
 
             User updatedUser = userRepository.save(user);
+            if (counterChanged) {
+                // Release the counter(s) the user still holds, or they stay on both.
+                counterService.releaseCountersHeldExcept(
+                        updatedUser.getId(), updatedUser.getCounterId(), currentUser);
+            }
 
             auditLogService.logWithChanges(
                     AuditAction.USER_UPDATED,

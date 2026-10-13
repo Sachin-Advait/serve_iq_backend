@@ -104,6 +104,48 @@ class AgentLogoutTest {
         assertThat(counters.findById(c.getId()).orElseThrow().getStatus()).isEqualTo(CounterStatus.CALLING);
     }
 
+    @Test
+    void loginAtAnotherCounterReleasesTheFirstAndSignsOutTheOldApp() throws Exception {
+        Fixture f = agentAtCounter();
+        Counter second = counter(f.branch);
+        // users.counter_id has drifted (e.g. an admin edit): it no longer names the held counter.
+        User agent = users.findById(f.agent.getId()).orElseThrow();
+        agent.setCounterId(null);
+        users.save(agent);
+
+        Thread.sleep(1100); // the old JWT must be from an earlier second than the cutoff
+        var actor = new com.gis.servelq.security.AuthenticatedUser(f.agent.getId(), f.agent.getEmail(),
+                "USER", f.branch.getId(), null);
+        counterService.claimCounter(second.getId(), false, actor);
+
+        assertThat(counters.findById(f.counter.getId()).orElseThrow().getUserId()).isNull();
+        assertThat(counters.findById(second.getId()).orElseThrow().getUserId()).isEqualTo(f.agent.getId());
+        assertThat(counters.findByUserId(f.agent.getId())).hasSize(1);
+        mvc.perform(post("/serveiq/api/agent/counter/logout").header("Authorization", "Bearer " + f.jwt))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void reloginAtTheSameCounterKeepsTheOtherDeviceSignedIn() throws Exception {
+        Fixture f = agentAtCounter();
+        var actor = new com.gis.servelq.security.AuthenticatedUser(f.agent.getId(), f.agent.getEmail(),
+                "USER", f.branch.getId(), f.counter.getId());
+        counterService.claimCounter(f.counter.getId(), false, actor);
+
+        assertThat(users.findById(f.agent.getId()).orElseThrow().getTokensValidAfter()).isNull();
+    }
+
+    private Counter counter(Branch b) {
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        Counter c = new Counter();
+        c.setCode("C" + suffix);
+        c.setName("Counter " + suffix);
+        c.setBranchId(b.getId());
+        c.setStatus(CounterStatus.CLOSED);
+        c.setEnabled(true);
+        return counters.save(c);
+    }
+
     private record Fixture(Branch branch, Counter counter, User agent, String jwt) {
     }
 

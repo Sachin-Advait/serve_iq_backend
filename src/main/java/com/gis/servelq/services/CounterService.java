@@ -19,6 +19,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -266,7 +267,7 @@ public class CounterService {
                 }
             } else {
                 // Unassign user
-                unassignUserFromCounter(counter.getUserId());
+                unassignUserFromCounter(counter.getUserId(), counterId);
                 counter.setUserId(null);
             }
         }
@@ -484,9 +485,12 @@ public class CounterService {
     /**
      * Helper method to unassign user from counter
      */
-    private void unassignUserFromCounter(String userId) {
+    private void unassignUserFromCounter(String userId, String counterId) {
         if (StringUtils.hasText(userId)) {
             userRepository.findById(userId).ifPresent(user -> {
+                // Only clear the pointer if it is this counter; clearing a pointer to another
+                // counter the user holds made the next login skip releasing that one.
+                if (!counterId.equals(user.getCounterId())) return;
                 user.setCounterId(null);
                 userRepository.save(user);
             });
@@ -719,9 +723,19 @@ public class CounterService {
         String userId = user.getId();
         String previousCounterId = user.getCounterId();
 
+        // Every other counter this agent still holds, not only the one users.counter_id
+        // points at: that pointer can drift (admin edits), and a counter it missed
+        // stayed held, so one agent showed on two counters.
+        List<String> leaving = new ArrayList<>();
         if (StringUtils.hasText(previousCounterId) && !previousCounterId.equals(counterId)) {
-            assertCanLeave(previousCounterId, userId);
+            leaving.add(previousCounterId);
         }
+        for (Counter held : counterRepository.findByUserId(userId)) {
+            if (!held.getId().equals(counterId) && !leaving.contains(held.getId())) {
+                leaving.add(held.getId());
+            }
+        }
+        for (String id : leaving) assertCanLeave(id, userId);
         int claimed = counterRepository.claimIfFree(counterId, userId);
         if (claimed == 0) {
             Counter current = counterRepository.findById(counterId)
@@ -744,10 +758,17 @@ public class CounterService {
             counterRepository.save(fresh);
         }
 
-        // An agent holds at most one counter: release the previous one (only if still theirs).
-        if (StringUtils.hasText(previousCounterId) && !previousCounterId.equals(counterId)) {
-            releaseIfOwner(previousCounterId, userId,
+        // An agent holds at most one counter: release the others (only if still theirs).
+        boolean movedAway = false;
+        for (String id : leaving) {
+            movedAway |= releaseIfOwner(id, userId,
                     "Counter released: agent moved to counter " + fresh.getName(), currentUser);
+        }
+        if (movedAway) {
+            // Sign out the app still open on the old counter: its next request gets 403
+            // and it goes back to the login page. The token for this login is issued
+            // after this cutoff, so it stays valid.
+            tokenRevocationService.revokeAll(userId);
         }
 
         User me = userRepository.findById(userId)
@@ -808,6 +829,24 @@ public class CounterService {
             user.setCounterId(null);
             userRepository.save(user);
         }
+    }
+
+    /**
+     * Admin moved a user to another counter on the user form: release the counters the
+     * user still holds (other than the new one) and sign their app out, as a login at
+     * the new counter would. Refused while a token is in progress there.
+     */
+    @Transactional
+    public void releaseCountersHeldExcept(String userId, String keepCounterId, AuthenticatedUser admin) {
+        List<Counter> held = counterRepository.findByUserId(userId).stream()
+                .filter(c -> !c.getId().equals(keepCounterId))
+                .toList();
+        for (Counter c : held) assertCanLeave(c.getId(), userId);
+        boolean released = false;
+        for (Counter c : held) {
+            released |= releaseIfOwner(c.getId(), userId, "Counter released: user moved by admin", admin);
+        }
+        if (released) tokenRevocationService.revokeAll(userId);
     }
 
     /**
@@ -877,25 +916,26 @@ public class CounterService {
     /**
      * Only clears the counter if it is still held by this user (guards against stale tokens/devices).
      */
-    private void releaseIfOwner(String counterId, String userId, String reason, AuthenticatedUser actor) {
-        releaseIfOwner(counterId, userId, reason, actor, CounterStatus.CLOSED);
+    private boolean releaseIfOwner(String counterId, String userId, String reason, AuthenticatedUser actor) {
+        return releaseIfOwner(counterId, userId, reason, actor, CounterStatus.CLOSED);
     }
 
-    private void releaseIfOwner(String counterId, String userId, String reason, AuthenticatedUser actor,
-                                CounterStatus releasedStatus) {
-        counterRepository.findById(counterId).ifPresent(counter -> {
-            if (!Objects.equals(counter.getUserId(), userId)) return;
+    /** Returns true if the counter was held by this user and has been released. */
+    private boolean releaseIfOwner(String counterId, String userId, String reason, AuthenticatedUser actor,
+                                   CounterStatus releasedStatus) {
+        Counter counter = counterRepository.findById(counterId).orElse(null);
+        if (counter == null || !Objects.equals(counter.getUserId(), userId)) return false;
 
-            counter.setUserId(null);
-            counter.setStatus(releasedStatus);
-            counter.setPaused(false);
-            counterRepository.save(counter);
+        counter.setUserId(null);
+        counter.setStatus(releasedStatus);
+        counter.setPaused(false);
+        counterRepository.save(counter);
 
-            publishCounterChanged(counter);
-            auditLogService.log(
-                    AuditAction.COUNTER_STATUS_CHANGED, "Counter", counter.getId(), counter.getName(),
-                    reason + ": " + counter.getName(), actor, counter.getBranchId(), request);
-        });
+        publishCounterChanged(counter);
+        auditLogService.log(
+                AuditAction.COUNTER_STATUS_CHANGED, "Counter", counter.getId(), counter.getName(),
+                reason + ": " + counter.getName(), actor, counter.getBranchId(), request);
+        return true;
     }
 
     private void publishCounterChanged(Counter c) {
