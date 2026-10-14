@@ -70,6 +70,8 @@ public class SecurityConfig {
                         // the controller checks the FCM id is the caller's own.
                         .requestMatchers(HttpMethod.POST, "/serveiq/api/users/me/password").authenticated()
                         .requestMatchers(HttpMethod.PATCH, "/serveiq/api/users/update-fcm-token/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/serveiq/api/users/update-fcm-token",
+                                "/serveiq/api/users/update-fcm-token/").authenticated()
                         .requestMatchers("/serveiq/api/users/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/api/admin/**", "/serveiq/api/admin/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/serveiq/api/reports/**").hasAnyRole("ADMIN", "MANAGER")

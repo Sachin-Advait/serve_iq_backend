@@ -121,6 +121,20 @@ public class UserController {
         return ResponseEntity.ok(new UserResponseDTO(updatedUser));
     }
 
+    /**
+     * What the agent app sends: POST users/update-fcm-token/ with the token in
+     * the body. The user is always the caller; the body's userId is ignored.
+     */
+    @PostMapping({"/update-fcm-token", "/update-fcm-token/"})
+    public ResponseEntity<UserResponseDTO> updateOwnFcmToken(@RequestBody UpdateFCMTokenRequest req,
+                                                             @AuthenticationPrincipal AuthenticatedUser caller) {
+        if (caller == null) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        User updatedUser = userService.updateFcmToken(caller.id(), req.getFcmToken());
+        return ResponseEntity.ok(new UserResponseDTO(updatedUser));
+    }
+
     @GetMapping("/roles")
     public ResponseEntity<List<String>> getAllRoles() {
         List<String> roles = Arrays.stream(UserRole.values())

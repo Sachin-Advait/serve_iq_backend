@@ -168,6 +168,17 @@ class AgentLogoutTest {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    void agentAppCanSaveItsOwnFcmToken() throws Exception {
+        Fixture f = agentAtCounter();
+        mvc.perform(post("/serveiq/api/users/update-fcm-token/").header("Authorization", "Bearer " + f.jwt)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userId\":\"someone-else\",\"fcmToken\":\"fcm-1\"}"))
+                .andExpect(status().isOk());
+
+        assertThat(users.findById(f.agent.getId()).orElseThrow().getFcmToken()).isEqualTo("fcm-1");
+    }
+
     /** The feedback screen logs in as a FEEDBACK user fixed to the counter. */
     private String feedbackScreenJwt(Fixture f) {
         User u = new User();
