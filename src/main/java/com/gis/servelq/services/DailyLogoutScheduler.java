@@ -16,12 +16,15 @@ import org.springframework.stereotype.Component;
 public class DailyLogoutScheduler {
 
     private final CounterService counterService;
+    private final UserSessionService userSessionService;
 
     @Scheduled(cron = "${app.daily-logout.cron:0 0 7 * * *}", zone = "${app.daily-logout.zone:}")
     public void signOutEveryone() {
         try {
             int released = counterService.signOutEveryone();
-            log.info("Daily sign-out: all login tokens invalidated, {} counter(s) released", released);
+            int closed = userSessionService.checkOutAllOpen();
+            log.info("Daily sign-out: all login tokens invalidated, {} counter(s) released, {} open session(s) closed",
+                    released, closed);
         } catch (Exception e) {
             log.error("Daily sign-out failed", e);
         }

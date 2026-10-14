@@ -42,6 +42,7 @@ public class AgentService {
     private final AuditLogService auditLogService;
     private final HttpServletRequest request;
     private final CounterService counterService;
+    private final UserSessionService userSessionService;
 
     public List<TokenResponseDTO> getUpcomingTokensForCounter(String counterId) {
         return tokenRepository.findUpcomingTokensForCounter(counterId)
@@ -610,6 +611,7 @@ public class AgentService {
     public void logout(AuthenticatedUser currentUser) {
         if (currentUser == null || !"USER".equals(currentUser.role())) return;
         counterService.logoutFromCounter(currentUser);
+        userSessionService.checkOut(currentUser.id());
     }
 
 

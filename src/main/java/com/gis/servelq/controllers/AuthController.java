@@ -8,9 +8,11 @@ import com.gis.servelq.repository.UserRepository;
 import com.gis.servelq.security.AuthenticatedUser;
 import com.gis.servelq.security.JwtService;
 import com.gis.servelq.services.AdAuthService;
+import com.gis.servelq.services.AgentService;
 import com.gis.servelq.services.AuditLogService;
 import com.gis.servelq.services.CounterService;
 import com.gis.servelq.services.UserService;
+import com.gis.servelq.services.UserSessionService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +36,8 @@ public class AuthController {
     private final AdAuthService adAuthService;
     private final CounterService counterService;
     private final JwtService jwtService;
+    private final UserSessionService userSessionService;
+    private final AgentService agentService;
 
     @PostMapping("/register")
     public UserResponseDTO register(@Valid @RequestBody RegisterRequest dto,
@@ -88,8 +92,25 @@ public class AuthController {
                         user.getBranchId(), user.getCounterId()),
                 user.getBranchId(), request);
 
+        userSessionService.checkIn(user);
+
         String token = jwtService.generateToken(user);
         return ResponseEntity.ok(new LoginResponseDTO(
                 token, jwtService.getExpirationMinutes() * 60, new UserResponseDTO(user)));
+    }
+
+    /**
+     * Logout for any app: records the check-out time. An agent's counter is released
+     * the same way as agent/counter/logout.
+     */
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@AuthenticationPrincipal AuthenticatedUser currentUser) {
+        if (currentUser == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (UserRole.USER.name().equals(currentUser.role())) {
+            agentService.logout(currentUser);
+        } else {
+            userSessionService.checkOut(currentUser.id());
+        }
+        return ResponseEntity.noContent().build();
     }
 }
