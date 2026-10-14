@@ -43,7 +43,8 @@ public interface TokenRepository extends JpaRepository<Token, String> {
         return countByStatusForBranch(branchId, LocalDate.now());
     }
 
-    List<Token> findTop20ByStatusAndAssignedCounterIdOrderByEndAtDesc(TokenStatus status, String assignedCounterId);
+    List<Token> findTop20ByStatusAndAssignedCounterIdAndEndAtGreaterThanEqualOrderByEndAtDesc(
+            TokenStatus status, String assignedCounterId, LocalDateTime endAtFrom);
 
     List<Token> findByStatusInAndAssignedCounterIdOrderByCreatedAtDesc(
             List<TokenStatus> statuses, String assignedCounterId);

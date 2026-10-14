@@ -321,7 +321,9 @@ public class AgentService {
     }
 
     public List<RecentServiceDTO> getRecentServices(String counterId) {
-        return tokenRepository.findTop20ByStatusAndAssignedCounterIdOrderByEndAtDesc(TokenStatus.DONE, counterId)
+        // Only visitors finished today; earlier days belong in the reports.
+        return tokenRepository.findTop20ByStatusAndAssignedCounterIdAndEndAtGreaterThanEqualOrderByEndAtDesc(
+                        TokenStatus.DONE, counterId, LocalDate.now().atStartOfDay())
                 .stream().map(token -> RecentServiceDTO.fromEntity(
                         token.getToken(),
                         token.getMobileNumber(),
