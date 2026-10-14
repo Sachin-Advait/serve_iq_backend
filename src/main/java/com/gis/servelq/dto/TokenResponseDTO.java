@@ -27,6 +27,8 @@ public class TokenResponseDTO {
 
     private String counterId;
     private String counterName;
+    private String createdByUserId;
+    private String servedByUserId;
 
     private String transferCounterName;
     private Boolean isTransfer;
@@ -63,6 +65,8 @@ public class TokenResponseDTO {
 
         dto.setCounterId(token.getAssignedCounterId());
         dto.setCounterName(token.getAssignedCounterName());
+        dto.setCreatedByUserId(token.getCreatedByUserId());
+        dto.setServedByUserId(token.getServedByUserId());
 
         dto.setUnassignedTokenCount(unassignedTokenCount);
         dto.setQrValue(buildQrValue(token));

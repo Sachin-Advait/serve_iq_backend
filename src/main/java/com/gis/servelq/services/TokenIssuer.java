@@ -9,7 +9,10 @@ import com.gis.servelq.models.TokenStatus;
 import com.gis.servelq.repository.BranchRepository;
 import com.gis.servelq.repository.ServiceRepository;
 import com.gis.servelq.repository.TokenRepository;
+import com.gis.servelq.security.AuthenticatedUser;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -66,6 +69,7 @@ public class TokenIssuer {
         token.setServiceName(service.getName());
 
         token.setStatus(TokenStatus.WAITING);
+        token.setCreatedByUserId(currentUserId());
         // No number (paper ticket) is stored as null rather than "".
         String mobile = request.getMobileNumber();
         token.setMobileNumber(mobile == null || mobile.isBlank() ? null : mobile.trim());
@@ -75,6 +79,11 @@ public class TokenIssuer {
         // saveAndFlush so a duplicate sequence surfaces here, inside this
         // transaction, instead of at commit time where the caller cannot retry.
         return tokenRepository.saveAndFlush(token);
+    }
+
+    private static String currentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth != null && auth.getPrincipal() instanceof AuthenticatedUser user ? user.id() : null;
     }
 
     /**

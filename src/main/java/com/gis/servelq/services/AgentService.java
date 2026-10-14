@@ -125,6 +125,7 @@ public class AgentService {
         nextToken.setStatus(TokenStatus.CALLING);
         nextToken.setAssignedCounterId(counterId);
         nextToken.setAssignedCounterName(counter.getName());
+        nextToken.setServedByUserId(currentUserId());
         tokenRepository.save(nextToken);
 
         counter.setStatus(CounterStatus.CALLING);
@@ -175,6 +176,7 @@ public class AgentService {
         token.setStatus(TokenStatus.CALLING);
         token.setAssignedCounterId(counterId);
         token.setAssignedCounterName(counter.getName());
+        token.setServedByUserId(currentUserId());
         token.setStartAt(null);
         token.setEndAt(null);
         tokenRepository.save(token);
@@ -294,6 +296,8 @@ public class AgentService {
 
         token.setStatus(TokenStatus.REVIEW);
         token.setEndAt(LocalDateTime.now());
+        String completedBy = currentUserId();
+        if (completedBy != null) token.setServedByUserId(completedBy);
         tokenRepository.save(token);
 
 
@@ -546,6 +550,11 @@ public class AgentService {
 
         counterRepository.findById(counterId).orElseThrow(() -> new ResourceNotFoundException("Counter not found"));
         return AgentCallResponseDTO.fromEntity(token);
+    }
+
+    private String currentUserId() {
+        AuthenticatedUser user = getCurrentUser();
+        return user != null ? user.id() : null;
     }
 
     private AuthenticatedUser getCurrentUser() {

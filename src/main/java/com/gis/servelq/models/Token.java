@@ -83,6 +83,14 @@ public class Token {
     @Convert(converter = StringListConverter.class)
     private List<String> counterIds;
 
+    // The kiosk or receptionist user that issued the ticket.
+    @Column(name = "created_by_user_id")
+    private String createdByUserId;
+
+    // The agent who called the token, then whoever completed it.
+    @Column(name = "served_by_user_id")
+    private String servedByUserId;
+
     private Boolean isTransfer = false;
     private String transferFrom;
 
