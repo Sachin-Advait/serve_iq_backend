@@ -53,17 +53,24 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/serveiq/api/app-config/*/dashboard").permitAll()
                         .requestMatchers(HttpMethod.GET, "/serveiq/api/app-config/templates/*/active").permitAll()
 
-                        // Walk-up kiosk
-                        .requestMatchers(HttpMethod.POST, "/serveiq/api/tokens/generate").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/serveiq/api/feedback").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/serveiq/api/feedback/timeout").permitAll()
+                        // Kiosk, reception and the admin panel issue tickets while
+                        // logged in, so the token records who created it.
+                        .requestMatchers(HttpMethod.POST, "/serveiq/api/tokens/generate")
+                        .hasAnyRole("ADMIN", "MANAGER", "RECEPTIONIST", "KIOSK")
+                        // The feedback screen is logged in; feedback is credited by its user.
+                        .requestMatchers(HttpMethod.POST, "/serveiq/api/feedback", "/serveiq/api/feedback/timeout")
+                        .hasAnyRole("ADMIN", "FEEDBACK")
                         .requestMatchers(HttpMethod.GET, "/serveiq/api/tv-display/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/serveiq/api/news/breaking-news").permitAll()
                         .requestMatchers(HttpMethod.GET, "/serveiq/api/news/images/**").permitAll()
 
                         // Admin only
                         .requestMatchers("/serveiq/api/auth/register").hasRole("ADMIN")
-                        .requestMatchers("/serveiq/api/users/**").permitAll()
+                        // Any logged-in user may change their own password and FCM token;
+                        // the controller checks the FCM id is the caller's own.
+                        .requestMatchers(HttpMethod.POST, "/serveiq/api/users/me/password").authenticated()
+                        .requestMatchers(HttpMethod.PATCH, "/serveiq/api/users/update-fcm-token/**").authenticated()
+                        .requestMatchers("/serveiq/api/users/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/api/admin/**", "/serveiq/api/admin/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/serveiq/api/reports/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/serveiq/api/branches/**").hasAnyRole("ADMIN", "MANAGER")

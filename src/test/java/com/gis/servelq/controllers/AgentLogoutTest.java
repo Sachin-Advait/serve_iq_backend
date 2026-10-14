@@ -17,6 +17,8 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -63,7 +65,8 @@ class AgentLogoutTest {
         c.setStatus(CounterStatus.CALLING);
         counters.save(c);
 
-        mvc.perform(post("/serveiq/api/feedback").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/serveiq/api/feedback").header("Authorization", "Bearer " + feedbackScreenJwt(f))
+                        .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"tokenId\":\"" + previous.getId() + "\",\"counterCode\":\"" + c.getCode()
                                 + "\",\"rating\":\"HAPPY\"}"))
                 .andExpect(status().isOk());
@@ -80,7 +83,8 @@ class AgentLogoutTest {
         c.setStatus(CounterStatus.COMPLETE);
         counters.save(c);
 
-        mvc.perform(post("/serveiq/api/feedback").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/serveiq/api/feedback").header("Authorization", "Bearer " + feedbackScreenJwt(f))
+                        .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"tokenId\":\"" + previous.getId() + "\",\"counterCode\":\"" + c.getCode()
                                 + "\",\"rating\":\"HAPPY\"}"))
                 .andExpect(status().isOk());
@@ -143,6 +147,37 @@ class AgentLogoutTest {
         tokens.saveAndFlush(t);
 
         assertThat(tokens.findById(t.getId()).orElseThrow().getMobileNumber()).isNull();
+    }
+
+    @Test
+    void anonymousCallersCannotIssueTokensSendFeedbackOrReadUsers() throws Exception {
+        mvc.perform(post("/serveiq/api/tokens/generate").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().is4xxClientError());
+        mvc.perform(post("/serveiq/api/feedback").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().is4xxClientError());
+        mvc.perform(get("/serveiq/api/users"))
+                .andExpect(status().is4xxClientError());
+    }
+
+    @Test
+    void agentsCannotReadOrDeleteOtherUsers() throws Exception {
+        Fixture f = agentAtCounter();
+        mvc.perform(get("/serveiq/api/users").header("Authorization", "Bearer " + f.jwt))
+                .andExpect(status().isForbidden());
+        mvc.perform(delete("/serveiq/api/users/" + f.agent.getId()).header("Authorization", "Bearer " + f.jwt))
+                .andExpect(status().isForbidden());
+    }
+
+    /** The feedback screen logs in as a FEEDBACK user fixed to the counter. */
+    private String feedbackScreenJwt(Fixture f) {
+        User u = new User();
+        u.setEmail("fb-" + UUID.randomUUID().toString().substring(0, 8) + "@test.local");
+        u.setName("Feedback screen");
+        u.setPassword("x");
+        u.setRole(UserRole.FEEDBACK);
+        u.setBranchId(f.branch.getId());
+        u.setCounterId(f.counter.getId());
+        return jwt.generateToken(users.save(u));
     }
 
     private Counter counter(Branch b) {

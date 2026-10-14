@@ -7,6 +7,7 @@ import com.gis.servelq.security.AuthenticatedUser;
 import com.gis.servelq.services.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -111,7 +112,11 @@ public class UserController {
 
     @PatchMapping("/update-fcm-token/{id}")
     public ResponseEntity<UserResponseDTO> updateFcmToken(@PathVariable String id,
-                                                          @RequestBody UpdateFCMTokenRequest req) {
+                                                          @RequestBody UpdateFCMTokenRequest req,
+                                                          @AuthenticationPrincipal AuthenticatedUser caller) {
+        if (caller == null || !(caller.isSameUser(id) || caller.isAdmin())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
         User updatedUser = userService.updateFcmToken(id, req.getFcmToken());
         return ResponseEntity.ok(new UserResponseDTO(updatedUser));
     }
