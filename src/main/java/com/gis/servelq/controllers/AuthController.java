@@ -56,7 +56,8 @@ public class AuthController {
                     AuditAction.LOGIN_FAILED, "User", null, dto.getEmail(),
                     "Failed login attempt for email: " + dto.getEmail(),
                     null, null, request);
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new ApiResponseDTO<>(false, authResult.getMessage(), null));
         }
 
         User user = authResult.getUser();
