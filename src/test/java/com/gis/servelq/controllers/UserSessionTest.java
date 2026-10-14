@@ -19,7 +19,9 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -96,6 +98,27 @@ class UserSessionTest {
         User kiosk = user(UserRole.KIOSK);
         userSessionService.checkIn(kiosk);
         assertThat(sessions.findByUserIdOrderByLoginAtDesc(kiosk.getId())).isEmpty();
+    }
+
+    @Test
+    void adminCanReadLoginHistoryButAgentsCannot() throws Exception {
+        User admin = user(UserRole.ADMIN);
+        User receptionist = user(UserRole.RECEPTIONIST);
+        userSessionService.checkIn(receptionist);
+        userSessionService.checkOut(receptionist.getId());
+
+        mvc.perform(get("/serveiq/api/admin/user-sessions")
+                        .param("userId", receptionist.getId())
+                        .header("Authorization", "Bearer " + jwt.generateToken(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.content[0].userName").value("RECEPTIONIST"))
+                .andExpect(jsonPath("$.data.content[0].logoutType").value("MANUAL"))
+                .andExpect(jsonPath("$.data.content[0].durationMinutes").value(0));
+
+        mvc.perform(get("/serveiq/api/admin/user-sessions")
+                        .header("Authorization", "Bearer " + jwt.generateToken(user(UserRole.USER))))
+                .andExpect(status().isForbidden());
     }
 
     private User user(UserRole role) {

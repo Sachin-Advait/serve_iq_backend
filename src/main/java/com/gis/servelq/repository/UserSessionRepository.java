@@ -3,6 +3,7 @@ package com.gis.servelq.repository;
 import com.gis.servelq.models.LogoutType;
 import com.gis.servelq.models.UserSession;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,7 +13,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
-public interface UserSessionRepository extends JpaRepository<UserSession, String> {
+public interface UserSessionRepository extends JpaRepository<UserSession, String>,
+        JpaSpecificationExecutor<UserSession> {
 
     List<UserSession> findByUserIdOrderByLoginAtDesc(String userId);
 
