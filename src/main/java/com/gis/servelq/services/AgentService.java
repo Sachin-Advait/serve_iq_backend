@@ -369,6 +369,11 @@ public class AgentService {
         if (token.getStatus() == TokenStatus.SERVING || token.getStatus() == TokenStatus.CALLING) {
             Counter toCounter = counterRepository.findById(request.getToCounterId())
                     .orElseThrow(() -> new ResourceNotFoundException("Target counter not found"));
+            // Nobody would call the visitor at a counter no agent is logged into.
+            if (toCounter.getUserId() == null || toCounter.getUserId().isBlank()) {
+                throw new BusinessException("No agent is logged in at counter " + toCounter.getName()
+                        + ". Pick a counter that has an agent");
+            }
 
             Counter fromCounter = counterRepository.findById(token.getAssignedCounterId())
                     .orElseThrow(() -> new ResourceNotFoundException("Target counter not found"));
