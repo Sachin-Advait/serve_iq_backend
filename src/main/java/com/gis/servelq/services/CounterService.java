@@ -423,7 +423,11 @@ public class CounterService {
         response.setName(counter.getName());
         response.setEnabled(counter.getEnabled());
         response.setPaused(counter.getPaused());
-        response.setStatus(counter.getStatus());
+        // No agent logged in means the counter is closed, even if a release left the
+        // status at IDLE (e.g. force release with a token in progress). Same rule as the
+        // TV board. COMPLETE stays so the visitor can still rate after the agent leaves.
+        response.setStatus(counter.getStatus() == CounterStatus.IDLE && !StringUtils.hasText(counter.getUserId())
+                ? CounterStatus.CLOSED : counter.getStatus());
 
         if (counter.getStatus() == CounterStatus.SERVING ||
                 counter.getStatus() == CounterStatus.CALLING ||
@@ -759,17 +763,15 @@ public class CounterService {
         }
 
         // An agent holds at most one counter: release the others (only if still theirs).
-        boolean movedAway = false;
         for (String id : leaving) {
-            movedAway |= releaseIfOwner(id, userId,
+            releaseIfOwner(id, userId,
                     "Counter released: agent moved to counter " + fresh.getName(), currentUser);
         }
-        if (movedAway) {
-            // Sign out the app still open on the old counter: its next request gets 403
-            // and it goes back to the login page. The token for this login is issued
-            // after this cutoff, so it stays valid.
-            tokenRevocationService.revokeAll(userId);
-        }
+        // One login per agent: sign out any app still open with an older login, whether
+        // it is on another counter or this same one. Its next request gets 403 and it
+        // goes back to the login page. The token for this login is issued after this
+        // cutoff, so it stays valid.
+        tokenRevocationService.revokeAll(userId);
 
         User me = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));

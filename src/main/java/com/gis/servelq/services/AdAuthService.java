@@ -164,6 +164,11 @@ public class AdAuthService {
         if (user.getRole() == UserRole.USER) {
             return;
         }
+        // A feedback screen only shows its counter; its login must not reopen a counter
+        // the agent closed (it flipped CLOSED to IDLE) or reset a busy one.
+        if (user.getRole() == UserRole.FEEDBACK) {
+            return;
+        }
         String counterId = user.getCounterId();
         if (counterId == null || counterId.isBlank()) {
             return;

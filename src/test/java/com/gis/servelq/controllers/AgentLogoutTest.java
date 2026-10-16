@@ -130,13 +130,27 @@ class AgentLogoutTest {
     }
 
     @Test
-    void reloginAtTheSameCounterKeepsTheOtherDeviceSignedIn() throws Exception {
+    void reloginAtTheSameCounterSignsOutTheOtherDevice() throws Exception {
         Fixture f = agentAtCounter();
+        Thread.sleep(1100); // the old JWT must be from an earlier second than the cutoff
         var actor = new com.gis.servelq.security.AuthenticatedUser(f.agent.getId(), f.agent.getEmail(),
                 "USER", f.branch.getId(), f.counter.getId());
         counterService.claimCounter(f.counter.getId(), false, actor);
 
-        assertThat(users.findById(f.agent.getId()).orElseThrow().getTokensValidAfter()).isNull();
+        assertThat(counters.findById(f.counter.getId()).orElseThrow().getUserId()).isEqualTo(f.agent.getId());
+        mvc.perform(post("/serveiq/api/agent/counter/logout").header("Authorization", "Bearer " + f.jwt))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void counterWithNoAgentReportsClosedToTheFeedbackScreen() {
+        Fixture f = agentAtCounter();
+        Counter c = counters.findById(f.counter.getId()).orElseThrow();
+        c.setUserId(null);
+        c.setStatus(CounterStatus.IDLE);
+        counters.save(c);
+
+        assertThat(counterService.getCounterStatusDetails(c.getId()).getStatus()).isEqualTo(CounterStatus.CLOSED);
     }
 
     @Test
