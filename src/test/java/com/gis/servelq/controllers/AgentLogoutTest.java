@@ -154,6 +154,23 @@ class AgentLogoutTest {
     }
 
     @Test
+    void displayBoardShowsTheVisitorTvStatus() throws Exception {
+        Fixture f = agentAtCounter();
+        Counter mine = counters.findById(f.counter.getId()).orElseThrow();
+        mine.setStatus(CounterStatus.COMPLETE);
+        counters.save(mine);
+        Counter empty = counter(f.branch);
+        empty.setStatus(CounterStatus.IDLE);
+        counters.save(empty);
+
+        var board = counterService.getCounterDisplayBoard(f.branch.getId());
+        assertThat(board).extracting(d -> d.getCounterStatus())
+                .containsExactly(CounterStatus.IDLE, CounterStatus.CLOSED);
+        mvc.perform(get("/serveiq/api/counters/display-board/branch/" + f.branch.getId()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void paperTicketWithoutMobileNumberSaves() {
         Fixture f = agentAtCounter();
         Token t = token(f, "A005", TokenStatus.WAITING);

@@ -61,6 +61,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/serveiq/api/feedback", "/serveiq/api/feedback/timeout")
                         .hasAnyRole("ADMIN", "FEEDBACK")
                         .requestMatchers(HttpMethod.GET, "/serveiq/api/tv-display/**").permitAll()
+                        // Counter board feed for the Spacehub TV, which has no ServeIQ login.
+                        .requestMatchers(HttpMethod.GET, "/serveiq/api/counters/display-board/branch/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/serveiq/api/news/breaking-news").permitAll()
                         .requestMatchers(HttpMethod.GET, "/serveiq/api/news/images/**").permitAll()
 

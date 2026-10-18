@@ -575,10 +575,9 @@ public class CounterService {
                     : name);
             dto.setEnabled(counter.getEnabled());
             dto.setPaused(counter.getPaused());
-            dto.setCounterStatus(counter.getStatus());
-
             Token activeToken = pickCurrentToken(counter,
                     activeTokensByCounter.getOrDefault(counter.getId(), List.of()));
+            dto.setCounterStatus(displayStatus(counter, activeToken));
             if (activeToken != null) {
                 dto.setTokenNumber(activeToken.getToken());
                 dto.setCalledAt(activeToken.getStartAt());
@@ -593,6 +592,23 @@ public class CounterService {
 
             return dto;
         }).collect(Collectors.toList());
+    }
+
+    /**
+     * Status the counter board shows, by the visitor TV's rule: the token being
+     * called or served decides; otherwise a paused counter is on break, a counter
+     * with no agent logged in (or disabled) is closed, and anything else is idle.
+     * The raw status alone was wrong: a released counter could still read IDLE,
+     * and COMPLETE (visitor rating) read as serving.
+     */
+    private CounterStatus displayStatus(Counter counter, Token activeToken) {
+        if (activeToken != null && activeToken.getStatus() == TokenStatus.SERVING) return CounterStatus.SERVING;
+        if (activeToken != null && activeToken.getStatus() == TokenStatus.CALLING) return CounterStatus.CALLING;
+        if (Boolean.FALSE.equals(counter.getEnabled()) || !StringUtils.hasText(counter.getUserId())) {
+            return CounterStatus.CLOSED;
+        }
+        if (Boolean.TRUE.equals(counter.getPaused())) return CounterStatus.PAUSED;
+        return CounterStatus.IDLE;
     }
 
     /**
