@@ -103,7 +103,8 @@ public class TVDisplayService {
     }
 
     // One tile per enabled counter: the token it is calling or serving, or
-    // idle / closed. A counter with no agent logged in, or paused, is closed.
+    // idle / on break / closed. No agent logged in is closed; paused is PAUSED
+    // (shown as On break, like the Spacehub TV).
     private List<TVDisplayResponseDTO.CounterTile> counterTiles(String branchId) {
         List<Counter> counters = counterRepository.findByBranchIdOrderByCreatedAtAsc(branchId).stream()
                 .filter(c -> !Boolean.FALSE.equals(c.getEnabled()))
@@ -127,8 +128,10 @@ public class TVDisplayService {
             if (t != null) {
                 tile.setToken(t.getToken());
                 tile.setStatus(t.getStatus().name());
-            } else if (Boolean.TRUE.equals(c.getPaused()) || c.getUserId() == null) {
+            } else if (c.getUserId() == null) {
                 tile.setStatus("CLOSED");
+            } else if (Boolean.TRUE.equals(c.getPaused())) {
+                tile.setStatus("PAUSED");
             } else {
                 tile.setStatus("IDLE");
             }
