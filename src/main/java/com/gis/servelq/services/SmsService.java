@@ -2,6 +2,8 @@ package com.gis.servelq.services;
 
 import com.gis.servelq.configs.SmsOmanConfig;
 import com.gis.servelq.dto.SmsRequest;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gis.servelq.models.AuditAction;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
@@ -14,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
 @Log4j2
@@ -24,6 +27,7 @@ public class SmsService {
     private final AuditLogService auditLogService;
     private final SmsOmanConfig smsOmanConfig;
     private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
 
 
     @Async
@@ -49,17 +53,18 @@ public class SmsService {
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON));
+            headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON, MediaType.TEXT_PLAIN));
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, headers);
 
-            ResponseEntity<SmsResponse> response = restTemplate.postForEntity(smsOmanConfig.url(),
-                    entity, SmsResponse.class);
+            ResponseEntity<String> response = restTemplate.postForEntity(smsOmanConfig.url(),
+                    entity, String.class);
 
-            SmsResponse body = response.getBody();
+            String raw = response.getBody();
+            SmsResponse body = parseResponse(raw);
 
             if (body == null) {
-                log.error("SMS Oman returned empty response");
+                log.error("SMS Oman returned an unreadable response: {}", abbreviate(raw));
                 return null;
             }
 
@@ -77,14 +82,74 @@ public class SmsService {
                 return body.getBatchRefCode();
             }
 
-            log.error("SMS Oman failed. StatusCode={}, StatusDesc={}", body.getStatusCode(),
-                    body.getStatusDesc());
+            log.error("SMS Oman failed. StatusCode={}, StatusDesc={}, raw response: {}",
+                    body.getStatusCode(), body.getStatusDesc(), abbreviate(raw));
             return null;
 
         } catch (Exception e) {
             log.error("Failed to send SMS to {}: {}", mobileNumber, e.getMessage(), e);
             return null;
         }
+    }
+
+    /**
+     * Reads SMSOMAN's reply leniently. The document shows a plain JSON object
+     * ({"StatusCode":"00",...}), but the live API has answered 200 with a body
+     * our fixed field mapping could not read, so this also accepts a JSON
+     * string holding the object, an ASP.NET {"d": ...} wrapper, and any key
+     * casing. Returns null when no status code can be found.
+     */
+    SmsResponse parseResponse(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            JsonNode node = objectMapper.readTree(raw);
+            for (int i = 0; i < 3 && node != null; i++) {
+                if (node.isTextual()) {
+                    node = objectMapper.readTree(node.asText());
+                } else if (node.isObject() && field(node, "d") != null && field(node, "StatusCode") == null) {
+                    node = field(node, "d");
+                } else {
+                    break;
+                }
+            }
+            if (node == null || !node.isObject() || field(node, "StatusCode") == null) {
+                return null;
+            }
+            SmsResponse response = new SmsResponse();
+            response.setStatusCode(text(field(node, "StatusCode")));
+            response.setStatusDesc(text(field(node, "StatusDesc")));
+            response.setBatchRefCode(text(field(node, "BatchRefCode")));
+            JsonNode processed = field(node, "Proccessed");
+            if (processed == null) processed = field(node, "Processed");
+            if (processed != null && processed.canConvertToInt()) {
+                response.setProcessed(processed.asInt());
+            }
+            return response;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static JsonNode field(JsonNode node, String name) {
+        Iterator<Map.Entry<String, JsonNode>> it = node.fields();
+        while (it.hasNext()) {
+            Map.Entry<String, JsonNode> e = it.next();
+            if (e.getKey().equalsIgnoreCase(name)) {
+                return e.getValue();
+            }
+        }
+        return null;
+    }
+
+    private static String text(JsonNode node) {
+        return node == null || node.isNull() ? null : node.asText();
+    }
+
+    private static String abbreviate(String raw) {
+        if (raw == null) return "null";
+        return raw.length() > 500 ? raw.substring(0, 500) + "..." : raw;
     }
 
     private Map<String, Object> buildSmsPayload(SmsRequest request, String message, String mobileNumber) {
