@@ -28,6 +28,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.Objects;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -45,10 +48,83 @@ public class AgentService {
     private final UserSessionService userSessionService;
 
     public List<TokenResponseDTO> getUpcomingTokensForCounter(String counterId) {
-        return tokenRepository.findUpcomingTokensForCounter(counterId)
-                .stream()
-                .map(TokenResponseDTO::fromEntity)
+        List<Token> tokens = tokenRepository.findUpcomingTokensForCounter(counterId);
+
+        // transferFrom holds the sending counter's id; the agent app shows its name.
+        Set<String> fromIds = tokens.stream()
+                .map(Token::getTransferFrom)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<String, String> counterNames = fromIds.isEmpty() ? Map.of()
+                : counterRepository.findAllById(fromIds).stream()
+                        .collect(Collectors.toMap(Counter::getId, Counter::getName));
+
+        return tokens.stream()
+                .map(t -> {
+                    TokenResponseDTO dto = TokenResponseDTO.fromEntity(t);
+                    if (t.getTransferFrom() != null) {
+                        dto.setTransferCounterName(counterNames.get(t.getTransferFrom()));
+                    }
+                    return dto;
+                })
                 .toList();
+    }
+
+    /**
+     * Calls a token that was transferred to this counter straight away, without
+     * waiting for it to come up in "Call next" (same flow as calling back a no-show).
+     */
+    @Transactional
+    public AgentCallResponseDTO callTransferredToken(String tokenId, String counterId) {
+        Token token = tokenRepository.findById(tokenId)
+                .orElseThrow(() -> new ResourceNotFoundException("Token not found"));
+
+        if (!Boolean.TRUE.equals(token.getIsTransfer()) || token.getStatus() != TokenStatus.WAITING) {
+            throw new BusinessException("Token cannot be called from status: " + token.getStatus());
+        }
+        if (!counterId.equals(token.getAssignedCounterId())) {
+            throw new BusinessException("This token was transferred to another counter");
+        }
+
+        Counter counter = counterRepository.findById(counterId)
+                .orElseThrow(() -> new ResourceNotFoundException("Counter not found"));
+        if (Boolean.TRUE.equals(counter.getPaused())) {
+            throw new BusinessException("Counter is paused");
+        }
+        counterService.assertNoTokenInProgress(counterId, "call a transferred token at");
+
+        closeOutReviewTokens(counterId);
+
+        token.setStatus(TokenStatus.CALLING);
+        token.setAssignedCounterName(counter.getName());
+        token.setServedByUserId(currentUserId());
+        tokenRepository.save(token);
+
+        counter.setStatus(CounterStatus.CALLING);
+        counterRepository.save(counter);
+
+        tokenEventPublisher.publish(new TokenEvent(
+                TokenEventType.TOKEN_CALLED,
+                token.getBranchId(),
+                token.getId(),
+                token.getToken(),
+                counterId,
+                Instant.now()
+        ));
+        publishQueueChanged(token);
+
+        auditLogService.log(
+                AuditAction.TOKEN_CALLED,
+                "Token",
+                token.getId(),
+                token.getToken(),
+                "Transferred token called at counter " + counter.getName(),
+                getCurrentUser(),
+                token.getBranchId(),
+                request
+        );
+
+        return AgentCallResponseDTO.fromEntity(token);
     }
 
     // Must be transactional: TokenEventDispatcher is an AFTER_COMMIT listener, so events

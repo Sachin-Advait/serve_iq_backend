@@ -57,6 +57,12 @@ public class AgentController {
         return ResponseEntity.ok(agentService.callNoShowToken(tokenId, counterId));
     }
 
+    @PostMapping("/call-transferred-token/{tokenId}/counter/{counterId}")
+    public ResponseEntity<AgentCallResponseDTO> callTransferredToken(@PathVariable String tokenId,
+                                                                     @PathVariable String counterId) {
+        return ResponseEntity.ok(agentService.callTransferredToken(tokenId, counterId));
+    }
+
     @PostMapping("/token/start-serving/{tokenId}")
     public ResponseEntity<Void> startServingToken(@PathVariable String tokenId) throws Exception {
         agentService.startServingToken(tokenId);
