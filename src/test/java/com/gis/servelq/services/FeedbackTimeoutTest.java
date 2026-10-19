@@ -85,6 +85,23 @@ class FeedbackTimeoutTest {
     }
 
     @Test
+    void waitsForTheMostRecentlyCompletedToken() {
+        // An older visit left in REVIEW sorts first (created later, completed
+        // long ago); the visitor who just finished must still get 30 seconds.
+        Token older = new Token();
+        older.setId("t0");
+        older.setStatus(TokenStatus.REVIEW);
+        older.setAssignedCounterId("c1");
+        older.setEndAt(LocalDateTime.now().minusMinutes(5));
+        token.setEndAt(LocalDateTime.now().minusSeconds(10));
+        when(tokenRepository.findByStatusInAndAssignedCounterIdOrderByCreatedAtDesc(
+                List.of(TokenStatus.REVIEW), "c1")).thenReturn(List.of(older, token));
+
+        assertThat(feedbackService.expireStaleReview("c1", Duration.ofSeconds(30))).isFalse();
+        assertThat(counter.getStatus()).isEqualTo(CounterStatus.COMPLETE);
+    }
+
+    @Test
     void freesACounterStuckOnCompleteWithNoTokenToRate() {
         token.setStatus(TokenStatus.DONE);
         counter.setUpdatedAt(LocalDateTime.now().minusMinutes(5));

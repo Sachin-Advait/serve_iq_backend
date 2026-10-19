@@ -160,8 +160,14 @@ public class FeedbackService {
                 return false;
             }
         } else {
-            Token latest = reviews.get(0);
-            if (latest.getEndAt() != null && latest.getEndAt().isAfter(cutoff)) {
+            // Wait for the most recently completed token. The list is ordered by
+            // creation time, and a token issued earlier can be completed later
+            // (transfer, hold, no-show call back), so reviews.get(0) may be an
+            // older visit and would free the counter early.
+            boolean recent = reviews.stream()
+                    .map(t -> t.getEndAt() != null ? t.getEndAt() : counter.getUpdatedAt())
+                    .anyMatch(endAt -> endAt != null && endAt.isAfter(cutoff));
+            if (recent) {
                 return false;
             }
             reviews.forEach(t -> t.setStatus(TokenStatus.DONE));
@@ -171,7 +177,10 @@ public class FeedbackService {
         counter.setStatus(CounterStatus.IDLE);
         counterRepository.save(counter);
 
-        Token latest = reviews.isEmpty() ? null : reviews.get(0);
+        Token latest = reviews.stream()
+                .filter(t -> t.getEndAt() != null)
+                .max(java.util.Comparator.comparing(Token::getEndAt))
+                .orElse(reviews.isEmpty() ? null : reviews.get(0));
         tokenEventPublisher.publish(new TokenEvent(
                 TokenEventType.FEEDBACK_SUBMITTED,
                 counter.getBranchId(),
