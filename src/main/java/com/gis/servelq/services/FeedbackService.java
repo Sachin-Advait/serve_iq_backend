@@ -17,6 +17,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.EnumMap;
@@ -63,7 +64,18 @@ public class FeedbackService {
         feedback.setAgentName(counter.getUserId() == null ? null
                 : userRepository.findById(counter.getUserId()).map(User::getName).orElse(null));
 
-        Feedback saved = feedbackRepository.save(feedback);
+        // One rating per visitor: a second submit for the same token (a retry, or a
+        // rating that arrives after the screen already timed out) replaces the first.
+        Feedback saved = feedbackRepository.findFirstByTokenIdOrderByCreatedAtDesc(feedback.getTokenId())
+                .map(existing -> {
+                    existing.setCounterCode(feedback.getCounterCode());
+                    existing.setRating(feedback.getRating());
+                    existing.setReview(feedback.getReview());
+                    existing.setAgentId(feedback.getAgentId());
+                    existing.setAgentName(feedback.getAgentName());
+                    return feedbackRepository.save(existing);
+                })
+                .orElseGet(() -> feedbackRepository.save(feedback));
 
         tokenEventPublisher.publish(new TokenEvent(
                 TokenEventType.FEEDBACK_SUBMITTED,
@@ -122,6 +134,53 @@ public class FeedbackService {
                 counter.getId(),
                 Instant.now()
         ));
+    }
+
+    /**
+     * Server-side twin of the feedback app's idle timeout: a counter left on COMPLETE
+     * longer than {@code timeout} (the app is offline, closed, or never got the token)
+     * is freed as if the screen had timed out, so the agent can call the next visitor.
+     * A rating that arrives later is still stored by {@link #createFeedback}.
+     *
+     * @return true if the counter was freed
+     */
+    @Transactional
+    public boolean expireStaleReview(String counterId, Duration timeout) {
+        Counter counter = counterRepository.findById(counterId).orElse(null);
+        if (counter == null || counter.getStatus() != CounterStatus.COMPLETE) {
+            return false;
+        }
+        LocalDateTime cutoff = LocalDateTime.now().minus(timeout);
+
+        List<Token> reviews = tokenRepository.findByStatusInAndAssignedCounterIdOrderByCreatedAtDesc(
+                List.of(TokenStatus.REVIEW), counterId);
+        if (reviews.isEmpty()) {
+            // COMPLETE with nothing to rate (bad data, or the token was closed elsewhere)
+            if (counter.getUpdatedAt() != null && counter.getUpdatedAt().isAfter(cutoff)) {
+                return false;
+            }
+        } else {
+            Token latest = reviews.get(0);
+            if (latest.getEndAt() != null && latest.getEndAt().isAfter(cutoff)) {
+                return false;
+            }
+            reviews.forEach(t -> t.setStatus(TokenStatus.DONE));
+            tokenRepository.saveAll(reviews);
+        }
+
+        counter.setStatus(CounterStatus.IDLE);
+        counterRepository.save(counter);
+
+        Token latest = reviews.isEmpty() ? null : reviews.get(0);
+        tokenEventPublisher.publish(new TokenEvent(
+                TokenEventType.FEEDBACK_SUBMITTED,
+                counter.getBranchId(),
+                latest == null ? null : latest.getId(),
+                latest == null ? null : latest.getToken(),
+                counter.getId(),
+                Instant.now()
+        ));
+        return true;
     }
 
     /**

@@ -1,6 +1,7 @@
 package com.gis.servelq.repository;
 
 import com.gis.servelq.models.Counter;
+import com.gis.servelq.models.CounterStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -19,6 +20,8 @@ public interface CounterRepository extends JpaRepository<Counter, String> {
     List<Counter> findByUserIdIsNotNull();
     
     Optional<Counter> findByCode(String code);
+
+    List<Counter> findByStatus(CounterStatus status);
 
     List<Counter> findByBranchIdOrderByCreatedAtAsc(String branchId);
 
