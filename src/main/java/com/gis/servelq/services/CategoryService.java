@@ -17,6 +17,7 @@ import java.util.Optional;
 public class CategoryService {
 
     private final CategoryRepository categoryRepository;
+    private final CodeUniquenessValidator codeUniquenessValidator;
 
     public List<Category> findAll() {
         return categoryRepository.findAll();
@@ -32,9 +33,8 @@ public class CategoryService {
     }
 
     public Category create(Category category) {
-        if (categoryRepository.existsByCode(category.getCode())) {
-            throw new IllegalArgumentException("Category code already exists: " + category.getCode());
-        }
+        codeUniquenessValidator.checkCategoryCode(category.getCode(), null);
+        category.setCode(CodeUniquenessValidator.normalize(category.getCode()));
         return categoryRepository.save(category);
     }
 
@@ -43,14 +43,11 @@ public class CategoryService {
         Category existingCategory = categoryRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Category not found with id: " + id));
 
-        if (updatedCategory.getCode() != null && !updatedCategory.getCode().equals(existingCategory.getCode())) {
-            if (categoryRepository.existsByCode(updatedCategory.getCode())) {
-                throw new IllegalArgumentException("Category code already exists: " + updatedCategory.getCode());
-            }
-        }
-
-        if (updatedCategory.getCode() != null && !updatedCategory.getCode().isBlank()) {
-            existingCategory.setCode(updatedCategory.getCode());
+        if (updatedCategory.getCode() != null && !updatedCategory.getCode().isBlank()
+                && !CodeUniquenessValidator.normalize(updatedCategory.getCode())
+                        .equals(CodeUniquenessValidator.normalize(existingCategory.getCode()))) {
+            codeUniquenessValidator.checkCategoryCode(updatedCategory.getCode(), id);
+            existingCategory.setCode(CodeUniquenessValidator.normalize(updatedCategory.getCode()));
         }
 
         if (updatedCategory.getName() != null && !updatedCategory.getName().isBlank()) {

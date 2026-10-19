@@ -25,13 +25,11 @@ public class ServiceManagementService {
     private final AuditLogService auditLogService;
     private final HttpServletRequest request;
     private final CounterServiceLinker counterServiceLinker;
+    private final CodeUniquenessValidator codeUniquenessValidator;
 
     @Transactional
     public Services createService(ServiceRequest serviceRequest, AuthenticatedUser user) {
-        serviceRepository.findByCodeAndBranchId(serviceRequest.getCode(), serviceRequest.getBranchId())
-                .ifPresent(s -> {
-                    throw new RuntimeException("Service code already exists");
-                });
+        codeUniquenessValidator.checkServiceCode(serviceRequest.getCode(), serviceRequest.getBranchId(), null);
 
         branchRepository.findById(serviceRequest.getBranchId())
                 .orElseThrow(() -> new RuntimeException("Branch does not exist"));
@@ -44,7 +42,7 @@ public class ServiceManagementService {
 
         Services newService = new Services();
 
-        newService.setCode(serviceRequest.getCode());
+        newService.setCode(CodeUniquenessValidator.normalize(serviceRequest.getCode()));
         newService.setName(serviceRequest.getName());
         newService.setArabicName(serviceRequest.getArabicName());
         newService.setDescription(blankToNull(serviceRequest.getDescription()));
@@ -134,13 +132,15 @@ public class ServiceManagementService {
         // Save old state for audit
         Services oldService = cloneService(service);
 
-        // Null-safe code uniqueness check
-        if (updateRequest.getCode() != null && !updateRequest.getCode().equals(service.getCode())) {
-            serviceRepository.findByCodeAndBranchId(updateRequest.getCode(), service.getBranchId()).ifPresent(s -> {
-                throw new RuntimeException("Service code already exists");
-            });
-
-            service.setCode(updateRequest.getCode());
+        // Prefix must stay unique in the branch the service ends up in, also
+        // when only the branch changes.
+        String targetBranchId = updateRequest.getBranchId() != null ? updateRequest.getBranchId() : service.getBranchId();
+        boolean codeChanged = updateRequest.getCode() != null && !updateRequest.getCode().isBlank()
+                && !CodeUniquenessValidator.normalize(updateRequest.getCode()).equals(CodeUniquenessValidator.normalize(service.getCode()));
+        if (codeChanged || !targetBranchId.equals(service.getBranchId())) {
+            String code = codeChanged ? updateRequest.getCode() : service.getCode();
+            codeUniquenessValidator.checkServiceCode(code, targetBranchId, service.getId());
+            service.setCode(CodeUniquenessValidator.normalize(code));
         }
 
         // Update only non-null fields

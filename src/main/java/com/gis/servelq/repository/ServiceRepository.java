@@ -22,6 +22,13 @@ public interface ServiceRepository extends JpaRepository<Services, String> {
 
     Optional<Services> findByCodeAndBranchId(String code, String branchId);
 
+    // code is expected upper case and trimmed (CodeUniquenessValidator.normalize)
+    @Query("SELECT s FROM Services s WHERE UPPER(TRIM(s.code)) = :code AND s.branchId = :branchId")
+    List<Services> findByNormalizedCodeAndBranchId(@Param("code") String code, @Param("branchId") String branchId);
+
+    @Query("SELECT s FROM Services s WHERE UPPER(TRIM(s.code)) = :code")
+    List<Services> findByNormalizedCode(@Param("code") String code);
+
     // Consumer/kiosk — enabled only main services (UNCHANGED)
     @Query("""
                 SELECT s FROM Services s
