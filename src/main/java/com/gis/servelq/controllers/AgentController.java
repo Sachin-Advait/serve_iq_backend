@@ -1,6 +1,7 @@
 package com.gis.servelq.controllers;
 
 import com.gis.servelq.dto.AgentCallResponseDTO;
+import com.gis.servelq.dto.CompleteTokenRequest;
 import com.gis.servelq.dto.RecentServiceDTO;
 import com.gis.servelq.dto.TokenResponseDTO;
 import com.gis.servelq.dto.TokenTransferRequest;
@@ -70,8 +71,9 @@ public class AgentController {
     }
 
     @PostMapping("/token/complete/{tokenId}")
-    public ResponseEntity<Void> completeToken(@PathVariable String tokenId) throws Exception {
-        agentService.completeToken(tokenId);
+    public ResponseEntity<Void> completeToken(@PathVariable String tokenId,
+                                              @RequestBody(required = false) CompleteTokenRequest body) throws Exception {
+        agentService.completeToken(tokenId, body == null ? null : body.getNote());
         return ResponseEntity.ok().build();
     }
 

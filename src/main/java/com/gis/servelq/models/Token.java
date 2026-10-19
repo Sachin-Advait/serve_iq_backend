@@ -107,4 +107,7 @@ public class Token {
 
     @Column(name = "end_at")
     private LocalDateTime endAt;
+
+    @Column(name = "agent_note", length = 1000)
+    private String agentNote;
 }

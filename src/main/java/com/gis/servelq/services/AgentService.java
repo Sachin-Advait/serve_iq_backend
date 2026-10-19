@@ -22,6 +22,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -362,7 +363,7 @@ public class AgentService {
     }
 
     @Transactional
-    public void completeToken(String tokenId) throws Exception {
+    public void completeToken(String tokenId, String note) throws Exception {
         Token token = tokenRepository.findById(tokenId)
                 .orElseThrow(() -> new ResourceNotFoundException("Token not found"));
 
@@ -373,6 +374,10 @@ public class AgentService {
 
         token.setStatus(TokenStatus.REVIEW);
         token.setEndAt(LocalDateTime.now());
+        if (StringUtils.hasText(note)) {
+            String trimmed = note.trim();
+            token.setAgentNote(trimmed.length() > 1000 ? trimmed.substring(0, 1000) : trimmed);
+        }
         String completedBy = currentUserId();
         if (completedBy != null) token.setServedByUserId(completedBy);
         tokenRepository.save(token);
@@ -410,7 +415,8 @@ public class AgentService {
                         token.getMobileNumber(),
                         token.getServiceName(),
                         token.getStartAt(),
-                        token.getEndAt()
+                        token.getEndAt(),
+                        token.getAgentNote()
                 )).collect(Collectors.toList());
     }
 
