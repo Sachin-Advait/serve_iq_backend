@@ -45,13 +45,18 @@ public class FeedbackService {
         Token token = tokenRepository.findById(feedback.getTokenId())
                 .orElseThrow(() -> new ResourceNotFoundException("Token not found"));
 
+        boolean wasWaiting = token.getStatus() == TokenStatus.REVIEW;
         token.setStatus(TokenStatus.DONE);
         tokenRepository.save(token);
 
         // Only free the counter if it is still waiting on this visitor's feedback. A late
         // rating can arrive after the agent already called the next token; flipping that
         // counter to IDLE hid the live token and let the agent try to log out mid-call.
-        if (counter.getStatus() == CounterStatus.COMPLETE
+        // It can also arrive after the timeout closed this token and the agent finished
+        // the next visitor, so the counter is on COMPLETE again for someone else: then
+        // this token is no longer in REVIEW and the counter stays for the new rating.
+        if (wasWaiting
+                && counter.getStatus() == CounterStatus.COMPLETE
                 && counter.getId().equals(token.getAssignedCounterId())) {
             counter.setStatus(CounterStatus.IDLE);
             counterRepository.save(counter);

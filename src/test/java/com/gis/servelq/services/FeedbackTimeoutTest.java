@@ -142,4 +142,38 @@ class FeedbackTimeoutTest {
         assertThat(saved.getReview()).isEqualTo("Too slow");
         verify(feedbackRepository, never()).save(late);
     }
+
+    @Test
+    void aLateRatingDoesNotFreeTheCounterWaitingOnTheNextVisitor() {
+        // t1 was already closed by the timeout; the counter is on COMPLETE for t2.
+        token.setStatus(TokenStatus.DONE);
+        when(tokenRepository.findById("t1")).thenReturn(Optional.of(token));
+        when(feedbackRepository.findFirstByTokenIdOrderByCreatedAtDesc("t1")).thenReturn(Optional.empty());
+        when(feedbackRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        Feedback late = new Feedback();
+        late.setTokenId("t1");
+        late.setCounterCode("C1");
+        late.setRating(Feedback.MoodRating.HAPPY);
+        feedbackService.createFeedback(late, null);
+
+        assertThat(counter.getStatus()).isEqualTo(CounterStatus.COMPLETE);
+        verify(counterRepository, never()).save(counter);
+    }
+
+    @Test
+    void aRatingInTimeFreesTheCounter() {
+        when(tokenRepository.findById("t1")).thenReturn(Optional.of(token));
+        when(feedbackRepository.findFirstByTokenIdOrderByCreatedAtDesc("t1")).thenReturn(Optional.empty());
+        when(feedbackRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        Feedback rating = new Feedback();
+        rating.setTokenId("t1");
+        rating.setCounterCode("C1");
+        rating.setRating(Feedback.MoodRating.HAPPY);
+        feedbackService.createFeedback(rating, null);
+
+        assertThat(counter.getStatus()).isEqualTo(CounterStatus.IDLE);
+        assertThat(token.getStatus()).isEqualTo(TokenStatus.DONE);
+    }
 }
