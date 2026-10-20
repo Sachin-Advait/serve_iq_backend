@@ -75,7 +75,11 @@ public class TokenService {
                     throw new BusinessException(
                             "Could not allocate a token number after " + MAX_ATTEMPTS + " attempts");
                 }
-                log.debug("Token sequence collision on attempt {}, retrying", attempt);
+                // Logged at warn with the cause, so a violation that is not a
+                // number collision (a missing column, an old constraint) shows
+                // up in the logs instead of only as "could not allocate".
+                log.warn("Token insert rejected on attempt {}, retrying: {}", attempt,
+                        e.getMostSpecificCause().getMessage());
                 sleepBriefly();
             }
         }
