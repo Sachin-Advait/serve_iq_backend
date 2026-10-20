@@ -51,15 +51,14 @@ public class TokenIssuer {
         LocalDate today = LocalDate.now();
         int priority = request.getPriority() != null ? request.getPriority() : 50;
 
-        int nextSeq = tokenRepository.findLastSeqForPriorityToday(
-                branch.getId(),
-                priority,
-                today.atStartOfDay(),
-                today.plusDays(1).atStartOfDay()
-        ).orElse(0) + 1;
+        // Each prefix has its own daily sequence: A001, B001, A002, C001.
+        String prefix = resolveTokenPrefix(mainServiceCode(service), priority);
+        int nextSeq = tokenRepository.findLastSeqForPrefix(branch.getId(), prefix, today)
+                .orElse(0) + 1;
 
         Token token = new Token();
-        token.setToken(resolveTokenPrefix(mainServiceCode(service), priority) + String.format("%03d", nextSeq));
+        token.setToken(prefix + String.format("%03d", nextSeq));
+        token.setTokenPrefix(prefix);
         token.setTokenSeq(nextSeq);
         token.setTokenDate(today);
         token.setPriority(priority);

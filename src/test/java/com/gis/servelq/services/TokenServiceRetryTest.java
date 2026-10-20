@@ -35,7 +35,7 @@ import static org.mockito.Mockito.*;
  *
  * Two kiosks in the same branch can derive the same sequence number at the same
  * moment, because it comes from MAX(token_seq)+1. The unique constraint on
- * (branch_id, priority, token_seq, token_date) makes the loser's insert fail
+ * (branch_id, token_prefix, token_date, token_seq) makes the loser's insert fail
  * instead of quietly handing two customers the same number, and this loop is
  * what turns that failure into the next number up.
  *

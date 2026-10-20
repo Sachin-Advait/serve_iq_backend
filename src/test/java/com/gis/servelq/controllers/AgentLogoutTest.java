@@ -268,6 +268,7 @@ class AgentLogoutTest {
     private Token token(Fixture f, String number, TokenStatus status) {
         Token t = new Token();
         t.setToken(number + UUID.randomUUID().toString().substring(0, 4));
+        t.setTokenPrefix(number);
         t.setTokenSeq((int) (Math.random() * 100000));
         t.setTokenDate(LocalDate.now());
         t.setBranchId(f.branch.getId());

@@ -14,13 +14,14 @@ import java.util.List;
 @Entity
 @Table(name = "tokens",
         uniqueConstraints = {
+                // Each prefix (A, B, V, ...) counts on its own: A001, B001, A002.
                 // The sequence is derived with MAX(token_seq)+1 and then
                 // inserted, which is a read-modify-write. Two kiosks issuing at
                 // the same instant both read the same max and both used to
                 // succeed, handing two customers the same number. This is what
                 // makes the loser fail so the retry can pick the next number.
-                @UniqueConstraint(name = "uk_tokens_branch_priority_seq_date",
-                        columnNames = {"branch_id", "priority", "token_seq", "token_date"})
+                @UniqueConstraint(name = "uk_tokens_branch_prefix_date_seq",
+                        columnNames = {"branch_id", "token_prefix", "token_date", "token_seq"})
         },
         indexes = {
                 @Index(name = "ix_tokens_branch_status_priority_created",
@@ -36,6 +37,12 @@ public class Token {
 
     @NotBlank
     private String token;
+
+    // Letter part of the ticket (token minus its number). The sequence is
+    // counted per prefix, so this is what the uniqueness is scoped to.
+    @NotBlank
+    @Column(name = "token_prefix", length = 20)
+    private String tokenPrefix;
 
     @NotNull
     @Column(name = "token_seq")

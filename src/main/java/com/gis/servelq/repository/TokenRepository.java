@@ -132,15 +132,13 @@ public interface TokenRepository extends JpaRepository<Token, String> {
             SELECT MAX(t.tokenSeq)
             FROM Token t
             WHERE t.branchId = :branchId
-              AND t.priority = :priority
-              AND t.createdAt >= :startOfDay
-              AND t.createdAt < :startOfNextDay
+              AND t.tokenPrefix = :prefix
+              AND t.tokenDate = :tokenDate
             """)
-    Optional<Integer> findLastSeqForPriorityToday(
+    Optional<Integer> findLastSeqForPrefix(
             @Param("branchId") String branchId,
-            @Param("priority") Integer priority,
-            @Param("startOfDay") LocalDateTime startOfDay,
-            @Param("startOfNextDay") LocalDateTime startOfNextDay
+            @Param("prefix") String prefix,
+            @Param("tokenDate") LocalDate tokenDate
     );
 
     @Query("""
