@@ -1,26 +1,45 @@
 package com.gis.servelq.models;
 
+import jakarta.persistence.*;
+import lombok.Data;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.time.LocalDateTime;
+
 /**
- * Why an agent moved a token to another counter. The list follows the queue
- * procedure (section 9.g); the agent app shows it as radio buttons.
+ * Why an agent moved a token to another counter (queue procedure 9.g). The
+ * admin manages the list; tokens store the code, which never changes after
+ * the reason is created so old transfers keep their label.
  */
-public enum TransferReason {
-    WRONG_SERVICE("Visitor selected the wrong service"),
-    NEEDS_SPECIALIST("Needs a specialist officer"),
-    MISSING_DOCUMENTS("Required documents are missing"),
-    OTHER_SECTION("Needs to consult another section"),
-    MISCLASSIFIED("Service was classified incorrectly at ticket issue"),
-    ALTERNATIVE_CHANNEL("Directed to an online or Contact Centre channel"),
-    CROWD_MANAGEMENT("Crowd management"),
-    OTHER("Other");
+@Entity
+@Table(name = "transfer_reasons")
+@Data
+public class TransferReason {
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private String id;
 
-    private final String label;
+    @Column(nullable = false, unique = true, updatable = false, length = 50)
+    private String code;
 
-    TransferReason(String label) {
-        this.label = label;
-    }
+    @Column(name = "title_en", nullable = false)
+    private String titleEn;
 
-    public String getLabel() {
-        return label;
-    }
+    @Column(name = "title_ar", nullable = false)
+    private String titleAr;
+
+    @Column(nullable = false)
+    private Boolean active = true;
+
+    @Column(name = "sort_order", nullable = false)
+    private Integer sortOrder = 0;
+
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 }

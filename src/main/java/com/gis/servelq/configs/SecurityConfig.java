@@ -82,6 +82,9 @@ public class SecurityConfig {
                         .requestMatchers("/serveiq/api/admin/ad-sync/**").hasRole("ADMIN")
                         .requestMatchers("/serveiq/api/health-check").permitAll()
                         // Serving customers
+                        .requestMatchers(HttpMethod.POST, "/serveiq/api/transfer-reasons/**").hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers(HttpMethod.PUT, "/serveiq/api/transfer-reasons/**").hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers(HttpMethod.DELETE, "/serveiq/api/transfer-reasons/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/serveiq/api/agent/**")
                         .hasAnyRole("ADMIN", "MANAGER", "USER", "RECEPTIONIST")
                         .requestMatchers("/serveiq/api/counters/**")

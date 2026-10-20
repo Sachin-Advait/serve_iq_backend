@@ -60,8 +60,7 @@ public class TokenResponseDTO {
 
         dto.setTransferCounterName(token.getTransferFrom());
         dto.setIsTransfer(token.getIsTransfer());
-        if (token.getTransferReason() != null)
-            dto.setTransferReason(token.getTransferReason().name());
+        dto.setTransferReason(token.getTransferReason());
 
         dto.setCounterId(token.getAssignedCounterId());
         dto.setCounterName(token.getAssignedCounterName());

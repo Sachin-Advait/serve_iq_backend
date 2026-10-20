@@ -24,6 +24,7 @@ public class ReportService {
     private final BranchRepository branchRepository;
     private final ServiceRepository serviceRepository;
     private final UserRepository userRepository;
+    private final TransferReasonService transferReasonService;
 
     // ==================== EXISTING TOKEN REPORT METHODS ====================
 
@@ -492,7 +493,7 @@ public class ReportService {
         List<MonthlyReportDTO.ReasonCount> reasons = tokens.stream()
                 .filter(t -> Boolean.TRUE.equals(t.getIsTransfer()))
                 .collect(Collectors.groupingBy(
-                        t -> t.getTransferReason() != null ? t.getTransferReason().name() : "NOT_RECORDED",
+                        t -> t.getTransferReason() != null ? t.getTransferReason() : "NOT_RECORDED",
                         Collectors.counting()))
                 .entrySet().stream()
                 .map(e -> MonthlyReportDTO.ReasonCount.builder()
@@ -552,13 +553,9 @@ public class ReportService {
                 .build();
     }
 
-    private static String reasonLabel(String code) {
+    private String reasonLabel(String code) {
         if ("NOT_RECORDED".equals(code)) return "Not recorded";
-        try {
-            return TransferReason.valueOf(code).getLabel();
-        } catch (IllegalArgumentException e) {
-            return code;
-        }
+        return transferReasonService.findByCode(code).map(TransferReason::getTitleEn).orElse(code);
     }
 
     private List<MonthlyReportDTO.Finding> buildFindings(long total, double slaRate, double noShowRate,

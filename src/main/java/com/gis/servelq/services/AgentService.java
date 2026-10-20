@@ -47,6 +47,7 @@ public class AgentService {
     private final HttpServletRequest request;
     private final CounterService counterService;
     private final UserSessionService userSessionService;
+    private final TransferReasonService transferReasonService;
 
     public List<TokenResponseDTO> getUpcomingTokensForCounter(String counterId) {
         List<Token> tokens = tokenRepository.findUpcomingTokensForCounter(counterId);
@@ -453,7 +454,7 @@ public class AgentService {
         Token token = tokenRepository.findById(request.getTokenId())
                 .orElseThrow(() -> new ResourceNotFoundException("Token not found"));
 
-        TransferReason reason = parseTransferReason(request.getReason());
+        TransferReason reason = transferReasonService.requireActive(request.getReason());
 
         if (token.getStatus() == TokenStatus.SERVING || token.getStatus() == TokenStatus.CALLING) {
             Counter toCounter = counterRepository.findById(request.getToCounterId())
@@ -475,7 +476,7 @@ public class AgentService {
 
             token.setIsTransfer(true);
             token.setTransferFrom(fromCounterId);
-            token.setTransferReason(reason);
+            token.setTransferReason(reason.getCode());
 
             // Work on a mutable copy: StringListConverter returns List.of() for an
             // empty column, and remove/add on that threw and failed the transfer.
@@ -519,7 +520,7 @@ public class AgentService {
                     updated.getId(),
                     updated.getToken(),
                     "Token transferred from counter " + fromCounter.getName() + " to " + toCounter.getName()
-                            + ". Reason: " + reason.getLabel(),
+                            + ". Reason: " + reason.getTitleEn(),
                     getCurrentUser(),
                     updated.getBranchId(),
                     this.request
@@ -527,17 +528,6 @@ public class AgentService {
             return updated;
         } else {
             throw new ResourceNotFoundException("Token cannot be transferred from status: " + token.getStatus());
-        }
-    }
-
-    private TransferReason parseTransferReason(String reason) {
-        if (reason == null || reason.isBlank()) {
-            throw new BusinessException("Select a reason for the transfer");
-        }
-        try {
-            return TransferReason.valueOf(reason.trim().toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new BusinessException("Unknown transfer reason: " + reason);
         }
     }
 
