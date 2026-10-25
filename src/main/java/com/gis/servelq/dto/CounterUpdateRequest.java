@@ -13,7 +13,9 @@ public class CounterUpdateRequest {
     private String userId;
     private Boolean enabled;
     private Boolean paused;
-    private CounterStatus status = CounterStatus.IDLE;
+    // No default: an admin edit that doesn't send a status must keep the
+    // counter's live one (defaulting to IDLE turned a closed counter idle).
+    private CounterStatus status;
     private String serviceId;
     private List<String> serviceIds;
 }

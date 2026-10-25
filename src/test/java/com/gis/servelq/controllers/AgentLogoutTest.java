@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -208,6 +209,35 @@ class AgentLogoutTest {
                 .andExpect(status().isOk());
 
         assertThat(users.findById(f.agent.getId()).orElseThrow().getFcmToken()).isEqualTo("fcm-1");
+    }
+
+    @Test
+    void adminEditKeepsAClosedCounterClosed() throws Exception {
+        Fixture f = agentAtCounter();
+        Counter c = counters.findById(f.counter.getId()).orElseThrow();
+        c.setUserId(null);
+        c.setStatus(CounterStatus.CLOSED);
+        counters.save(c);
+
+        // What the admin panel sends when saving the counter form: no status.
+        mvc.perform(put("/serveiq/api/counters/" + c.getId()).header("Authorization", "Bearer " + adminJwt(f))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Renamed\",\"enabled\":true,\"userId\":null}"))
+                .andExpect(status().isOk());
+
+        Counter saved = counters.findById(c.getId()).orElseThrow();
+        assertThat(saved.getName()).isEqualTo("Renamed");
+        assertThat(saved.getStatus()).isEqualTo(CounterStatus.CLOSED);
+    }
+
+    private String adminJwt(Fixture f) {
+        User u = new User();
+        u.setEmail("admin-" + UUID.randomUUID().toString().substring(0, 8) + "@test.local");
+        u.setName("Admin");
+        u.setPassword("x");
+        u.setRole(UserRole.ADMIN);
+        u.setBranchId(f.branch.getId());
+        return jwt.generateToken(users.save(u));
     }
 
     /** The feedback screen logs in as a FEEDBACK user fixed to the counter. */
