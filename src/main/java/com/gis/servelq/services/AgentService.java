@@ -48,6 +48,7 @@ public class AgentService {
     private final CounterService counterService;
     private final UserSessionService userSessionService;
     private final TransferReasonService transferReasonService;
+    private final CounterBreakService counterBreakService;
 
     public List<TokenResponseDTO> getUpcomingTokensForCounter(String counterId) {
         List<Token> tokens = tokenRepository.findUpcomingTokensForCounter(counterId);
@@ -97,6 +98,7 @@ public class AgentService {
 
         closeOutReviewTokens(counterId);
 
+        token.recordCall();
         token.setStatus(TokenStatus.CALLING);
         token.setAssignedCounterName(counter.getName());
         token.setServedByUserId(currentUserId());
@@ -201,6 +203,7 @@ public class AgentService {
 
         closeOutReviewTokens(counterId);
 
+        nextToken.recordCall();
         nextToken.setStatus(TokenStatus.CALLING);
         nextToken.setAssignedCounterId(counterId);
         nextToken.setAssignedCounterName(counter.getName());
@@ -252,6 +255,7 @@ public class AgentService {
         closeOutReviewTokens(counterId);
 
         String previousCounterName = token.getAssignedCounterName();
+        token.recordCall();
         token.setStatus(TokenStatus.CALLING);
         token.setAssignedCounterId(counterId);
         token.setAssignedCounterName(counter.getName());
@@ -316,6 +320,7 @@ public class AgentService {
             throw new BusinessException("Token cannot be called from status: " + token.getStatus());
         }
 
+        token.recordCall();
         token.setStatus(TokenStatus.CALLING);
         tokenRepository.save(token);
 
@@ -431,6 +436,7 @@ public class AgentService {
         Counter counter = counterRepository.findById(token.getAssignedCounterId())
                 .orElseThrow(() -> new ResourceNotFoundException("Counter not found"));
 
+        token.recordCall();
         token.setStatus(TokenStatus.CALLING);
         tokenRepository.save(token);
 
@@ -585,6 +591,9 @@ public class AgentService {
         counterRepository.save(counter);
 
         token.setStatus(TokenStatus.NO_SHOW);
+        token.setNoShowCount((token.getNoShowCount() == null ? 0 : token.getNoShowCount()) + 1);
+        token.setNoShowCounterId(counter.getId());
+        token.setNoShowUserId(currentUserId());
         Token updated = tokenRepository.save(token);
 
         tokenEventPublisher.publish(new TokenEvent(
@@ -655,6 +664,7 @@ public class AgentService {
         counter.setPaused(paused);
         counter.setStatus(paused ? CounterStatus.PAUSED : CounterStatus.IDLE);
         Counter updated = counterRepository.save(counter);
+        counterBreakService.sync(updated);
 
         tokenEventPublisher.publish(new TokenEvent(
                 TokenEventType.COUNTER_STATUS_CHANGED,

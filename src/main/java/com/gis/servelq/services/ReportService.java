@@ -278,7 +278,6 @@ public class ReportService {
 
         long totalTokens = tokens.size();
         long slaCompliant = tokens.stream()
-                .filter(t -> t.getStartAt() != null)
                 .filter(t -> ServiceSlaResolver.withinSla(t, sla))
                 .count();
         long slaBreached = totalTokens - slaCompliant;
@@ -297,7 +296,6 @@ public class ReportService {
 
             long hourTotal = hourTokens.size();
             long hourCompliant = hourTokens.stream()
-                    .filter(t -> t.getStartAt() != null)
                     .filter(t -> ServiceSlaResolver.withinSla(t, sla))
                     .count();
 
@@ -675,8 +673,9 @@ public class ReportService {
 
     private double calculateAverageWaitTime(List<Token> tokens) {
         return tokens.stream()
-                .filter(t -> t.getStartAt() != null && t.getCreatedAt() != null)
-                .mapToLong(t -> Duration.between(t.getCreatedAt(), t.getStartAt()).toMinutes())
+                .map(ServiceSlaResolver::waitSeconds)
+                .filter(Objects::nonNull)
+                .mapToDouble(sec -> sec / 60.0)
                 .average()
                 .orElse(0.0);
     }
@@ -691,13 +690,12 @@ public class ReportService {
 
     private double calculateSlaRate(List<Token> tokens, Map<String, Integer> slaByService) {
         long total = tokens.stream()
-                .filter(t -> t.getCreatedAt() != null && t.getStartAt() != null)
+                .filter(t -> ServiceSlaResolver.waitSeconds(t) != null)
                 .count();
 
         if (total == 0) return 0;
 
         long compliant = tokens.stream()
-                .filter(t -> t.getCreatedAt() != null && t.getStartAt() != null)
                 .filter(t -> ServiceSlaResolver.withinSla(t, slaByService))
                 .count();
 

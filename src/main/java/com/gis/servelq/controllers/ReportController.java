@@ -1,6 +1,7 @@
 package com.gis.servelq.controllers;
 
 import com.gis.servelq.dto.*;
+import com.gis.servelq.services.OperationsReportService;
 import com.gis.servelq.services.ReportService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -17,6 +18,7 @@ import java.util.List;
 public class ReportController {
 
     private final ReportService reportService;
+    private final OperationsReportService operationsReportService;
 
     // ==================== TOKEN REPORTS (Existing) ====================
 
@@ -149,5 +151,54 @@ public class ReportController {
         MonthlyReportDTO report = reportService.getMonthlyReport(branchId, month);
         return ResponseEntity.ok(new ApiResponseDTO<>(true,
                 "Monthly report generated successfully", report));
+    }
+
+    // ==================== OPERATIONAL REPORTS (date range) ====================
+    // Each takes from/to (yyyy-MM-dd, both default to today, at most 92 days)
+    // and returns headline figures plus tables. Example:
+    // /api/reports/agent-performance?branchId=BR001&from=2026-10-01&to=2026-10-25
+
+    @GetMapping("/agent-performance")
+    public ResponseEntity<ApiResponseDTO<TabularReportDTO>> getAgentPerformance(
+            @RequestParam String branchId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ok(operationsReportService.agentPerformance(branchId, from, to));
+    }
+
+    @GetMapping("/waiting-sla")
+    public ResponseEntity<ApiResponseDTO<TabularReportDTO>> getWaitingAndSla(
+            @RequestParam String branchId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ok(operationsReportService.waitingAndSla(branchId, from, to));
+    }
+
+    @GetMapping("/no-show")
+    public ResponseEntity<ApiResponseDTO<TabularReportDTO>> getNoShowAnalysis(
+            @RequestParam String branchId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ok(operationsReportService.noShowAnalysis(branchId, from, to));
+    }
+
+    @GetMapping("/service-demand")
+    public ResponseEntity<ApiResponseDTO<TabularReportDTO>> getServiceDemand(
+            @RequestParam String branchId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ok(operationsReportService.serviceDemand(branchId, from, to));
+    }
+
+    @GetMapping("/agent-utilization")
+    public ResponseEntity<ApiResponseDTO<TabularReportDTO>> getAgentUtilization(
+            @RequestParam String branchId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ok(operationsReportService.agentUtilization(branchId, from, to));
+    }
+
+    private static ResponseEntity<ApiResponseDTO<TabularReportDTO>> ok(TabularReportDTO report) {
+        return ResponseEntity.ok(new ApiResponseDTO<>(true, report.getTitle() + " report generated successfully", report));
     }
 }

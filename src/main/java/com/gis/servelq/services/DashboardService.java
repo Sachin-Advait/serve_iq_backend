@@ -80,7 +80,6 @@ public class DashboardService {
                 .toList();
 
         long slaCompliant = servedTokens.stream()
-                .filter(t -> t.getStartAt() != null && t.getCreatedAt() != null)
                 .filter(t -> ServiceSlaResolver.withinSla(t, sla))
                 .count();
 

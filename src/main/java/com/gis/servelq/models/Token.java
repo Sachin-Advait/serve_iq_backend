@@ -117,4 +117,27 @@ public class Token {
 
     @Column(name = "agent_note", length = 1000)
     private String agentNote;
+
+    // When the visitor was first called. Waiting time runs from createdAt to here.
+    @Column(name = "first_called_at")
+    private LocalDateTime firstCalledAt;
+
+    // Every call: first call, recalls, and calls back from hold or no-show.
+    @Column(name = "call_count", nullable = false)
+    private Integer callCount = 0;
+
+    @Column(name = "no_show_count", nullable = false)
+    private Integer noShowCount = 0;
+
+    // Counter and agent of the latest no-show
+    @Column(name = "no_show_counter_id")
+    private String noShowCounterId;
+
+    @Column(name = "no_show_user_id")
+    private String noShowUserId;
+
+    public void recordCall() {
+        if (firstCalledAt == null) firstCalledAt = LocalDateTime.now();
+        callCount = (callCount == null ? 0 : callCount) + 1;
+    }
 }

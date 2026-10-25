@@ -46,6 +46,7 @@ public class CounterService {
     private final HttpServletRequest request;
     private final CounterServiceLinker counterServiceLinker;
     private final TokenRevocationService tokenRevocationService;
+    private final CounterBreakService counterBreakService;
 
     /**
      * Creates a Counter entity from request DTO
@@ -273,6 +274,7 @@ public class CounterService {
         }
 
         Counter updated = counterRepository.save(counter);
+        counterBreakService.sync(updated);
 
         // Audit log with changes
         auditLogService.logWithChanges(
@@ -312,6 +314,7 @@ public class CounterService {
 
         counter.setEnabled(enabled);
         Counter saved = counterRepository.save(counter);
+        counterBreakService.sync(saved);
 
         auditLogService.log(
                 AuditAction.COUNTER_STATUS_CHANGED,
@@ -357,6 +360,7 @@ public class CounterService {
         }
 
         Counter saved = counterRepository.save(counter);
+        counterBreakService.sync(saved);
 
         auditLogService.log(
                 AuditAction.COUNTER_STATUS_CHANGED,
@@ -776,6 +780,7 @@ public class CounterService {
             fresh.setStatus(statusForTokenInProgress(counterId));
             fresh.setPaused(false);
             counterRepository.save(fresh);
+            counterBreakService.sync(fresh);
         }
 
         // An agent holds at most one counter: release the others (only if still theirs).
@@ -926,6 +931,7 @@ public class CounterService {
             counter.setStatus(CounterStatus.IDLE);
             counter.setPaused(false);
             counterRepository.save(counter);
+            counterBreakService.sync(counter);
             publishCounterChanged(counter);
         }
         return convertToResponse(counterRepository.findById(counterId).orElse(counter));
@@ -948,6 +954,7 @@ public class CounterService {
         counter.setStatus(releasedStatus);
         counter.setPaused(false);
         counterRepository.save(counter);
+        counterBreakService.sync(counter);
 
         publishCounterChanged(counter);
         auditLogService.log(

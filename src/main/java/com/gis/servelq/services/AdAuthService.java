@@ -26,6 +26,7 @@ public class AdAuthService {
     private final UserRepository userRepository;
     private final BranchRepository branchRepository;
     private final CounterRepository counterRepository;
+    private final CounterBreakService counterBreakService;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;  // For local DB password check
 
@@ -178,6 +179,7 @@ public class AdAuthService {
             counter.setStatus(CounterStatus.IDLE);
             counter.setPaused(false);
             counterRepository.save(counter);
+            counterBreakService.sync(counter);
             log.info("Counter {} reset to IDLE/unpaused on login for user {}",
                     counterId, user.getEmail());
         }, () -> log.warn("User {} references missing counter {} on login",

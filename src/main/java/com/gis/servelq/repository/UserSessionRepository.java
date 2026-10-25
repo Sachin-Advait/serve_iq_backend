@@ -1,6 +1,7 @@
 package com.gis.servelq.repository;
 
 import com.gis.servelq.models.LogoutType;
+import com.gis.servelq.models.UserRole;
 import com.gis.servelq.models.UserSession;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -17,6 +18,14 @@ public interface UserSessionRepository extends JpaRepository<UserSession, String
         JpaSpecificationExecutor<UserSession> {
 
     List<UserSession> findByUserIdOrderByLoginAtDesc(String userId);
+
+    // Sessions of one role in a branch that overlap [from, to)
+    @Query("SELECT s FROM UserSession s WHERE s.branchId = :branchId AND s.role = :role " +
+            "AND s.loginAt < :to AND (s.logoutAt IS NULL OR s.logoutAt > :from)")
+    List<UserSession> findOverlapping(@Param("branchId") String branchId,
+                                      @Param("role") UserRole role,
+                                      @Param("from") LocalDateTime from,
+                                      @Param("to") LocalDateTime to);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE UserSession s SET s.logoutAt = :at, s.logoutType = :type " +
