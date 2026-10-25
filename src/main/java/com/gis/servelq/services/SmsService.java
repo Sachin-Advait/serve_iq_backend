@@ -5,6 +5,7 @@ import com.gis.servelq.dto.SmsRequest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gis.servelq.models.AuditAction;
+import com.gis.servelq.models.SmsTemplateCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.http.HttpEntity;
@@ -15,9 +16,12 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Optional;
 
 @Log4j2
 @Service
@@ -28,6 +32,7 @@ public class SmsService {
     private final SmsOmanConfig smsOmanConfig;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+    private final SmsTemplateService smsTemplateService;
 
 
     @Async
@@ -35,21 +40,49 @@ public class SmsService {
         sendReceiptSms(request);
     }
 
+    /** Sends the ticket receipt; returns the BatchRefCode, or null when it was not sent. */
     public String sendReceiptSms(SmsRequest request) {
-        if (isBlank(smsOmanConfig.username())
-            || isBlank(smsOmanConfig.password())
-            || isBlank(smsOmanConfig.sender())) {
-            log.warn("SMS Oman credentials are not configured");
-            return null;
+        SmsSendResult result = sendTemplate(SmsTemplateCode.TOKEN_RECEIPT, request.getTo(),
+                request.getLanguage(), receiptValues(request), request.getTokenNo());
+        return result.success() ? result.batchRefCode() : null;
+    }
+
+    /** Sends a template filled with sample values, so the admin can check the text. */
+    public SmsSendResult sendTest(SmsTemplateCode code, String to, String language) {
+        Map<String, String> sample = new HashMap<>();
+        boolean arabic = "ar".equalsIgnoreCase(language);
+        sample.put("token", "A001");
+        sample.put("service", arabic ? "استفسار معاش" : "Pension Inquiry");
+        sample.put("queue", "5");
+        LocalDateTime now = LocalDateTime.now();
+        sample.put("date", now.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+        sample.put("time", now.format(DateTimeFormatter.ofPattern("HH:mm")));
+        return sendTemplate(code, to, language, sample, "TEST");
+    }
+
+    public SmsSendResult sendTemplate(SmsTemplateCode code, String to, String language,
+                                      Map<String, String> values, String sourceRef) {
+        if (isBlank(to)) {
+            return SmsSendResult.failed("No mobile number");
+        }
+        if (!Boolean.TRUE.equals(smsTemplateService.settings().getEnabled())) {
+            log.info("SMS sending is switched off in the admin panel - not sending {} to {}", code, to);
+            return SmsSendResult.failed("SMS sending is switched off");
+        }
+        String sender = smsTemplateService.effectiveSender();
+        if (isBlank(smsOmanConfig.username()) || isBlank(smsOmanConfig.password()) || isBlank(sender)) {
+            log.warn("SMS Oman credentials or sender are not configured");
+            return SmsSendResult.failed("SMSOMAN username, password or sender is not configured");
+        }
+        Optional<String> message = smsTemplateService.render(code, language, values);
+        if (message.isEmpty()) {
+            log.info("SMS template {} is switched off - not sending to {}", code, to);
+            return SmsSendResult.failed("This SMS template is switched off");
         }
 
-
-        String message = buildReceiptMessage(request);
-        String mobileNumber = request.getTo();
-
+        String mobileNumber = to.trim();
         try {
-
-            Map<String, Object> payload = buildSmsPayload(request, message, mobileNumber);
+            Map<String, Object> payload = buildSmsPayload(message.get(), mobileNumber, sender, sourceRef);
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
@@ -65,31 +98,44 @@ public class SmsService {
 
             if (body == null) {
                 log.error("SMS Oman returned an unreadable response: {}", abbreviate(raw));
-                return null;
+                return SmsSendResult.failed("SMSOMAN returned an unreadable response");
             }
 
             if ("00".equals(body.getStatusCode())) {
-                log.info("SMS sent successfully to {}. BatchRefCode={}",
-                        mobileNumber, body.getBatchRefCode());
+                log.info("SMS {} sent successfully to {}. BatchRefCode={}",
+                        code, mobileNumber, body.getBatchRefCode());
 
                 auditLogService.log(
                         AuditAction.SMS_SENT,
                         "SMS",
                         body.getBatchRefCode(),
                         mobileNumber,
-                        "SMS receipt sent to: " + mobileNumber, null, null, null
+                        "SMS " + code + " sent to: " + mobileNumber, null, null, null
                 );
-                return body.getBatchRefCode();
+                return new SmsSendResult(true, body.getBatchRefCode(), body.getStatusCode(), body.getStatusDesc());
             }
 
             log.error("SMS Oman failed. StatusCode={}, StatusDesc={}, raw response: {}",
                     body.getStatusCode(), body.getStatusDesc(), abbreviate(raw));
-            return null;
+            return new SmsSendResult(false, null, body.getStatusCode(),
+                    body.getStatusDesc() == null ? null : body.getStatusDesc().trim());
 
         } catch (Exception e) {
             log.error("Failed to send SMS to {}: {}", mobileNumber, e.getMessage(), e);
-            return null;
+            return SmsSendResult.failed("Could not reach SMSOMAN: " + e.getMessage());
         }
+    }
+
+    private static Map<String, String> receiptValues(SmsRequest request) {
+        boolean arabic = "ar".equalsIgnoreCase(request.getLanguage());
+        Map<String, String> values = new HashMap<>();
+        values.put("token", request.getTokenNo());
+        values.put("service", arabic && !isBlank(request.getServiceAr())
+                ? request.getServiceAr() : request.getServiceEn());
+        values.put("queue", request.getCurrentQueue());
+        values.put("date", request.getDate());
+        values.put("time", request.getTime());
+        return values;
     }
 
     /**
@@ -152,82 +198,29 @@ public class SmsService {
         return raw.length() > 500 ? raw.substring(0, 500) + "..." : raw;
     }
 
-    private Map<String, Object> buildSmsPayload(SmsRequest request, String message, String mobileNumber) {
+    private Map<String, Object> buildSmsPayload(String message, String mobileNumber,
+                                                String sender, String sourceRef) {
         Map<String, Object> payload = new HashMap<>();
         payload.put("UserName", smsOmanConfig.username());
         payload.put("Password", smsOmanConfig.password());
         payload.put("Message", message);
-        payload.put("Priority", smsOmanConfig.priority());
+        payload.put("Priority", smsTemplateService.effectivePriority());
 
         // Empty means send immediately.
         payload.put("Schdate", "");
 
-        payload.put("Sender", smsOmanConfig.sender());
-        payload.put("AppID", smsOmanConfig.appId());
+        payload.put("Sender", sender);
+        payload.put("AppID", smsTemplateService.effectiveAppId());
 
-        // Maximum 10 characters according to the API document.
-        payload.put("SourceRef", request.getTokenNo());
+        // 1 to 10 characters according to the API document.
+        String ref = isBlank(sourceRef) ? "SMS" : sourceRef.trim();
+        payload.put("SourceRef", ref.length() > 10 ? ref.substring(0, 10) : ref);
 
         payload.put("MSISDNs", mobileNumber);
         return payload;
     }
 
-    /**
-     * Creates the SMS text in the backend.
-     */
-    private String buildReceiptMessage(SmsRequest request) {
-        boolean arabic = "ar".equalsIgnoreCase(request.getLanguage());
-        if (arabic) {
-            return String.format(
-                    """
-                            MSSPF
-                            نظام إدارة الزوار
-                            
-                            رقم الانتظار: %s
-                            الخدمة: %s
-                            المنتظرون حالياً: %s
-                            التاريخ: %s
-                            الوقت: %s
-                            
-                            يرجى انتظار نداء الرقم
-                            شكراً لك
-                            """,
-                    safe(request.getTokenNo()),
-                    safe(request.getServiceAr()),
-                    safe(request.getCurrentQueue()),
-                    safe(request.getDate()),
-                    safe(request.getTime())
-            ).trim();
-
-        }
-
-        return String.format(
-                """
-                        MSSPF
-                        Visitor Management
-                        
-                        Queue Token: %s
-                        Service: %s
-                        Current Queue: %s
-                        Date: %s
-                        Time: %s
-                        
-                        Please wait for your number to be called.
-                        Thank you.
-                        """,
-                safe(request.getTokenNo()),
-                safe(request.getServiceEn()),
-                safe(request.getCurrentQueue()),
-                safe(request.getDate()),
-                safe(request.getTime())
-        ).trim();
-    }
-
-    private String safe(String value) {
-        return value == null ? "" : value;
-    }
-
-    private boolean isBlank(String s) {
+    private static boolean isBlank(String s) {
         return s == null || s.isBlank();
     }
 }

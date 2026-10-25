@@ -7,7 +7,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class SmsResponseParseTest {
 
-    private final SmsService service = new SmsService(null, null, null, new ObjectMapper());
+    private final SmsService service = new SmsService(null, null, null, new ObjectMapper(), null);
 
     @Test
     void readsDocumentedShape() {
