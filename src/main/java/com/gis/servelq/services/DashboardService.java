@@ -25,6 +25,7 @@ public class DashboardService {
 
     private final TokenRepository tokenRepository;
     private final CounterRepository counterRepository;
+    private final ServiceSlaResolver serviceSlaResolver;
 
     /**
      * Get complete dashboard overview
@@ -70,7 +71,8 @@ public class DashboardService {
         double yesterdayAvgService = calculateAverageServiceTime(branchId, yesterdayStart, yesterdayEnd);
         String serviceChange = formatTimeChange(avgServiceTime, yesterdayAvgService);
 
-        // 3. SLA Compliance (tokens served within target time, e.g., 15 minutes)
+        // 3. SLA Compliance (tokens called within their service's SLA)
+        Map<String, Integer> sla = serviceSlaResolver.forBranch(branchId);
         List<Token> servedTokens = tokenRepository.findByBranchIdAndCreatedAtBetween(
                         branchId, startOfDay, endOfDay)
                 .stream()
@@ -79,7 +81,7 @@ public class DashboardService {
 
         long slaCompliant = servedTokens.stream()
                 .filter(t -> t.getStartAt() != null && t.getCreatedAt() != null)
-                .filter(t -> Duration.between(t.getCreatedAt(), t.getStartAt()).toMinutes() <= 15)
+                .filter(t -> ServiceSlaResolver.withinSla(t, sla))
                 .count();
 
         double slaRate = servedTokens.isEmpty() ? 0 :

@@ -20,6 +20,7 @@ public class ServiceResponseDTO {
     private List<String> childrenIds = List.of();
     private List<String> counterIds = List.of();
     private Boolean enabled;
+    private Integer slaSeconds;
     private String branchId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -41,6 +42,7 @@ public class ServiceResponseDTO {
             dto.setCounterIds(service.getCounterIds());
         }
         dto.setEnabled(service.getEnabled());
+        dto.setSlaSeconds(service.getSlaSeconds());
         dto.setBranchId(service.getBranchId());
         dto.setCreatedAt(service.getCreatedAt());
         dto.setUpdatedAt(service.getUpdatedAt());

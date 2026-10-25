@@ -40,6 +40,10 @@ public class Services {
     @NotNull
     private Boolean enabled = true;
 
+    // Longest wait before a visitor is called. NULL on a sub-service uses the parent's.
+    @Column(name = "sla_seconds")
+    private Integer slaSeconds;
+
     @Column(name = "counter_ids")
     @Convert(converter = StringListConverter.class)
     private List<String> counterIds;

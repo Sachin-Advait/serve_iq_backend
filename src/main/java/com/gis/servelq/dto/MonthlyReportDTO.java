@@ -68,6 +68,7 @@ public class MonthlyReportDTO {
     @AllArgsConstructor
     public static class ServiceRow {
         private String serviceName;
+        private double slaMinutes;
         private long totalTokens;
         private long served;
         private long noShow;

@@ -25,6 +25,7 @@ public class ReportService {
     private final ServiceRepository serviceRepository;
     private final UserRepository userRepository;
     private final TransferReasonService transferReasonService;
+    private final ServiceSlaResolver serviceSlaResolver;
 
     // ==================== EXISTING TOKEN REPORT METHODS ====================
 
@@ -144,7 +145,7 @@ public class ReportService {
 
         double avgWaitTime = calculateAverageWaitTime(tokens);
         double avgServiceTime = calculateAverageServiceTime(tokens);
-        double slaRate = calculateSlaRate(tokens, 15);
+        double slaRate = calculateSlaRate(tokens, serviceSlaResolver.forBranch(branchId));
 
         // Find peak hour
         Map<String, Long> hourlyTokens = tokens.stream()
@@ -267,7 +268,7 @@ public class ReportService {
         Branch branch = branchRepository.findById(branchId)
                 .orElseThrow(() -> new RuntimeException("Branch not found"));
 
-        int slaTargetMinutes = 15;
+        Map<String, Integer> sla = serviceSlaResolver.forBranch(branchId);
 
         List<Token> tokens = tokenRepository.findByBranchIdAndCreatedAtBetween(
                         branchId, startOfDay, endOfDay)
@@ -278,7 +279,7 @@ public class ReportService {
         long totalTokens = tokens.size();
         long slaCompliant = tokens.stream()
                 .filter(t -> t.getStartAt() != null)
-                .filter(t -> Duration.between(t.getCreatedAt(), t.getStartAt()).toMinutes() <= slaTargetMinutes)
+                .filter(t -> ServiceSlaResolver.withinSla(t, sla))
                 .count();
         long slaBreached = totalTokens - slaCompliant;
 
@@ -297,7 +298,7 @@ public class ReportService {
             long hourTotal = hourTokens.size();
             long hourCompliant = hourTokens.stream()
                     .filter(t -> t.getStartAt() != null)
-                    .filter(t -> Duration.between(t.getCreatedAt(), t.getStartAt()).toMinutes() <= slaTargetMinutes)
+                    .filter(t -> ServiceSlaResolver.withinSla(t, sla))
                     .count();
 
             double hourRate = hourTotal > 0 ? (hourCompliant * 100.0 / hourTotal) : 0;
@@ -316,7 +317,7 @@ public class ReportService {
                 .totalTokens(totalTokens)
                 .slaCompliantTokens(slaCompliant)
                 .slaBreachedTokens(slaBreached)
-                .slaTargetMinutes(slaTargetMinutes)
+                .slaTargetMinutes(ServiceSlaResolver.DEFAULT_SLA_SECONDS / 60)
                 .hourlyBreakdown(hourlyBreakdown)
                 .build();
     }
@@ -401,7 +402,6 @@ public class ReportService {
 
     // Defaults until the Office of the Assistant CEO approves official
     // indicators. 65% matches the colour threshold the admin panel uses.
-    private static final int SLA_TARGET_MINUTES = 15;
     private static final double SLA_RATE_TARGET = 65.0;
     private static final double NO_SHOW_RATE_LIMIT = 10.0;
     private static final double TRANSFER_RATE_LIMIT = 10.0;
@@ -436,6 +436,7 @@ public class ReportService {
                 .stream()
                 .filter(t -> t.getCreatedAt() != null)
                 .toList();
+        Map<String, Integer> sla = serviceSlaResolver.forBranch(branchId);
 
         long total = tokens.size();
         long served = tokens.stream().filter(ReportService::isServed).count();
@@ -455,7 +456,7 @@ public class ReportService {
                         .transferred(e.getValue().stream().filter(t -> Boolean.TRUE.equals(t.getIsTransfer())).count())
                         .averageWaitTimeMinutes(calculateAverageWaitTime(e.getValue()))
                         .averageServiceTimeMinutes(calculateAverageServiceTime(e.getValue()))
-                        .slaComplianceRate(calculateSlaRate(e.getValue(), SLA_TARGET_MINUTES))
+                        .slaComplianceRate(calculateSlaRate(e.getValue(), sla))
                         .build())
                 .toList();
 
@@ -465,13 +466,14 @@ public class ReportService {
                 .entrySet().stream()
                 .map(e -> MonthlyReportDTO.ServiceRow.builder()
                         .serviceName(e.getKey())
+                        .slaMinutes(ServiceSlaResolver.slaSeconds(e.getValue().get(0), sla) / 60.0)
                         .totalTokens(e.getValue().size())
                         .served(e.getValue().stream().filter(ReportService::isServed).count())
                         .noShow(e.getValue().stream().filter(t -> t.getStatus() == TokenStatus.NO_SHOW).count())
                         .transferred(e.getValue().stream().filter(t -> Boolean.TRUE.equals(t.getIsTransfer())).count())
                         .averageWaitTimeMinutes(calculateAverageWaitTime(e.getValue()))
                         .averageServiceTimeMinutes(calculateAverageServiceTime(e.getValue()))
-                        .slaComplianceRate(calculateSlaRate(e.getValue(), SLA_TARGET_MINUTES))
+                        .slaComplianceRate(calculateSlaRate(e.getValue(), sla))
                         .build())
                 .sorted(Comparator.comparingLong(MonthlyReportDTO.ServiceRow::getTotalTokens).reversed())
                 .toList();
@@ -516,7 +518,7 @@ public class ReportService {
                 .max(Comparator.comparingLong(MonthlyReportDTO.Day::getTotalTokens))
                 .orElse(null);
 
-        double slaRate = calculateSlaRate(tokens, SLA_TARGET_MINUTES);
+        double slaRate = calculateSlaRate(tokens, sla);
         double noShowRate = rate(noShow, total);
         double transferRate = rate(transferred, total);
 
@@ -526,7 +528,7 @@ public class ReportService {
         return MonthlyReportDTO.builder()
                 .month(month.toString())
                 .branchName(branch.getName())
-                .slaTargetMinutes(SLA_TARGET_MINUTES)
+                .slaTargetMinutes(ServiceSlaResolver.DEFAULT_SLA_SECONDS / 60)
                 .slaRateTarget(SLA_RATE_TARGET)
                 .noShowRateLimit(NO_SHOW_RATE_LIMIT)
                 .transferRateLimit(TRANSFER_RATE_LIMIT)
@@ -584,7 +586,7 @@ public class ReportService {
         boolean slaOk = slaRate >= SLA_RATE_TARGET;
         findings.add(MonthlyReportDTO.Finding.builder()
                 .onTarget(slaOk)
-                .indicator("Visitors called within " + SLA_TARGET_MINUTES + " min")
+                .indicator("Visitors called within their service's SLA")
                 .target(String.format("%.0f%% or more", SLA_RATE_TARGET))
                 .actual(String.format("%.1f%%", slaRate))
                 .finding(slaOk
@@ -687,7 +689,7 @@ public class ReportService {
                 .orElse(0.0);
     }
 
-    private double calculateSlaRate(List<Token> tokens, int targetMinutes) {
+    private double calculateSlaRate(List<Token> tokens, Map<String, Integer> slaByService) {
         long total = tokens.stream()
                 .filter(t -> t.getCreatedAt() != null && t.getStartAt() != null)
                 .count();
@@ -696,7 +698,7 @@ public class ReportService {
 
         long compliant = tokens.stream()
                 .filter(t -> t.getCreatedAt() != null && t.getStartAt() != null)
-                .filter(t -> Duration.between(t.getCreatedAt(), t.getStartAt()).toMinutes() <= targetMinutes)
+                .filter(t -> ServiceSlaResolver.withinSla(t, slaByService))
                 .count();
 
         return (compliant * 100.0) / total;

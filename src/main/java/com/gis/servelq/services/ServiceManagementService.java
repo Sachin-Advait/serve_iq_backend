@@ -49,6 +49,7 @@ public class ServiceManagementService {
         newService.setArabicDescription(blankToNull(serviceRequest.getArabicDescription()));
         newService.setParentId(serviceRequest.getParentId());
         newService.setEnabled(serviceRequest.getEnabled());
+        newService.setSlaSeconds(serviceRequest.getSlaSeconds());
         newService.setBranchId(serviceRequest.getBranchId());
 
         newService = serviceRepository.save(newService);
@@ -156,6 +157,9 @@ public class ServiceManagementService {
             counterServiceLinker.setServiceCounters(service, updateRequest.getCounterIds());
         }
         if (updateRequest.getEnabled() != null) service.setEnabled(updateRequest.getEnabled());
+        if (updateRequest.getSlaSeconds() != null) {
+            service.setSlaSeconds(updateRequest.getSlaSeconds() > 0 ? updateRequest.getSlaSeconds() : null);
+        }
         if (updateRequest.getBranchId() != null) service.setBranchId(updateRequest.getBranchId());
 
         Services updatedService = serviceRepository.save(service);
@@ -243,6 +247,7 @@ public class ServiceManagementService {
         clone.setArabicDescription(original.getArabicDescription());
         clone.setParentId(original.getParentId());
         clone.setEnabled(original.getEnabled());
+        clone.setSlaSeconds(original.getSlaSeconds());
         clone.setCounterIds(original.getCounterIds());
         clone.setChildren(original.getChildren());
         clone.setBranchId(original.getBranchId());

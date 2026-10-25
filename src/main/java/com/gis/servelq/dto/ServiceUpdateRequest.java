@@ -1,5 +1,6 @@
 package com.gis.servelq.dto;
 
+import jakarta.validation.constraints.PositiveOrZero;
 import lombok.Data;
 
 import java.util.List;
@@ -14,5 +15,8 @@ public class ServiceUpdateRequest {
     private String parentId;
     private List<String> counterIds;
     private Boolean enabled;
+    // 0 clears it, so a sub-service goes back to using its parent's SLA
+    @PositiveOrZero
+    private Integer slaSeconds;
     private String branchId;
 }

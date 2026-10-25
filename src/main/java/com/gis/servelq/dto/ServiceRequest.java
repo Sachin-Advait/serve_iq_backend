@@ -1,6 +1,7 @@
 package com.gis.servelq.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
 import lombok.Data;
 
 import java.util.List;
@@ -20,6 +21,8 @@ public class ServiceRequest {
     private String parentId;
     private List<String> counterIds;
     private Boolean enabled = true;
+    @Positive
+    private Integer slaSeconds;
     @NotBlank
     private String branchId;
 }
