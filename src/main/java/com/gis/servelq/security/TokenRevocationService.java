@@ -6,7 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.Map;
@@ -21,7 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * The cutoff is cached per user for a short time so the JWT filter doesn't
  * hit the database on every request. A revoke on this instance updates the
- * cache immediately.
+ * cache immediately. Cutoffs are stored in UTC so the server timezone doesn't matter.
  */
 @Slf4j
 @Service
@@ -39,7 +39,7 @@ public class TokenRevocationService {
     public void revokeAll(String userId) {
         // JWT iat has second precision, so cut at the second: a token issued
         // in an earlier second is rejected, a login after this is accepted.
-        LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC).truncatedTo(ChronoUnit.SECONDS);
         userRepository.findById(userId).ifPresent(u -> {
             u.setTokensValidAfter(now);
             userRepository.save(u);
@@ -49,7 +49,7 @@ public class TokenRevocationService {
 
     /** Signs every user out: any token issued before now is rejected. */
     public void revokeAllUsers() {
-        LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC).truncatedTo(ChronoUnit.SECONDS);
         userRepository.revokeAllTokens(now);
         // Other instances pick the new cutoff up when their cache entries expire.
         cache.clear();
@@ -60,10 +60,15 @@ public class TokenRevocationService {
         Optional<LocalDateTime> cutoff = cutoff(userId);
         if (cutoff.isEmpty()) return false;
         if (issuedAt == null) return true;
-        LocalDateTime issued = LocalDateTime.ofInstant(issuedAt.toInstant(), ZoneId.systemDefault());
-        boolean revoked = issued.isBefore(cutoff.get());
+        LocalDateTime issued = LocalDateTime.ofInstant(issuedAt.toInstant(), ZoneOffset.UTC);
+        // A cutoff later than now was written in another timezone (an older build
+        // stored server local time, or another server shares the database). Honouring
+        // it would reject every new login until that time comes, so ignore it.
+        LocalDateTime validAfter = cutoff.get();
+        if (validAfter.isAfter(LocalDateTime.now(ZoneOffset.UTC))) return false;
+        boolean revoked = issued.isBefore(validAfter);
         if (revoked) {
-            log.info("Rejected revoked JWT for user {}: issued {}, valid after {}", userId, issued, cutoff.get());
+            log.info("Rejected revoked JWT for user {}: issued {} UTC, valid after {} UTC", userId, issued, validAfter);
         }
         return revoked;
     }
