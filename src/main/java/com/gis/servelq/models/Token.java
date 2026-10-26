@@ -136,6 +136,18 @@ public class Token {
     @Column(name = "no_show_user_id")
     private String noShowUserId;
 
+    // Serving seconds at earlier counters, added up on each transfer
+    @Column(name = "prior_serving_seconds", nullable = false)
+    private Integer priorServingSeconds = 0;
+
+    /** Before a transfer clears startAt/endAt: keep the serving time spent so far. */
+    public void addServingTimeBeforeTransfer(LocalDateTime now) {
+        if (startAt == null) return;
+        LocalDateTime end = endAt != null ? endAt : now;
+        long seconds = Math.max(0, java.time.Duration.between(startAt, end).getSeconds());
+        priorServingSeconds = (priorServingSeconds == null ? 0 : priorServingSeconds) + (int) seconds;
+    }
+
     public void recordCall() {
         if (firstCalledAt == null) firstCalledAt = LocalDateTime.now();
         callCount = (callCount == null ? 0 : callCount) + 1;

@@ -37,6 +37,7 @@ public class MonthlyReportDTO {
     private double averageServiceTimeMinutes;
     private double slaComplianceRate;
     private double servingSlaComplianceRate;
+    private double totalServingSlaComplianceRate;
     private int workingDays;
     private double averageTokensPerDay;
     private String busiestDay;
@@ -73,6 +74,7 @@ public class MonthlyReportDTO {
         private String serviceName;
         private double slaMinutes;
         private double servingSlaMinutes;
+        private double totalServingSlaComplianceRate;
         private long totalTokens;
         private long served;
         private long noShow;

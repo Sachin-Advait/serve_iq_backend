@@ -2,6 +2,7 @@ package com.gis.servelq.services;
 
 import com.gis.servelq.models.Services;
 import com.gis.servelq.models.Token;
+import com.gis.servelq.models.TokenStatus;
 import com.gis.servelq.repository.ServiceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -63,6 +64,17 @@ public class ServiceSlaResolver {
         return slaByService.getOrDefault(token.getServiceId(), DEFAULT_SLA_SECONDS);
     }
 
+    public static int servingSlaSeconds(Token token, Map<String, Integer> servingSlaByService) {
+        return servingSlaByService.getOrDefault(token.getServiceId(), DEFAULT_SERVING_SLA_SECONDS);
+    }
+
+    /**
+     * How one ticket stands against an SLA. Only ON_TIME and BREACHED are
+     * judged; PENDING (still inside its limit) and EXCLUDED (the SLA does not
+     * apply) are left out of the SLA %.
+     */
+    public enum Verdict { ON_TIME, BREACHED, PENDING, EXCLUDED }
+
     /**
      * When the visitor was first called. Tokens from before first_called_at
      * existed only have startAt (serving started), which is the closest we have.
@@ -78,35 +90,110 @@ public class ServiceSlaResolver {
         return Math.max(0, Duration.between(token.getCreatedAt(), called).getSeconds());
     }
 
-    /** True when the ticket was called within its service's SLA. False when not called yet. */
-    public static boolean withinSla(Token token, Map<String, Integer> slaByService) {
+    /**
+     * Waiting SLA. A called ticket is judged on ticket-to-first-call. A ticket
+     * still waiting is BREACHED once it has waited past its limit by asOf, else
+     * PENDING. Anything else that was never called (no-show or hold records
+     * without call times) is EXCLUDED.
+     */
+    public static Verdict waitingVerdict(Token token, Map<String, Integer> slaByService, LocalDateTime asOf) {
+        if (token.getCreatedAt() == null) return Verdict.EXCLUDED;
+        int limit = slaSeconds(token, slaByService);
         Long wait = waitSeconds(token);
-        return wait != null && wait <= slaSeconds(token, slaByService);
+        if (wait != null) return wait <= limit ? Verdict.ON_TIME : Verdict.BREACHED;
+        if (token.getStatus() != TokenStatus.WAITING) return Verdict.EXCLUDED;
+        return elapsed(token.getCreatedAt(), asOf) > limit ? Verdict.BREACHED : Verdict.PENDING;
     }
 
-    // ---- serving time ----
-
-    public static int servingSlaSeconds(Token token, Map<String, Integer> servingSlaByService) {
-        return servingSlaByService.getOrDefault(token.getServiceId(), DEFAULT_SERVING_SLA_SECONDS);
-    }
-
-    /** Seconds from start of serving to completion, or null when not finished. */
+    /** Seconds from start of serving to completion at the last counter, or null when not finished. */
     public static Long servingSeconds(Token token) {
         if (token.getStartAt() == null || token.getEndAt() == null) return null;
         return Math.max(0, Duration.between(token.getStartAt(), token.getEndAt()).getSeconds());
     }
 
-    /** True when serving finished within its service's serving SLA. False when not finished. */
-    public static boolean withinServingSla(Token token, Map<String, Integer> servingSlaByService) {
-        Long serving = servingSeconds(token);
-        return serving != null && serving <= servingSlaSeconds(token, servingSlaByService);
+    /** Serving time across all counters (earlier counters + the last one), or null when not finished. */
+    public static Long totalServingSeconds(Token token) {
+        Long last = servingSeconds(token);
+        return last == null ? null : last + prior(token);
     }
 
-    /** % of finished tickets served within their serving SLA (0 when none finished). */
-    public static double servingSlaRate(List<Token> tokens, Map<String, Integer> servingSlaByService) {
-        long finished = tokens.stream().filter(t -> servingSeconds(t) != null).count();
-        if (finished == 0) return 0;
-        long within = tokens.stream().filter(t -> withinServingSla(t, servingSlaByService)).count();
-        return within * 100.0 / finished;
+    /**
+     * Serving SLA at the last counter. A finished ticket is judged on
+     * start-of-serving to completion; one still being served is BREACHED once
+     * it runs past its limit by asOf, else PENDING. A ticket that was never
+     * served (waiting, no-show) is EXCLUDED.
+     */
+    public static Verdict servingVerdict(Token token, Map<String, Integer> servingSlaByService, LocalDateTime asOf) {
+        if (token.getStartAt() == null) return Verdict.EXCLUDED;
+        return judge(servingSoFar(token, asOf), token.getEndAt() != null, servingSlaSeconds(token, servingSlaByService));
+    }
+
+    /**
+     * Serving SLA over the visitor's whole visit: serving time at every counter
+     * added up, against the ticket's service limit. Between counters after a
+     * transfer it is judged on the earlier counters' time so far.
+     */
+    public static Verdict totalServingVerdict(Token token, Map<String, Integer> servingSlaByService, LocalDateTime asOf) {
+        int limit = servingSlaSeconds(token, servingSlaByService);
+        if (token.getStartAt() == null) {
+            if (prior(token) == 0) return Verdict.EXCLUDED;
+            return prior(token) > limit ? Verdict.BREACHED : Verdict.PENDING;
+        }
+        return judge(prior(token) + servingSoFar(token, asOf), token.getEndAt() != null, limit);
+    }
+
+    private static Verdict judge(long seconds, boolean finished, int limit) {
+        if (finished) return seconds <= limit ? Verdict.ON_TIME : Verdict.BREACHED;
+        return seconds > limit ? Verdict.BREACHED : Verdict.PENDING;
+    }
+
+    private static long servingSoFar(Token token, LocalDateTime asOf) {
+        LocalDateTime end = token.getEndAt() != null ? token.getEndAt() : asOf;
+        return elapsed(token.getStartAt(), end);
+    }
+
+    private static long prior(Token token) {
+        return token.getPriorServingSeconds() == null ? 0 : token.getPriorServingSeconds();
+    }
+
+    private static long elapsed(LocalDateTime from, LocalDateTime to) {
+        if (from == null || to == null) return 0;
+        return Math.max(0, Duration.between(from, to).getSeconds());
+    }
+
+    /** Counts of each verdict for a list of tickets. */
+    public record Tally(long onTime, long breached, long pending, long excluded) {
+        public long judged() {
+            return onTime + breached;
+        }
+
+        /** SLA % = on-time judged / all judged x 100 (0 when nothing can be judged yet). */
+        public double rate() {
+            return judged() == 0 ? 0 : onTime * 100.0 / judged();
+        }
+    }
+
+    public static Tally tally(List<Token> tokens, Function<Token, Verdict> verdict) {
+        long[] c = new long[4];
+        tokens.forEach(t -> c[verdict.apply(t).ordinal()]++);
+        return new Tally(c[0], c[1], c[2], c[3]);
+    }
+
+    public static Tally waitingTally(List<Token> tokens, Map<String, Integer> sla, LocalDateTime asOf) {
+        return tally(tokens, t -> waitingVerdict(t, sla, asOf));
+    }
+
+    public static Tally servingTally(List<Token> tokens, Map<String, Integer> servingSla, LocalDateTime asOf) {
+        return tally(tokens, t -> servingVerdict(t, servingSla, asOf));
+    }
+
+    public static Tally totalServingTally(List<Token> tokens, Map<String, Integer> servingSla, LocalDateTime asOf) {
+        return tally(tokens, t -> totalServingVerdict(t, servingSla, asOf));
+    }
+
+    /** The moment tickets are judged at: now, or the end of a period that is already over. */
+    public static LocalDateTime asOf(LocalDateTime periodEnd) {
+        LocalDateTime now = LocalDateTime.now();
+        return periodEnd != null && periodEnd.isBefore(now) ? periodEnd : now;
     }
 }

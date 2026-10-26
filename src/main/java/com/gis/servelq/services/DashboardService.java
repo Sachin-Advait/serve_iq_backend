@@ -71,24 +71,16 @@ public class DashboardService {
         double yesterdayAvgService = calculateAverageServiceTime(branchId, yesterdayStart, yesterdayEnd);
         String serviceChange = formatTimeChange(avgServiceTime, yesterdayAvgService);
 
-        // 3. SLA Compliance (tokens called within their service's SLA)
+        // 3. SLA Compliance: on-time / judged tickets; tickets still inside their limit are pending
         Map<String, Integer> sla = serviceSlaResolver.forBranch(branchId);
-        List<Token> servedTokens = tokenRepository.findByBranchIdAndCreatedAtBetween(
-                        branchId, startOfDay, endOfDay)
-                .stream()
-                .filter(t -> t.getStatus() == TokenStatus.DONE)
-                .toList();
+        List<Token> todayTokens = tokenRepository.findByBranchIdAndCreatedAtBetween(
+                branchId, startOfDay, endOfDay);
+        LocalDateTime asOf = ServiceSlaResolver.asOf(endOfDay);
+        double slaRate = ServiceSlaResolver.waitingTally(todayTokens, sla, asOf).rate();
 
-        long slaCompliant = servedTokens.stream()
-                .filter(t -> ServiceSlaResolver.withinSla(t, sla))
-                .count();
-
-        double slaRate = servedTokens.isEmpty() ? 0 :
-                (slaCompliant * 100.0) / servedTokens.size();
-
-        // 3b. Serving-time SLA (serving finished within the service's limit)
-        double servingSlaRate = ServiceSlaResolver.servingSlaRate(servedTokens,
-                serviceSlaResolver.servingForBranch(branchId));
+        // 3b. Serving-time SLA, judged independently of waiting
+        double servingSlaRate = ServiceSlaResolver.servingTally(todayTokens,
+                serviceSlaResolver.servingForBranch(branchId), asOf).rate();
 
         // 4. Active Counters
         List<Counter> counters = counterRepository.findByBranchId(branchId);

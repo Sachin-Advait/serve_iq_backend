@@ -500,6 +500,7 @@ public class AgentService {
             token.setAssignedCounterName(toCounter.getName());
 
             token.setStatus(TokenStatus.WAITING);
+            token.addServingTimeBeforeTransfer(LocalDateTime.now());
             token.setStartAt(null);
             token.setEndAt(null);
 

@@ -93,7 +93,7 @@ class OperationsReportServiceTest {
                 .findFirst().orElseThrow().getRows()).hasSize(2);
         // Both finished tickets took 4 min, inside the 10 min default serving SLA
         assertThat(stat(r, "Served over serving SLA")).isEqualTo("0");
-        assertThat(stat(r, "Within serving SLA")).startsWith("100.0%");
+        assertThat(stat(r, "Within serving SLA (last counter)")).startsWith("100.0%");
     }
 
     @Test

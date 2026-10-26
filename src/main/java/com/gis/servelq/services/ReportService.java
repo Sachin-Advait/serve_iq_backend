@@ -145,8 +145,11 @@ public class ReportService {
 
         double avgWaitTime = calculateAverageWaitTime(tokens);
         double avgServiceTime = calculateAverageServiceTime(tokens);
-        double slaRate = calculateSlaRate(tokens, serviceSlaResolver.forBranch(branchId));
-        double servingSlaRate = ServiceSlaResolver.servingSlaRate(tokens, serviceSlaResolver.servingForBranch(branchId));
+        LocalDateTime asOf = ServiceSlaResolver.asOf(endOfDay);
+        double slaRate = calculateSlaRate(tokens, serviceSlaResolver.forBranch(branchId), asOf);
+        Map<String, Integer> servingSla = serviceSlaResolver.servingForBranch(branchId);
+        double servingSlaRate = ServiceSlaResolver.servingTally(tokens, servingSla, asOf).rate();
+        double totalServingSlaRate = ServiceSlaResolver.totalServingTally(tokens, servingSla, asOf).rate();
 
         // Find peak hour
         Map<String, Long> hourlyTokens = tokens.stream()
@@ -189,6 +192,7 @@ public class ReportService {
                 .averageServiceTimeMinutes(avgServiceTime)
                 .slaComplianceRate(slaRate)
                 .servingSlaComplianceRate(servingSlaRate)
+                .totalServingSlaComplianceRate(totalServingSlaRate)
                 .peakHour(peakHour)
                 .peakHourTokens(peakHourTokens)
                 .tokensByService(tokensByService)
@@ -278,13 +282,12 @@ public class ReportService {
                 .filter(t -> t.getCreatedAt() != null)
                 .toList();
 
+        LocalDateTime asOf = ServiceSlaResolver.asOf(endOfDay);
         long totalTokens = tokens.size();
-        long slaCompliant = tokens.stream()
-                .filter(t -> ServiceSlaResolver.withinSla(t, sla))
-                .count();
-        long slaBreached = totalTokens - slaCompliant;
-
-        double overallSlaRate = totalTokens > 0 ? (slaCompliant * 100.0 / totalTokens) : 0;
+        ServiceSlaResolver.Tally tally = ServiceSlaResolver.waitingTally(tokens, sla, asOf);
+        long slaCompliant = tally.onTime();
+        long slaBreached = tally.breached();
+        double overallSlaRate = tally.rate();
 
         // Hourly breakdown
         List<HourlySlaDTO> hourlyBreakdown = new ArrayList<>();
@@ -297,11 +300,9 @@ public class ReportService {
                     .toList();
 
             long hourTotal = hourTokens.size();
-            long hourCompliant = hourTokens.stream()
-                    .filter(t -> ServiceSlaResolver.withinSla(t, sla))
-                    .count();
-
-            double hourRate = hourTotal > 0 ? (hourCompliant * 100.0 / hourTotal) : 0;
+            ServiceSlaResolver.Tally hourTally = ServiceSlaResolver.waitingTally(hourTokens, sla, asOf);
+            long hourCompliant = hourTally.onTime();
+            double hourRate = hourTally.rate();
 
             hourlyBreakdown.add(HourlySlaDTO.builder()
                     .hour(String.format("%02d:00", hour))
@@ -317,6 +318,7 @@ public class ReportService {
                 .totalTokens(totalTokens)
                 .slaCompliantTokens(slaCompliant)
                 .slaBreachedTokens(slaBreached)
+                .pendingTokens(tally.pending() + tally.excluded())
                 .slaTargetMinutes(ServiceSlaResolver.DEFAULT_SLA_SECONDS / 60)
                 .hourlyBreakdown(hourlyBreakdown)
                 .build();
@@ -438,6 +440,7 @@ public class ReportService {
                 .toList();
         Map<String, Integer> sla = serviceSlaResolver.forBranch(branchId);
         Map<String, Integer> servingSla = serviceSlaResolver.servingForBranch(branchId);
+        LocalDateTime asOf = ServiceSlaResolver.asOf(month.plusMonths(1).atDay(1).atStartOfDay());
 
         long total = tokens.size();
         long served = tokens.stream().filter(ReportService::isServed).count();
@@ -457,8 +460,8 @@ public class ReportService {
                         .transferred(e.getValue().stream().filter(t -> Boolean.TRUE.equals(t.getIsTransfer())).count())
                         .averageWaitTimeMinutes(calculateAverageWaitTime(e.getValue()))
                         .averageServiceTimeMinutes(calculateAverageServiceTime(e.getValue()))
-                        .slaComplianceRate(calculateSlaRate(e.getValue(), sla))
-                        .servingSlaComplianceRate(ServiceSlaResolver.servingSlaRate(e.getValue(), servingSla))
+                        .slaComplianceRate(calculateSlaRate(e.getValue(), sla, asOf))
+                        .servingSlaComplianceRate(ServiceSlaResolver.servingTally(e.getValue(), servingSla, asOf).rate())
                         .build())
                 .toList();
 
@@ -470,14 +473,16 @@ public class ReportService {
                         .serviceName(e.getKey())
                         .slaMinutes(ServiceSlaResolver.slaSeconds(e.getValue().get(0), sla) / 60.0)
                         .servingSlaMinutes(ServiceSlaResolver.servingSlaSeconds(e.getValue().get(0), servingSla) / 60.0)
+                        .totalServingSlaComplianceRate(
+                                ServiceSlaResolver.totalServingTally(e.getValue(), servingSla, asOf).rate())
                         .totalTokens(e.getValue().size())
                         .served(e.getValue().stream().filter(ReportService::isServed).count())
                         .noShow(e.getValue().stream().filter(t -> t.getStatus() == TokenStatus.NO_SHOW).count())
                         .transferred(e.getValue().stream().filter(t -> Boolean.TRUE.equals(t.getIsTransfer())).count())
                         .averageWaitTimeMinutes(calculateAverageWaitTime(e.getValue()))
                         .averageServiceTimeMinutes(calculateAverageServiceTime(e.getValue()))
-                        .slaComplianceRate(calculateSlaRate(e.getValue(), sla))
-                        .servingSlaComplianceRate(ServiceSlaResolver.servingSlaRate(e.getValue(), servingSla))
+                        .slaComplianceRate(calculateSlaRate(e.getValue(), sla, asOf))
+                        .servingSlaComplianceRate(ServiceSlaResolver.servingTally(e.getValue(), servingSla, asOf).rate())
                         .build())
                 .sorted(Comparator.comparingLong(MonthlyReportDTO.ServiceRow::getTotalTokens).reversed())
                 .toList();
@@ -492,7 +497,7 @@ public class ReportService {
                         .counterName(e.getKey())
                         .served(e.getValue().size())
                         .averageServiceTimeMinutes(calculateAverageServiceTime(e.getValue()))
-                        .servingSlaComplianceRate(ServiceSlaResolver.servingSlaRate(e.getValue(), servingSla))
+                        .servingSlaComplianceRate(ServiceSlaResolver.servingTally(e.getValue(), servingSla, asOf).rate())
                         .build())
                 .toList();
 
@@ -523,8 +528,9 @@ public class ReportService {
                 .max(Comparator.comparingLong(MonthlyReportDTO.Day::getTotalTokens))
                 .orElse(null);
 
-        double slaRate = calculateSlaRate(tokens, sla);
-        double servingSlaRate = ServiceSlaResolver.servingSlaRate(tokens, servingSla);
+        double slaRate = calculateSlaRate(tokens, sla, asOf);
+        double servingSlaRate = ServiceSlaResolver.servingTally(tokens, servingSla, asOf).rate();
+        double totalServingSlaRate = ServiceSlaResolver.totalServingTally(tokens, servingSla, asOf).rate();
         double noShowRate = rate(noShow, total);
         double transferRate = rate(transferred, total);
 
@@ -551,6 +557,7 @@ public class ReportService {
                 .averageServiceTimeMinutes(calculateAverageServiceTime(tokens))
                 .slaComplianceRate(slaRate)
                 .servingSlaComplianceRate(servingSlaRate)
+                .totalServingSlaComplianceRate(totalServingSlaRate)
                 .workingDays(days.size())
                 .averageTokensPerDay(days.isEmpty() ? 0 : (double) total / days.size())
                 .busiestDay(busiest != null ? busiest.getDate().toString() : "N/A")
@@ -733,17 +740,8 @@ public class ReportService {
                 .orElse(0.0);
     }
 
-    private double calculateSlaRate(List<Token> tokens, Map<String, Integer> slaByService) {
-        long total = tokens.stream()
-                .filter(t -> ServiceSlaResolver.waitSeconds(t) != null)
-                .count();
-
-        if (total == 0) return 0;
-
-        long compliant = tokens.stream()
-                .filter(t -> ServiceSlaResolver.withinSla(t, slaByService))
-                .count();
-
-        return (compliant * 100.0) / total;
+    /** Waiting SLA %: on-time judged / all judged, see ServiceSlaResolver.waitingVerdict. */
+    private double calculateSlaRate(List<Token> tokens, Map<String, Integer> slaByService, LocalDateTime asOf) {
+        return ServiceSlaResolver.waitingTally(tokens, slaByService, asOf).rate();
     }
 }

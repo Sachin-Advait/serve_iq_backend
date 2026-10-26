@@ -16,6 +16,8 @@ public class SlaComplianceDTO {
     private long totalTokens;
     private long slaCompliantTokens;
     private long slaBreachedTokens;
+    // Still waiting inside their limit, or never called (no-show): not judged
+    private long pendingTokens;
     private int slaTargetMinutes;
     private List<HourlySlaDTO> hourlyBreakdown;
 }

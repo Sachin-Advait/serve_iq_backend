@@ -2,6 +2,7 @@ package com.gis.servelq.services;
 
 import com.gis.servelq.models.Services;
 import com.gis.servelq.models.Token;
+import com.gis.servelq.models.TokenStatus;
 import com.gis.servelq.repository.ServiceRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -55,14 +56,49 @@ class ServiceSlaResolverTest {
                 .containsEntry("orphan", ServiceSlaResolver.DEFAULT_SLA_SECONDS);
     }
 
+    private static ServiceSlaResolver.Verdict verdict(Token t, Map<String, Integer> sla) {
+        return ServiceSlaResolver.waitingVerdict(t, sla, LocalDateTime.of(2026, 10, 25, 12, 0));
+    }
+
     @Test
     void ticketIsJudgedAgainstItsServiceSla() {
         Map<String, Integer> sla = Map.of("quick", 300);
 
-        assertThat(ServiceSlaResolver.withinSla(token("quick", 300), sla)).isTrue();
-        assertThat(ServiceSlaResolver.withinSla(token("quick", 301), sla)).isFalse();
+        assertThat(verdict(token("quick", 300), sla)).isEqualTo(ServiceSlaResolver.Verdict.ON_TIME);
+        assertThat(verdict(token("quick", 301), sla)).isEqualTo(ServiceSlaResolver.Verdict.BREACHED);
         // Unknown service falls back to the default 15 minutes
-        assertThat(ServiceSlaResolver.withinSla(token("gone", 900), sla)).isTrue();
-        assertThat(ServiceSlaResolver.withinSla(token("gone", 901), sla)).isFalse();
+        assertThat(verdict(token("gone", 900), sla)).isEqualTo(ServiceSlaResolver.Verdict.ON_TIME);
+        assertThat(verdict(token("gone", 901), sla)).isEqualTo(ServiceSlaResolver.Verdict.BREACHED);
+    }
+
+    @Test
+    void uncalledTicketIsPendingThenBreachedOnceItsLimitExpires() {
+        Map<String, Integer> sla = Map.of("quick", 300);
+        Token t = new Token();
+        t.setServiceId("quick");
+        t.setStatus(TokenStatus.WAITING);
+        LocalDateTime created = LocalDateTime.of(2026, 10, 25, 9, 0);
+        t.setCreatedAt(created);
+
+        assertThat(ServiceSlaResolver.waitingVerdict(t, sla, created.plusMinutes(5)))
+                .isEqualTo(ServiceSlaResolver.Verdict.PENDING);
+        assertThat(ServiceSlaResolver.waitingVerdict(t, sla, created.plusMinutes(6)))
+                .isEqualTo(ServiceSlaResolver.Verdict.BREACHED);
+
+        // A no-show record without any call time cannot be judged
+        t.setStatus(TokenStatus.NO_SHOW);
+        assertThat(ServiceSlaResolver.waitingVerdict(t, sla, created.plusMinutes(6)))
+                .isEqualTo(ServiceSlaResolver.Verdict.EXCLUDED);
+    }
+
+    @Test
+    void waitingAndServingAreJudgedIndependently() {
+        Token t = token("quick", 60);
+        t.setEndAt(t.getStartAt().plusMinutes(20));
+        LocalDateTime asOf = LocalDateTime.of(2026, 10, 25, 12, 0);
+        assertThat(ServiceSlaResolver.waitingVerdict(t, Map.of("quick", 300), asOf))
+                .isEqualTo(ServiceSlaResolver.Verdict.ON_TIME);
+        assertThat(ServiceSlaResolver.servingVerdict(t, Map.of("quick", 600), asOf))
+                .isEqualTo(ServiceSlaResolver.Verdict.BREACHED);
     }
 }

@@ -23,6 +23,7 @@ public class DailySummaryDTO {
     private double averageServiceTimeMinutes;
     private double slaComplianceRate;
     private double servingSlaComplianceRate;
+    private double totalServingSlaComplianceRate;
     private String peakHour;
     private long peakHourTokens;
     private Map<String, Long> tokensByService;
