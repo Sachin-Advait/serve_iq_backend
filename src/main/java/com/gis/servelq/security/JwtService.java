@@ -89,7 +89,7 @@ public class JwtService {
                     .parseSignedClaims(token)
                     .getPayload();
         } catch (JwtException | IllegalArgumentException e) {
-            log.debug("Rejected JWT: {}", e.getMessage());
+            log.info("Rejected JWT: {}", e.getMessage());
             return null;
         }
     }

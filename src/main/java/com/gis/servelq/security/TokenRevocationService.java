@@ -2,6 +2,7 @@ package com.gis.servelq.security;
 
 import com.gis.servelq.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -22,6 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * hit the database on every request. A revoke on this instance updates the
  * cache immediately.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class TokenRevocationService {
@@ -59,7 +61,11 @@ public class TokenRevocationService {
         if (cutoff.isEmpty()) return false;
         if (issuedAt == null) return true;
         LocalDateTime issued = LocalDateTime.ofInstant(issuedAt.toInstant(), ZoneId.systemDefault());
-        return issued.isBefore(cutoff.get());
+        boolean revoked = issued.isBefore(cutoff.get());
+        if (revoked) {
+            log.info("Rejected revoked JWT for user {}: issued {}, valid after {}", userId, issued, cutoff.get());
+        }
+        return revoked;
     }
 
     private Optional<LocalDateTime> cutoff(String userId) {
