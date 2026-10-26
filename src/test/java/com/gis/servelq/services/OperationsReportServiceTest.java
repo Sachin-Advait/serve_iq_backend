@@ -89,7 +89,11 @@ class OperationsReportServiceTest {
         assertThat(stat(r, "SLA breaches")).isEqualTo("2");
         assertThat(stat(r, "Not called yet")).isEqualTo("1");
         assertThat(stat(r, "Average wait")).isEqualTo("8.5 min");
-        assertThat(r.getSections().get(3).getRows()).hasSize(2);
+        assertThat(r.getSections().stream().filter(x -> x.getTitle().equals("Longest delays"))
+                .findFirst().orElseThrow().getRows()).hasSize(2);
+        // Both finished tickets took 4 min, inside the 10 min default serving SLA
+        assertThat(stat(r, "Served over serving SLA")).isEqualTo("0");
+        assertThat(stat(r, "Within serving SLA")).startsWith("100.0%");
     }
 
     @Test

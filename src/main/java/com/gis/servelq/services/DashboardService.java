@@ -86,6 +86,10 @@ public class DashboardService {
         double slaRate = servedTokens.isEmpty() ? 0 :
                 (slaCompliant * 100.0) / servedTokens.size();
 
+        // 3b. Serving-time SLA (serving finished within the service's limit)
+        double servingSlaRate = ServiceSlaResolver.servingSlaRate(servedTokens,
+                serviceSlaResolver.servingForBranch(branchId));
+
         // 4. Active Counters
         List<Counter> counters = counterRepository.findByBranchId(branchId);
         long totalCounters = counters.size();
@@ -119,6 +123,14 @@ public class DashboardService {
                 .value(String.format("%.0f%%", slaRate))
                 .change(String.format("%+.0f%% from target", slaRate - 65))
                 .positive(slaRate >= 65)
+                .build());
+
+        kpis.add(KpiDTO.builder()
+                .icon("CLOCK")
+                .label("SERVING SLA")
+                .value(String.format("%.0f%%", servingSlaRate))
+                .change(String.format("%+.0f%% from target", servingSlaRate - 65))
+                .positive(servingSlaRate >= 65)
                 .build());
 
         kpis.add(KpiDTO.builder()

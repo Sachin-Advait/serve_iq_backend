@@ -146,6 +146,7 @@ public class ReportService {
         double avgWaitTime = calculateAverageWaitTime(tokens);
         double avgServiceTime = calculateAverageServiceTime(tokens);
         double slaRate = calculateSlaRate(tokens, serviceSlaResolver.forBranch(branchId));
+        double servingSlaRate = ServiceSlaResolver.servingSlaRate(tokens, serviceSlaResolver.servingForBranch(branchId));
 
         // Find peak hour
         Map<String, Long> hourlyTokens = tokens.stream()
@@ -187,6 +188,7 @@ public class ReportService {
                 .averageWaitTimeMinutes(avgWaitTime)
                 .averageServiceTimeMinutes(avgServiceTime)
                 .slaComplianceRate(slaRate)
+                .servingSlaComplianceRate(servingSlaRate)
                 .peakHour(peakHour)
                 .peakHourTokens(peakHourTokens)
                 .tokensByService(tokensByService)
@@ -435,6 +437,7 @@ public class ReportService {
                 .filter(t -> t.getCreatedAt() != null)
                 .toList();
         Map<String, Integer> sla = serviceSlaResolver.forBranch(branchId);
+        Map<String, Integer> servingSla = serviceSlaResolver.servingForBranch(branchId);
 
         long total = tokens.size();
         long served = tokens.stream().filter(ReportService::isServed).count();
@@ -455,6 +458,7 @@ public class ReportService {
                         .averageWaitTimeMinutes(calculateAverageWaitTime(e.getValue()))
                         .averageServiceTimeMinutes(calculateAverageServiceTime(e.getValue()))
                         .slaComplianceRate(calculateSlaRate(e.getValue(), sla))
+                        .servingSlaComplianceRate(ServiceSlaResolver.servingSlaRate(e.getValue(), servingSla))
                         .build())
                 .toList();
 
@@ -465,6 +469,7 @@ public class ReportService {
                 .map(e -> MonthlyReportDTO.ServiceRow.builder()
                         .serviceName(e.getKey())
                         .slaMinutes(ServiceSlaResolver.slaSeconds(e.getValue().get(0), sla) / 60.0)
+                        .servingSlaMinutes(ServiceSlaResolver.servingSlaSeconds(e.getValue().get(0), servingSla) / 60.0)
                         .totalTokens(e.getValue().size())
                         .served(e.getValue().stream().filter(ReportService::isServed).count())
                         .noShow(e.getValue().stream().filter(t -> t.getStatus() == TokenStatus.NO_SHOW).count())
@@ -472,6 +477,7 @@ public class ReportService {
                         .averageWaitTimeMinutes(calculateAverageWaitTime(e.getValue()))
                         .averageServiceTimeMinutes(calculateAverageServiceTime(e.getValue()))
                         .slaComplianceRate(calculateSlaRate(e.getValue(), sla))
+                        .servingSlaComplianceRate(ServiceSlaResolver.servingSlaRate(e.getValue(), servingSla))
                         .build())
                 .sorted(Comparator.comparingLong(MonthlyReportDTO.ServiceRow::getTotalTokens).reversed())
                 .toList();
@@ -486,6 +492,7 @@ public class ReportService {
                         .counterName(e.getKey())
                         .served(e.getValue().size())
                         .averageServiceTimeMinutes(calculateAverageServiceTime(e.getValue()))
+                        .servingSlaComplianceRate(ServiceSlaResolver.servingSlaRate(e.getValue(), servingSla))
                         .build())
                 .toList();
 
@@ -517,16 +524,19 @@ public class ReportService {
                 .orElse(null);
 
         double slaRate = calculateSlaRate(tokens, sla);
+        double servingSlaRate = ServiceSlaResolver.servingSlaRate(tokens, servingSla);
         double noShowRate = rate(noShow, total);
         double transferRate = rate(transferred, total);
 
         List<MonthlyReportDTO.Finding> findings = buildFindings(
-                total, slaRate, noShowRate, transferRate, unserved, services, reasons, peakHour);
+                total, slaRate, servingSlaRate, noShowRate, transferRate, unserved, services, counters,
+                reasons, peakHour);
 
         return MonthlyReportDTO.builder()
                 .month(month.toString())
                 .branchName(branch.getName())
                 .slaTargetMinutes(ServiceSlaResolver.DEFAULT_SLA_SECONDS / 60)
+                .servingSlaTargetMinutes(ServiceSlaResolver.DEFAULT_SERVING_SLA_SECONDS / 60)
                 .slaRateTarget(SLA_RATE_TARGET)
                 .noShowRateLimit(NO_SHOW_RATE_LIMIT)
                 .transferRateLimit(TRANSFER_RATE_LIMIT)
@@ -540,6 +550,7 @@ public class ReportService {
                 .averageWaitTimeMinutes(calculateAverageWaitTime(tokens))
                 .averageServiceTimeMinutes(calculateAverageServiceTime(tokens))
                 .slaComplianceRate(slaRate)
+                .servingSlaComplianceRate(servingSlaRate)
                 .workingDays(days.size())
                 .averageTokensPerDay(days.isEmpty() ? 0 : (double) total / days.size())
                 .busiestDay(busiest != null ? busiest.getDate().toString() : "N/A")
@@ -558,9 +569,10 @@ public class ReportService {
         return transferReasonService.findByCode(code).map(TransferReason::getTitleEn).orElse(code);
     }
 
-    private List<MonthlyReportDTO.Finding> buildFindings(long total, double slaRate, double noShowRate,
-                                                         double transferRate, long unserved,
+    private List<MonthlyReportDTO.Finding> buildFindings(long total, double slaRate, double servingSlaRate,
+                                                         double noShowRate, double transferRate, long unserved,
                                                          List<MonthlyReportDTO.ServiceRow> services,
+                                                         List<MonthlyReportDTO.CounterRow> counters,
                                                          List<MonthlyReportDTO.ReasonCount> reasons,
                                                          String peakHour) {
         List<MonthlyReportDTO.Finding> findings = new ArrayList<>();
@@ -600,6 +612,39 @@ public class ReportService {
                         : "Open more counters"
                         + (worstService != null ? " for " + worstService.getServiceName() : "")
                         + " around " + peakHour + ", and move staff from quieter services at that time.")
+                .build());
+
+        // Serving-time SLA: serving finished within the service's limit
+        MonthlyReportDTO.ServiceRow slowestService = services.stream()
+                .filter(s -> s.getServed() > 0)
+                .min(Comparator.comparingDouble(MonthlyReportDTO.ServiceRow::getServingSlaComplianceRate))
+                .orElse(null);
+        MonthlyReportDTO.CounterRow slowestCounter = counters.stream()
+                .filter(c -> c.getServed() > 0)
+                .min(Comparator.comparingDouble(MonthlyReportDTO.CounterRow::getServingSlaComplianceRate))
+                .orElse(null);
+        boolean servingOk = servingSlaRate >= SLA_RATE_TARGET;
+        findings.add(MonthlyReportDTO.Finding.builder()
+                .onTarget(servingOk)
+                .indicator("Visitors served within their service's serving time")
+                .target(String.format("%.0f%% or more", SLA_RATE_TARGET))
+                .actual(String.format("%.1f%%", servingSlaRate))
+                .finding(servingOk
+                        ? "Serving times met the target."
+                        : "Serving took longer than the limit too often"
+                        + (slowestService != null
+                        ? String.format(", mostly in %s (%.1f%%)", slowestService.getServiceName(),
+                        slowestService.getServingSlaComplianceRate())
+                        : "")
+                        + (slowestCounter != null
+                        ? String.format(" and at %s (%.1f%%)", slowestCounter.getCounterName(),
+                        slowestCounter.getServingSlaComplianceRate())
+                        : "")
+                        + ".")
+                .suggestedAction(servingOk
+                        ? "None."
+                        : "Review the steps of the slowest services, check whether the serving time limit is "
+                        + "realistic for them, and offer refresher training at the slowest counters.")
                 .build());
 
         // No-shows

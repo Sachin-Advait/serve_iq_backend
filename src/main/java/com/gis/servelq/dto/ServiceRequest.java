@@ -23,6 +23,7 @@ public class ServiceRequest {
     private Boolean enabled = true;
     @Positive
     private Integer slaSeconds;
+    private Integer servingSlaSeconds;
     @NotBlank
     private String branchId;
 }

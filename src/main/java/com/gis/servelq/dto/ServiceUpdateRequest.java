@@ -18,5 +18,7 @@ public class ServiceUpdateRequest {
     // 0 clears it, so a sub-service goes back to using its parent's SLA
     @PositiveOrZero
     private Integer slaSeconds;
+    // Same rule for the serving-time SLA
+    private Integer servingSlaSeconds;
     private String branchId;
 }

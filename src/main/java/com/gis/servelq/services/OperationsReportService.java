@@ -88,6 +88,7 @@ public class OperationsReportService {
     public TabularReportDTO agentPerformance(String branchId, LocalDate from, LocalDate to) {
         Range r = new Range(branchId, from, to);
         Map<String, Integer> sla = serviceSlaResolver.forBranch(branchId);
+        Map<String, Integer> servingSla = serviceSlaResolver.servingForBranch(branchId);
         List<Token> served = r.tokens.stream().filter(OperationsReportService::isServed).toList();
 
         Set<String> agentIds = new LinkedHashSet<>();
@@ -112,6 +113,7 @@ public class OperationsReportService {
                     round(totalServiceMinutes(a.served)),
                     round(avgWaitMinutes(a.served)),
                     round(slaRate(a.served, sla)),
+                    round(ServiceSlaResolver.servingSlaRate(a.served, servingSla)),
                     round(pct(a.served.size(), served.size())),
                     a.served.isEmpty() || branchAvgService == 0 ? "-"
                             : String.format("%+.0f%%", (avg - branchAvgService) * 100 / branchAvgService));
@@ -133,6 +135,8 @@ public class OperationsReportService {
         summary.add(new Stat("Agents", String.valueOf(agents.size())));
         summary.add(new Stat("Tokens served", String.valueOf(served.size())));
         summary.add(new Stat("Average service time", minutes(branchAvgService)));
+        summary.add(new Stat("Served within serving SLA",
+                String.format("%.1f%%", ServiceSlaResolver.servingSlaRate(served, servingSla))));
         agents.stream().filter(a -> !a.served.isEmpty()).findFirst()
                 .ifPresent(a -> summary.add(new Stat("Most served", a.name + " (" + a.served.size() + ")")));
         agents.stream().filter(a -> !a.served.isEmpty())
@@ -145,11 +149,13 @@ public class OperationsReportService {
                 .sections(List.of(
                         new Section("Agent comparison", List.of("Agent", "Served", "No-shows",
                                 "Avg service (min)", "Total serving (min)", "Avg wait of visitors (min)",
-                                "Called within SLA (%)", "Share of served (%)", "Service time vs branch"),
+                                "Called within SLA (%)", "Served within serving SLA (%)", "Share of served (%)",
+                                "Service time vs branch"),
                                 rows),
                         new Section("Served per day", dayColumns, dayRows)))
                 .notes(List.of(
                         "Served counts tickets the agent completed. Service time runs from start of serving to completion.",
+                        "Serving SLA is each service's maximum serving time (a sub-service without one uses its main service's, otherwise 10 min).",
                         "\"Service time vs branch\" is how much longer (+) or shorter (-) the agent's average is than the branch average."))
                 .build();
     }
@@ -162,6 +168,7 @@ public class OperationsReportService {
     public TabularReportDTO waitingAndSla(String branchId, LocalDate from, LocalDate to) {
         Range r = new Range(branchId, from, to);
         Map<String, Integer> sla = serviceSlaResolver.forBranch(branchId);
+        Map<String, Integer> servingSla = serviceSlaResolver.servingForBranch(branchId);
         LocalDateTime cap = r.cap();
 
         List<Wait> waits = r.tokens.stream().map(t -> {
@@ -179,6 +186,10 @@ public class OperationsReportService {
         long judged = waits.stream().filter(w -> w.called || w.breached).count();
         double rate = pct(judged - breaches, judged);
 
+        List<Token> finished = r.tokens.stream().filter(t -> ServiceSlaResolver.servingSeconds(t) != null).toList();
+        double servingRate = ServiceSlaResolver.servingSlaRate(finished, servingSla);
+        long servingBreaches = finished.size() - countIf(finished, t -> ServiceSlaResolver.withinServingSla(t, servingSla));
+
         List<Stat> summary = List.of(
                 new Stat("Tokens", String.valueOf(waits.size())),
                 new Stat("Average wait", minutes(avgSeconds(called) / 60)),
@@ -187,7 +198,11 @@ public class OperationsReportService {
                 new Stat("SLA breaches", String.valueOf(breaches), breaches > 0 ? "BAD" : "GOOD"),
                 new Stat("Within SLA", String.format("%.1f%% (target %.0f%%)", rate, SLA_RATE_TARGET),
                         rate >= SLA_RATE_TARGET ? "GOOD" : "BAD"),
-                new Stat("Not called yet", String.valueOf(waits.size() - called.size())));
+                new Stat("Not called yet", String.valueOf(waits.size() - called.size())),
+                new Stat("Served over serving SLA", String.valueOf(servingBreaches),
+                        servingBreaches > 0 ? "BAD" : "GOOD"),
+                new Stat("Within serving SLA", String.format("%.1f%% (target %.0f%%)", servingRate, SLA_RATE_TARGET),
+                        servingRate >= SLA_RATE_TARGET ? "GOOD" : "BAD"));
 
         Map<String, String> serviceNames = new HashMap<>();
         r.tokens.forEach(t -> serviceNames.putIfAbsent(t.getServiceId(), t.getServiceName()));
@@ -202,6 +217,22 @@ public class OperationsReportService {
                             round(maxSeconds(onlyCalled(ws)) / 60.0),
                             ws.stream().filter(Wait::breached).count(),
                             round(withinRate(ws)));
+                })
+                .sorted(Comparator.comparing(row -> -((Number) row.get(2)).longValue()))
+                .toList();
+
+        List<List<Object>> servingByService = group(finished, Token::getServiceId).entrySet().stream()
+                .map(e -> {
+                    List<Token> ts = e.getValue();
+                    List<Long> secs = ts.stream().map(ServiceSlaResolver::servingSeconds).toList();
+                    return List.<Object>of(
+                            Objects.toString(serviceNames.get(e.getKey()), "-"),
+                            round(ServiceSlaResolver.servingSlaSeconds(ts.get(0), servingSla) / 60.0),
+                            ts.size(),
+                            round(secs.stream().mapToLong(Long::longValue).average().orElse(0) / 60),
+                            round(secs.stream().mapToLong(Long::longValue).max().orElse(0) / 60.0),
+                            ts.size() - countIf(ts, t -> ServiceSlaResolver.withinServingSla(t, servingSla)),
+                            round(ServiceSlaResolver.servingSlaRate(ts, servingSla)));
                 })
                 .sorted(Comparator.comparing(row -> -((Number) row.get(2)).longValue()))
                 .toList();
@@ -245,12 +276,16 @@ public class OperationsReportService {
                                 "Within SLA (%)"), byDay),
                         new Section("By hour of arrival", List.of("Hour", "Tokens", "Avg wait (min)", "Breaches",
                                 "Within SLA (%)"), byHour),
+                        new Section("Serving time by service", List.of("Service", "Serving SLA (min)", "Served",
+                                "Avg serving (min)", "Longest serving (min)", "Over serving SLA",
+                                "Within serving SLA (%)"), servingByService),
                         new Section("Longest delays", List.of("Ticket", "Date", "Service", "Waited (min)",
                                 "SLA (min)", "Over by (min)", "Counter", "Status"), worst)))
                 .notes(List.of(
                         "Waiting time runs from taking the ticket to the first call.",
                         "Each ticket is judged against its own service's SLA (a sub-service without one uses its main service's, otherwise 15 min).",
-                        "A ticket that was never called counts as a breach once it has waited longer than its SLA."))
+                        "A ticket that was never called counts as a breach once it has waited longer than its SLA.",
+                        "Serving time runs from start of serving to completion, judged against the service's serving SLA (otherwise 10 min)."))
                 .build();
     }
 

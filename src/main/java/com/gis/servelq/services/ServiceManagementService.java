@@ -50,6 +50,7 @@ public class ServiceManagementService {
         newService.setParentId(serviceRequest.getParentId());
         newService.setEnabled(serviceRequest.getEnabled());
         newService.setSlaSeconds(serviceRequest.getSlaSeconds());
+        newService.setServingSlaSeconds(serviceRequest.getServingSlaSeconds());
         newService.setBranchId(serviceRequest.getBranchId());
 
         newService = serviceRepository.save(newService);
@@ -160,6 +161,10 @@ public class ServiceManagementService {
         if (updateRequest.getSlaSeconds() != null) {
             service.setSlaSeconds(updateRequest.getSlaSeconds() > 0 ? updateRequest.getSlaSeconds() : null);
         }
+        if (updateRequest.getServingSlaSeconds() != null) {
+            service.setServingSlaSeconds(updateRequest.getServingSlaSeconds() > 0
+                    ? updateRequest.getServingSlaSeconds() : null);
+        }
         if (updateRequest.getBranchId() != null) service.setBranchId(updateRequest.getBranchId());
 
         Services updatedService = serviceRepository.save(service);
@@ -248,6 +253,7 @@ public class ServiceManagementService {
         clone.setParentId(original.getParentId());
         clone.setEnabled(original.getEnabled());
         clone.setSlaSeconds(original.getSlaSeconds());
+        clone.setServingSlaSeconds(original.getServingSlaSeconds());
         clone.setCounterIds(original.getCounterIds());
         clone.setChildren(original.getChildren());
         clone.setBranchId(original.getBranchId());

@@ -44,6 +44,11 @@ public class Services {
     @Column(name = "sla_seconds")
     private Integer slaSeconds;
 
+    // Serving-time SLA: the longest serving should take, from start of
+    // serving to completion. NULL on a sub-service means "use the parent's".
+    @Column(name = "serving_sla_seconds")
+    private Integer servingSlaSeconds;
+
     @Column(name = "counter_ids")
     @Convert(converter = StringListConverter.class)
     private List<String> counterIds;

@@ -21,6 +21,7 @@ public class MonthlyReportDTO {
     private String branchName;
 
     private int slaTargetMinutes;
+    private int servingSlaTargetMinutes;
     private double slaRateTarget;
     private double noShowRateLimit;
     private double transferRateLimit;
@@ -35,6 +36,7 @@ public class MonthlyReportDTO {
     private double averageWaitTimeMinutes;
     private double averageServiceTimeMinutes;
     private double slaComplianceRate;
+    private double servingSlaComplianceRate;
     private int workingDays;
     private double averageTokensPerDay;
     private String busiestDay;
@@ -60,6 +62,7 @@ public class MonthlyReportDTO {
         private double averageWaitTimeMinutes;
         private double averageServiceTimeMinutes;
         private double slaComplianceRate;
+        private double servingSlaComplianceRate;
     }
 
     @Data
@@ -69,6 +72,7 @@ public class MonthlyReportDTO {
     public static class ServiceRow {
         private String serviceName;
         private double slaMinutes;
+        private double servingSlaMinutes;
         private long totalTokens;
         private long served;
         private long noShow;
@@ -76,6 +80,7 @@ public class MonthlyReportDTO {
         private double averageWaitTimeMinutes;
         private double averageServiceTimeMinutes;
         private double slaComplianceRate;
+        private double servingSlaComplianceRate;
     }
 
     @Data
@@ -86,6 +91,7 @@ public class MonthlyReportDTO {
         private String counterName;
         private long served;
         private double averageServiceTimeMinutes;
+        private double servingSlaComplianceRate;
     }
 
     @Data
