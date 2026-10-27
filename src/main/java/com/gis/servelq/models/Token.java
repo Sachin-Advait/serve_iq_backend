@@ -69,6 +69,9 @@ public class Token {
     @Column(name = "service_name")
     private String serviceName;
 
+    @Column(name = "service_arabic_name")
+    private String serviceArabicName;
+
     @NotNull
     private Integer priority = 50;
 

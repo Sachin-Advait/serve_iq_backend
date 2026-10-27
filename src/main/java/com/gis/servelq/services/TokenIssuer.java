@@ -66,6 +66,7 @@ public class TokenIssuer {
         token.setBranchId(branch.getId());
         token.setServiceId(service.getId());
         token.setServiceName(service.getName());
+        token.setServiceArabicName(service.getArabicName());
 
         token.setStatus(TokenStatus.WAITING);
         token.setCreatedByUserId(currentUserId());
