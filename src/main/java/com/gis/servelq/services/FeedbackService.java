@@ -240,9 +240,12 @@ public class FeedbackService {
      * All-time feedback summary counts (HAPPY / NEUTRAL / SAD).
      * Always computed across the whole table — no date filtering.
      */
-    public Map<String, Long> getFeedbackSummary() {
+    public Map<String, Long> getFeedbackSummary(LocalDateTime start, LocalDateTime end) {
         Map<Feedback.MoodRating, Long> counts = new EnumMap<>(Feedback.MoodRating.class);
-        for (Object[] row : feedbackRepository.countByRating()) {
+        List<Object[]> rows = (start != null && end != null)
+                ? feedbackRepository.countByRatingBetween(start, end)
+                : feedbackRepository.countByRating();
+        for (Object[] row : rows) {
             counts.put((Feedback.MoodRating) row[0], (Long) row[1]);
         }
 

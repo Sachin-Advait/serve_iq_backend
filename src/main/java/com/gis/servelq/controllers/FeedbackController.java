@@ -84,15 +84,25 @@ public class FeedbackController {
         service.delete(id, user);
     }
 
-    // ==================== SUMMARY (all-time, no filter) ====================
+    // ==================== SUMMARY (all-time or a date range) ====================
 
     /**
-     * GET /serveiq/api/feedback/summary
+     * GET /serveiq/api/feedback/summary                              → all-time totals
+     * GET /serveiq/api/feedback/summary?from=2026-10-01&to=2026-10-31 → totals in that range
      *
-     * Always returns all-time totals.
+     * `from` / `to` are inclusive dates (YYYY-MM-DD).
      */
     @GetMapping("/summary")
-    public Map<String, Long> getSummary() {
-        return service.getFeedbackSummary();
+    public Map<String, Long> getSummary(
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+
+        LocalDateTime start = (from != null) ? from.atStartOfDay() : null;
+        LocalDateTime end   = (to   != null) ? to.plusDays(1).atStartOfDay() : null;
+
+        return service.getFeedbackSummary(start, end);
     }
 }
