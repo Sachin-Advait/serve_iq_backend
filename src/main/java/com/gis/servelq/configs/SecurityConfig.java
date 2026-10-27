@@ -69,7 +69,6 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/serveiq/api/news/images/**").permitAll()
 
                         // Admin panel staff: ADMIN, MANAGER and SUPERVISOR (see roleHierarchy).
-                        // UserService stops them creating or editing anyone at or above their own rank.
                         .requestMatchers("/serveiq/api/auth/register").hasRole("SUPERVISOR")
                         // Any logged-in user may change their own password and FCM token;
                         // the controller checks the FCM id is the caller's own.

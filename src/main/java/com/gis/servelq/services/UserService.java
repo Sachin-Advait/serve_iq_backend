@@ -39,7 +39,6 @@ public class UserService {
     // ==================== REGISTRATION ====================
 
     public User registerUser(RegisterRequest dto, AuthenticatedUser admin) {
-        assertCanAssign(admin, dto.getRole() != null ? dto.getRole() : UserRole.USER);
         if (userRepository.existsByEmail(dto.getEmail())) {
             throw new BusinessException("Email already exists");
         }
@@ -189,7 +188,6 @@ public class UserService {
     @Transactional
     public User updateUser(String id, User userDetails, AuthenticatedUser currentUser) {
         return userRepository.findById(id).map(user -> {
-            assertCanManage(currentUser, user);
             User oldUser = cloneUser(user);
 
             if (userDetails.getName() != null) user.setName(userDetails.getName());
@@ -224,8 +222,6 @@ public class UserService {
 
     public User changeRole(String id, UserRole newRole, AuthenticatedUser admin) {
         return userRepository.findById(id).map(user -> {
-            assertCanManage(admin, user);
-            assertCanAssign(admin, newRole);
             UserRole oldRole = user.getRole();
             user.setRole(newRole);
             User updatedUser = userRepository.save(user);
@@ -274,7 +270,6 @@ public class UserService {
     public void resetPassword(String id, String newPassword, AuthenticatedUser admin) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + id));
-        assertCanManage(admin, user);
 
         if (newPassword == null || newPassword.length() < 8) {
             throw new BusinessException("New password must be at least 8 characters");
@@ -306,7 +301,6 @@ public class UserService {
     public void deleteUser(String id, AuthenticatedUser admin) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + id));
-        assertCanManage(admin, user);
 
         auditLogService.log(
                 AuditAction.USER_DELETED,
@@ -320,47 +314,6 @@ public class UserService {
         );
 
         userRepository.deleteById(id);
-    }
-
-    // ==================== RANK CHECKS ====================
-
-    /**
-     * Admin panel ranks: ADMIN > MANAGER > SUPERVISOR > everyone else. A manager or
-     * supervisor may only create, edit or delete users, and give roles, below their
-     * own rank, so nobody can make themselves or anyone else an admin. The admin
-     * may do anything.
-     */
-    private static int rank(UserRole role) {
-        if (role == null) return 0;
-        return switch (role) {
-            case ADMIN -> 3;
-            case MANAGER -> 2;
-            case SUPERVISOR -> 1;
-            default -> 0;
-        };
-    }
-
-    private static int rank(AuthenticatedUser caller) {
-        if (caller == null || caller.role() == null) return 0;
-        try {
-            return rank(UserRole.valueOf(caller.role()));
-        } catch (IllegalArgumentException e) {
-            return 0;
-        }
-    }
-
-    private static void assertCanAssign(AuthenticatedUser caller, UserRole role) {
-        if (caller != null && caller.isAdmin()) return;
-        if (rank(role) >= rank(caller)) {
-            throw new BusinessException("You cannot give the " + role + " role");
-        }
-    }
-
-    private static void assertCanManage(AuthenticatedUser caller, User target) {
-        if (caller != null && caller.isAdmin()) return;
-        if (rank(target.getRole()) >= rank(caller)) {
-            throw new BusinessException("You cannot change a " + target.getRole() + " user");
-        }
     }
 
     // ==================== HELPER ====================
