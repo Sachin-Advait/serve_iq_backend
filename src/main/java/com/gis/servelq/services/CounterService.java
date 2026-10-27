@@ -173,6 +173,16 @@ public class CounterService {
                 this.request
         );
 
+        // New counter shows up on both TVs straight away
+        tokenEventPublisher.publish(new TokenEvent(
+                TokenEventType.COUNTER_LIST_CHANGED,
+                saved.getBranchId(),
+                null,
+                null,
+                saved.getId(),
+                Instant.now()
+        ));
+
         log.info("Counter created successfully: {} (ID: {})", saved.getName(), saved.getId());
         return convertToResponse(saved);
     }
@@ -410,6 +420,15 @@ public class CounterService {
                 request
         );
         counterRepository.deleteById(counterId);
+
+        tokenEventPublisher.publish(new TokenEvent(
+                TokenEventType.COUNTER_LIST_CHANGED,
+                counter.getBranchId(),
+                null,
+                null,
+                counterId,
+                Instant.now()
+        ));
         log.info("Counter deleted successfully: {} (ID: {})", counter.getName(), counterId);
     }
 

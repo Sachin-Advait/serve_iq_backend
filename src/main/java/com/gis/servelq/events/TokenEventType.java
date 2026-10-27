@@ -13,6 +13,8 @@ public enum TokenEventType {
     // UI intent events
     AGENT_QUEUE_CHANGED,
     COUNTER_STATUS_CHANGED,
+    // A counter was created or deleted: both TVs redraw their counter grid
+    COUNTER_LIST_CHANGED,
 
     // Feedback
     FEEDBACK_SUBMITTED,
