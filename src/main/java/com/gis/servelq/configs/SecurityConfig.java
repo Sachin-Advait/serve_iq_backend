@@ -58,7 +58,7 @@ public class SecurityConfig {
                         // Kiosk, reception and the admin panel issue tickets while
                         // logged in, so the token records who created it.
                         .requestMatchers(HttpMethod.POST, "/serveiq/api/tokens/generate")
-                        .hasAnyRole("ADMIN", "MANAGER", "RECEPTIONIST", "KIOSK")
+                        .hasAnyRole("SUPERVISOR", "RECEPTIONIST", "KIOSK")
                         // The feedback screen is logged in; feedback is credited by its user.
                         .requestMatchers(HttpMethod.POST, "/serveiq/api/feedback", "/serveiq/api/feedback/timeout")
                         .hasAnyRole("ADMIN", "FEEDBACK")
@@ -68,29 +68,33 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/serveiq/api/news/breaking-news").permitAll()
                         .requestMatchers(HttpMethod.GET, "/serveiq/api/news/images/**").permitAll()
 
-                        // Admin only
-                        .requestMatchers("/serveiq/api/auth/register").hasRole("ADMIN")
+                        // Admin panel staff: ADMIN, MANAGER and SUPERVISOR (see roleHierarchy).
+                        // UserService stops them creating or editing anyone at or above their own rank.
+                        .requestMatchers("/serveiq/api/auth/register").hasRole("SUPERVISOR")
                         // Any logged-in user may change their own password and FCM token;
                         // the controller checks the FCM id is the caller's own.
                         .requestMatchers(HttpMethod.POST, "/serveiq/api/users/me/password").authenticated()
                         .requestMatchers(HttpMethod.PATCH, "/serveiq/api/users/update-fcm-token/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/serveiq/api/users/update-fcm-token",
                                 "/serveiq/api/users/update-fcm-token/").authenticated()
-                        .requestMatchers("/serveiq/api/users/**").hasAnyRole("ADMIN", "MANAGER")
-                        .requestMatchers("/api/admin/**", "/serveiq/api/admin/**").hasAnyRole("ADMIN", "MANAGER")
-                        .requestMatchers("/serveiq/api/reports/**").hasAnyRole("ADMIN", "MANAGER")
-                        .requestMatchers("/serveiq/api/branches/**").hasAnyRole("ADMIN", "MANAGER")
-                        .requestMatchers("/serveiq/api/whatsapp/**").hasRole("ADMIN")
+                        .requestMatchers("/serveiq/api/users/**").hasRole("SUPERVISOR")
+                        // Login History: admin and manager. Audit log: admin only.
+                        .requestMatchers("/serveiq/api/admin/user-sessions/**").hasRole("MANAGER")
+                        .requestMatchers("/serveiq/api/admin/audit-logs/**").hasRole("ADMIN")
                         .requestMatchers("/serveiq/api/admin/ad-sync/**").hasRole("ADMIN")
+                        .requestMatchers("/api/admin/**", "/serveiq/api/admin/**").hasRole("SUPERVISOR")
+                        .requestMatchers("/serveiq/api/reports/**").hasRole("SUPERVISOR")
+                        .requestMatchers("/serveiq/api/branches/**").hasRole("SUPERVISOR")
+                        .requestMatchers("/serveiq/api/whatsapp/**").hasRole("ADMIN")
                         .requestMatchers("/serveiq/api/health-check").permitAll()
                         // Serving customers
-                        .requestMatchers(HttpMethod.POST, "/serveiq/api/transfer-reasons/**").hasAnyRole("ADMIN", "MANAGER")
-                        .requestMatchers(HttpMethod.PUT, "/serveiq/api/transfer-reasons/**").hasAnyRole("ADMIN", "MANAGER")
-                        .requestMatchers(HttpMethod.DELETE, "/serveiq/api/transfer-reasons/**").hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers(HttpMethod.POST, "/serveiq/api/transfer-reasons/**").hasRole("SUPERVISOR")
+                        .requestMatchers(HttpMethod.PUT, "/serveiq/api/transfer-reasons/**").hasRole("SUPERVISOR")
+                        .requestMatchers(HttpMethod.DELETE, "/serveiq/api/transfer-reasons/**").hasRole("SUPERVISOR")
                         .requestMatchers("/serveiq/api/agent/**")
-                        .hasAnyRole("ADMIN", "MANAGER", "USER", "RECEPTIONIST")
+                        .hasAnyRole("SUPERVISOR", "USER", "RECEPTIONIST")
                         .requestMatchers("/serveiq/api/counters/**")
-                        .hasAnyRole("ADMIN", "MANAGER", "USER", "RECEPTIONIST", "DISPLAY", "FEEDBACK")
+                        .hasAnyRole("SUPERVISOR", "USER", "RECEPTIONIST", "DISPLAY", "FEEDBACK")
                         .anyRequest().authenticated())
 
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
@@ -100,12 +104,15 @@ public class SecurityConfig {
 
     /**
      * ADMIN holds every other role, so the admin can call any API, both the URL
-     * rules above and the @PreAuthorize checks. Other roles are unchanged.
+     * rules above and the @PreAuthorize checks. MANAGER holds SUPERVISOR, so a
+     * rule for SUPERVISOR admits all admin panel staff; one for MANAGER leaves
+     * the supervisor out.
      */
     @Bean
     public RoleHierarchy roleHierarchy() {
         return RoleHierarchyImpl.withDefaultRolePrefix()
-                .role("ADMIN").implies("MANAGER", "USER", "DISPLAY", "KIOSK", "RECEPTIONIST", "FEEDBACK")
+                .role("ADMIN").implies("MANAGER", "SUPERVISOR", "USER", "DISPLAY", "KIOSK", "RECEPTIONIST", "FEEDBACK")
+                .role("MANAGER").implies("SUPERVISOR")
                 .build();
     }
 

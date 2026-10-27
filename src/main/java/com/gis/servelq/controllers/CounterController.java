@@ -115,7 +115,7 @@ public class CounterController {
     }
 
     @PostMapping("/{counterId}/release")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    @PreAuthorize("hasRole('SUPERVISOR')")
     public ResponseEntity<?> release(@PathVariable String counterId,
                                      @AuthenticationPrincipal AuthenticatedUser admin) {
         return ResponseEntity.ok(counterService.forceReleaseCounter(counterId, admin));

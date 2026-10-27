@@ -80,7 +80,7 @@ public class UserController {
     }
 
     @PutMapping("/{id}/role")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    @PreAuthorize("hasRole('SUPERVISOR')")
     public ResponseEntity<UserResponseDTO> changeRole(@PathVariable String id,
                                                       @Valid @RequestBody ChangeRoleRequest request,
                                                       @AuthenticationPrincipal AuthenticatedUser admin) {
@@ -88,7 +88,7 @@ public class UserController {
     }
 
     @PostMapping("/{id}/reset-password")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPERVISOR')")
     public ResponseEntity<Void> resetUserPassword(@PathVariable String id,
                                                   @Valid @RequestBody ResetPasswordRequest request,
                                                   @AuthenticationPrincipal AuthenticatedUser admin) {

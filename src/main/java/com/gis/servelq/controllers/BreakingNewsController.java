@@ -48,7 +48,7 @@ public class BreakingNewsController {
     // ==================== ADMIN ENDPOINTS ====================
 
     @PostMapping("/manual")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPERVISOR')")
     public ApiResponseDTO<BreakingNews> createManualNews(
             @RequestParam String title,
             @RequestParam(required = false) String description,
@@ -61,7 +61,7 @@ public class BreakingNewsController {
     }
 
     @PutMapping("/{id}/archive")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    @PreAuthorize("hasRole('SUPERVISOR')")
     public ApiResponseDTO<BreakingNews> archiveNews(@PathVariable String id) {
         BreakingNews news = newsService.archiveNews(id);
         socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
@@ -69,7 +69,7 @@ public class BreakingNewsController {
     }
 
     @PutMapping("/{id}/unarchive")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    @PreAuthorize("hasRole('SUPERVISOR')")
     public ApiResponseDTO<BreakingNews> unarchiveNews(@PathVariable String id) {
         BreakingNews news = newsService.unarchiveNews(id);
         socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
@@ -77,7 +77,7 @@ public class BreakingNewsController {
     }
 
     @GetMapping("/archived")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    @PreAuthorize("hasRole('SUPERVISOR')")
     public ApiResponseDTO<?> getArchivedNews(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "15") int size,
@@ -88,7 +88,7 @@ public class BreakingNewsController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    @PreAuthorize("hasRole('SUPERVISOR')")
     public ApiResponseDTO<BreakingNews> updateNews(@PathVariable String id,
                                                    @RequestBody BreakingNews news) {
         BreakingNews updated = newsService.updateNews(id, news);
@@ -97,7 +97,7 @@ public class BreakingNewsController {
     }
 
     @GetMapping("/fetch")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    @PreAuthorize("hasRole('SUPERVISOR')")
     public ApiResponseDTO<List<NewsItemDTO>> fetchNews(
             @RequestParam String url,
             @RequestParam(defaultValue = "20") int maxItems,
@@ -108,14 +108,14 @@ public class BreakingNewsController {
     }
 
     @GetMapping("/fetch-all")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    @PreAuthorize("hasRole('SUPERVISOR')")
     public ApiResponseDTO<List<NewsItemDTO>> fetchAllNews() {
         return new ApiResponseDTO<>(true, "News fetched from all sources",
                 newsService.fetchNewsFromAllSources());
     }
 
     @PostMapping("/publish")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    @PreAuthorize("hasRole('SUPERVISOR')")
     public ApiResponseDTO<List<BreakingNews>> publishNews(
             @RequestBody List<NewsItemDTO> items) {
         List<BreakingNews> published = newsService.publishNewsItems(items);
@@ -124,7 +124,7 @@ public class BreakingNewsController {
     }
 
     @PostMapping("/fetch-publish")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    @PreAuthorize("hasRole('SUPERVISOR')")
     public ApiResponseDTO<Map<String, Object>> manualFetchAndPublish() {
         Map<String, Object> result = newsService.manualFetchAndPublish();
         socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
@@ -132,7 +132,7 @@ public class BreakingNewsController {
     }
 
     @PostMapping("/source-config")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPERVISOR')")
     public ApiResponseDTO<NewsSourceConfig> saveSourceConfig(
             @RequestBody NewsSourceConfigRequest request) {
         NewsSourceConfig config = newsService.saveSourceConfig(request);
@@ -141,14 +141,14 @@ public class BreakingNewsController {
     }
 
     @GetMapping("/source-configs")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPERVISOR')")
     public ApiResponseDTO<List<NewsSourceConfig>> getAllSourceConfigs() {
         return new ApiResponseDTO<>(true, "Source configs fetched",
                 newsService.getAllSourceConfigs());
     }
 
     @DeleteMapping("/source-config/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPERVISOR')")
     public ApiResponseDTO<Void> deleteSourceConfig(@PathVariable String id) {
         newsService.deleteSourceConfig(id);
         socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
@@ -156,14 +156,14 @@ public class BreakingNewsController {
     }
 
     @GetMapping("/unpublished")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    @PreAuthorize("hasRole('SUPERVISOR')")
     public ApiResponseDTO<List<BreakingNews>> getUnpublishedNews() {
         return new ApiResponseDTO<>(true, "Unpublished news fetched",
                 newsService.getUnpublishedNews());
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    @PreAuthorize("hasRole('SUPERVISOR')")
     public ApiResponseDTO<Void> deleteNews(@PathVariable String id) {
         newsService.deleteNews(id);
         socketService.broadcastAppDashboard(AppType.TV_DISPLAY);
@@ -171,7 +171,7 @@ public class BreakingNewsController {
     }
 
     @DeleteMapping("/bulk-delete")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    @PreAuthorize("hasRole('SUPERVISOR')")
     public ApiResponseDTO<Map<String, Object>> bulkDeleteNews(
             @RequestBody Map<String, List<String>> request) {
         List<String> ids = request.get("ids");
@@ -184,7 +184,7 @@ public class BreakingNewsController {
     }
 
     @DeleteMapping("/archived/bulk-delete")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    @PreAuthorize("hasRole('SUPERVISOR')")
     public ApiResponseDTO<Map<String, Object>> bulkDeleteArchivedNews(
             @RequestBody Map<String, List<String>> request) {
         List<String> ids = request.get("ids");
@@ -197,7 +197,7 @@ public class BreakingNewsController {
     }
 
     @PostMapping("/upload-separator")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPERVISOR')")
     public ApiResponseDTO<Map<String, String>> uploadSeparatorImage(
             @RequestParam("file") MultipartFile file,
             HttpServletRequest request) {

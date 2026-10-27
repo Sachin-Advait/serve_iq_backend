@@ -20,7 +20,7 @@ import java.time.LocalDate;
 @RestController
 @RequestMapping("/serveiq/api/admin/user-sessions")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+@PreAuthorize("hasRole('MANAGER')") // admin and manager; not supervisor
 public class UserSessionController {
 
     private final UserSessionService userSessionService;
