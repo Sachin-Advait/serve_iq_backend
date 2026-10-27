@@ -199,22 +199,16 @@ public class FeedbackService {
     }
 
     /**
-     * Paged feedback, newest first.
-     * - If start & end are both null → returns everything.
-     * - If both are provided       → returns only rows whose createdAt is in [start, end).
+     * Paged feedback, newest first (the Pageable's sort). Every filter is
+     * optional: agent, [start, end), rating, and free-text search over the
+     * comment, agent, counter, ticket number and service.
      */
-    public Page<Feedback> getAll(LocalDateTime start, LocalDateTime end, String agentId, Pageable pageable) {
-        Page<Feedback> page;
-        if (StringUtils.hasText(agentId)) {
-            page = (start != null && end != null)
-                    ? feedbackRepository.findByAgentIdAndCreatedAtBetweenOrderByCreatedAtDesc(
-                            agentId, start, end, pageable)
-                    : feedbackRepository.findByAgentIdOrderByCreatedAtDesc(agentId, pageable);
-        } else {
-            page = (start != null && end != null)
-                    ? feedbackRepository.findByCreatedAtBetweenOrderByCreatedAtDesc(start, end, pageable)
-                    : feedbackRepository.findAllByOrderByCreatedAtDesc(pageable);
-        }
+    public Page<Feedback> getAll(LocalDateTime start, LocalDateTime end, String agentId,
+                                 Feedback.MoodRating rating, String search, Pageable pageable) {
+        String pattern = StringUtils.hasText(search)
+                ? "%" + search.trim().toLowerCase() + "%" : null;
+        Page<Feedback> page = feedbackRepository.search(
+                StringUtils.hasText(agentId) ? agentId : null, start, end, rating, pattern, pageable);
         addTicketDetails(page.getContent());
         return page;
     }

@@ -56,6 +56,8 @@ public class FeedbackController {
      * `from` / `to` are inclusive dates (YYYY-MM-DD).
      * Omit them → no date filtering (return everything).
      * `agentId` → only feedback for tickets that agent served.
+     * `rating`  → HAPPY, NEUTRAL or SAD only.
+     * `search`  → text in the comment, agent name, counter, ticket number or service.
      */
     @GetMapping
     public Page<Feedback> getAllFeedback(
@@ -67,13 +69,17 @@ public class FeedbackController {
 
             @RequestParam(required = false) String agentId,
 
+            @RequestParam(required = false) Feedback.MoodRating rating,
+
+            @RequestParam(required = false) String search,
+
             @PageableDefault(size = 50, sort = "createdAt", direction = Sort.Direction.DESC)
             Pageable pageable) {
 
         LocalDateTime start = (from != null) ? from.atStartOfDay() : null;
         LocalDateTime end   = (to   != null) ? to.plusDays(1).atStartOfDay() : null;
 
-        return service.getAll(start, end, agentId, pageable);
+        return service.getAll(start, end, agentId, rating, search, pageable);
     }
 
     // ==================== DELETE ====================

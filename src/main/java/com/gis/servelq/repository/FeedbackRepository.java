@@ -27,29 +27,29 @@ public interface FeedbackRepository extends JpaRepository<Feedback, String> {
     List<Object[]> countByRatingBetween(@Param("start") LocalDateTime start,
                                         @Param("end") LocalDateTime end);
 
-    Page<Feedback> findAllByOrderByCreatedAtDesc(Pageable pageable);
-
     Optional<Feedback> findFirstByTokenIdOrderByCreatedAtDesc(String tokenId);
 
-    // ==================== NEW: DATE FILTERING (list only) ====================
-
     /**
-     * Paged feedback between two timestamps, newest first.
+     * The feedback list with every filter optional (null = not filtered):
+     * agent, [start, end), rating, and a search pattern (already lower-cased
+     * and wrapped in %) matched against the comment, agent name, counter code,
+     * and the ticket's number and service. Order comes from the Pageable.
      */
-    Page<Feedback> findByCreatedAtBetweenOrderByCreatedAtDesc(
-            LocalDateTime start,
-            LocalDateTime end,
-            Pageable pageable
-    );
-
-    // ==================== AGENT FILTER (list only) ====================
-
-    Page<Feedback> findByAgentIdOrderByCreatedAtDesc(String agentId, Pageable pageable);
-
-    Page<Feedback> findByAgentIdAndCreatedAtBetweenOrderByCreatedAtDesc(
-            String agentId,
-            LocalDateTime start,
-            LocalDateTime end,
-            Pageable pageable
-    );
+    @Query("SELECT f FROM Feedback f WHERE "
+            + "(:agentId IS NULL OR f.agentId = :agentId) "
+            + "AND (CAST(:start AS LocalDateTime) IS NULL OR f.createdAt >= :start) "
+            + "AND (CAST(:end AS LocalDateTime) IS NULL OR f.createdAt < :end) "
+            + "AND (:rating IS NULL OR f.rating = :rating) "
+            + "AND (:search IS NULL "
+            + "  OR LOWER(f.review) LIKE :search "
+            + "  OR LOWER(f.agentName) LIKE :search "
+            + "  OR LOWER(f.counterCode) LIKE :search "
+            + "  OR EXISTS (SELECT 1 FROM Token t WHERE t.id = f.tokenId "
+            + "      AND (LOWER(t.serviceName) LIKE :search OR LOWER(t.token) LIKE :search)))")
+    Page<Feedback> search(@Param("agentId") String agentId,
+                          @Param("start") LocalDateTime start,
+                          @Param("end") LocalDateTime end,
+                          @Param("rating") Feedback.MoodRating rating,
+                          @Param("search") String search,
+                          Pageable pageable);
 }
