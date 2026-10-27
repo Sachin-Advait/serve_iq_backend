@@ -13,6 +13,9 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
+import java.time.ZoneId;
+import java.util.TimeZone;
+
 @Slf4j
 @SpringBootApplication
 @EnableAsync
@@ -24,6 +27,7 @@ public class ServelqApplication implements ApplicationListener<WebServerInitiali
 
     public static void main(String[] args) {
         loadDotenvIntoSystemProperties();
+        useBranchTimeZone();
         SpringApplication.run(ServelqApplication.class, args);
     }
 
@@ -42,6 +46,19 @@ public class ServelqApplication implements ApplicationListener<WebServerInitiali
                 System.setProperty(entry.getKey(), entry.getValue());
             }
         });
+    }
+
+    /**
+     * Runs the app on Oman time (APP_TIMEZONE overrides). Every saved time
+     * (ticket times, daily numbering, the daily sign-out) uses the JVM's zone,
+     * which comes from how the process is started, not the server's clock:
+     * the deployed backend ran on UTC+3 and printed 06:38 on 09:38 tickets.
+     */
+    private static void useBranchTimeZone() {
+        String zone = System.getenv("APP_TIMEZONE");
+        if (zone == null || zone.isBlank()) zone = System.getProperty("APP_TIMEZONE", "Asia/Muscat");
+        TimeZone.setDefault(TimeZone.getTimeZone(ZoneId.of(zone)));
+        log.info("Time zone: {}", zone);
     }
 
     @Override
