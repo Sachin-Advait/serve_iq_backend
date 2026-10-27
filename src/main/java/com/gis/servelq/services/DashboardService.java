@@ -23,6 +23,8 @@ import java.util.stream.Collectors;
 @Slf4j
 public class DashboardService {
 
+    private static final double SLA_RATE_TARGET = 65.0;
+
     private final TokenRepository tokenRepository;
     private final CounterRepository counterRepository;
     private final ServiceSlaResolver serviceSlaResolver;
@@ -76,17 +78,18 @@ public class DashboardService {
         List<Token> todayTokens = tokenRepository.findByBranchIdAndCreatedAtBetween(
                 branchId, startOfDay, endOfDay);
         LocalDateTime asOf = ServiceSlaResolver.asOf(endOfDay);
-        double slaRate = ServiceSlaResolver.waitingTally(todayTokens, sla, asOf).rate();
+        ServiceSlaResolver.Tally waitingTally = ServiceSlaResolver.waitingTally(todayTokens, sla, asOf);
 
         // 3b. Serving-time SLA, judged independently of waiting
-        double servingSlaRate = ServiceSlaResolver.servingTally(todayTokens,
-                serviceSlaResolver.servingForBranch(branchId), asOf).rate();
+        ServiceSlaResolver.Tally servingTally = ServiceSlaResolver.servingTally(todayTokens,
+                serviceSlaResolver.servingForBranch(branchId), asOf);
 
-        // 4. Active Counters
+        // 4. Active Counters: an agent is logged in and the counter is not on a break
         List<Counter> counters = counterRepository.findByBranchId(branchId);
-        long totalCounters = counters.size();
+        long totalCounters = counters.stream().filter(c -> Boolean.TRUE.equals(c.getEnabled())).count();
         long activeCounters = counters.stream()
-                .filter(c -> c.getEnabled() && !c.getPaused())
+                .filter(c -> Boolean.TRUE.equals(c.getEnabled()) && c.getUserId() != null
+                        && !Boolean.TRUE.equals(c.getPaused()))
                 .count();
         double utilizationRate = totalCounters == 0 ? 0 :
                 (activeCounters * 100.0) / totalCounters;
@@ -109,21 +112,8 @@ public class DashboardService {
                 .positive(avgServiceTime <= yesterdayAvgService)
                 .build());
 
-        kpis.add(KpiDTO.builder()
-                .icon("TRENDING_UP")
-                .label("SLA COMPLIANCE")
-                .value(String.format("%.0f%%", slaRate))
-                .change(String.format("%+.0f%% from target", slaRate - 65))
-                .positive(slaRate >= 65)
-                .build());
-
-        kpis.add(KpiDTO.builder()
-                .icon("CLOCK")
-                .label("SERVING SLA")
-                .value(String.format("%.0f%%", servingSlaRate))
-                .change(String.format("%+.0f%% from target", servingSlaRate - 65))
-                .positive(servingSlaRate >= 65)
-                .build());
+        kpis.add(slaKpi("TRENDING_UP", "SLA COMPLIANCE", waitingTally));
+        kpis.add(slaKpi("CLOCK", "SERVING SLA", servingTally));
 
         kpis.add(KpiDTO.builder()
                 .icon("BAR_CHART")
@@ -186,12 +176,14 @@ public class DashboardService {
 
             double avgWaitTime = tokens.stream()
                     .filter(t -> t.getCreatedAt() != null)
-                    .mapToLong(t -> Duration.between(t.getCreatedAt(), t.getStartAt()).toMinutes())
+                    // Waiting ends at the first call, as in the SLA reports
+                    .mapToDouble(t -> minutesBetween(t.getCreatedAt(),
+                            t.getFirstCalledAt() != null ? t.getFirstCalledAt() : t.getStartAt()))
                     .average()
                     .orElse(0.0);
 
             double avgServiceTime = tokens.stream()
-                    .mapToLong(t -> Duration.between(t.getStartAt(), t.getEndAt()).toMinutes())
+                    .mapToDouble(t -> minutesBetween(t.getStartAt(), t.getEndAt()))
                     .average()
                     .orElse(0.0);
 
@@ -277,9 +269,30 @@ public class DashboardService {
         return tokenRepository.findByBranchIdAndCreatedAtBetween(branchId, start, end)
                 .stream()
                 .filter(t -> t.getStartAt() != null && t.getEndAt() != null)
-                .mapToLong(t -> Duration.between(t.getStartAt(), t.getEndAt()).toMinutes())
+                .mapToDouble(t -> minutesBetween(t.getStartAt(), t.getEndAt()))
                 .average()
                 .orElse(0.0);
+    }
+
+    /** Minutes with seconds kept, so a 40 second visit is 0.7 min and not 0. */
+    private static double minutesBetween(LocalDateTime from, LocalDateTime to) {
+        return Math.max(0, Duration.between(from, to).getSeconds()) / 60.0;
+    }
+
+    /** SLA tile; with no ticket judged yet it shows a dash instead of a red 0%. */
+    private static KpiDTO slaKpi(String icon, String label, ServiceSlaResolver.Tally tally) {
+        if (tally.judged() == 0) {
+            return KpiDTO.builder().icon(icon).label(label).value("-")
+                    .change("No tickets judged yet").neutral(true).build();
+        }
+        double rate = tally.rate();
+        return KpiDTO.builder()
+                .icon(icon)
+                .label(label)
+                .value(String.format("%.0f%%", rate))
+                .change(String.format("%+.0f%% from target", rate - SLA_RATE_TARGET))
+                .positive(rate >= SLA_RATE_TARGET)
+                .build();
     }
 
     /**
