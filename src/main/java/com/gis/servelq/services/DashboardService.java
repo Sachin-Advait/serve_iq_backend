@@ -13,8 +13,6 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -133,23 +131,15 @@ public class DashboardService {
         if (date == null) {
             date = LocalDate.now();
         }
+        Map<Integer, List<Token>> byHour = tokensByHour(branchId, date);
 
         List<VisitorFlowDTO> flowData = new ArrayList<>();
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm");
-
-        for (int hour = 8; hour <= 18; hour++) {
-            LocalDateTime hourStart = date.atTime(LocalTime.of(hour, 0));
-            LocalDateTime hourEnd = date.atTime(LocalTime.of(hour, 59, 59));
-
-            long visitorCount = tokenRepository.countByBranchIdAndCreatedAtBetween(
-                    branchId, hourStart, hourEnd);
-
+        for (int hour : chartHours(byHour)) {
             flowData.add(VisitorFlowDTO.builder()
-                    .hour(hourStart.format(formatter))
-                    .visitors((int) visitorCount)
+                    .hour(String.format("%02d:00", hour))
+                    .visitors(byHour.getOrDefault(hour, List.of()).size())
                     .build());
         }
-
         return flowData;
     }
 
@@ -160,22 +150,15 @@ public class DashboardService {
         if (date == null) {
             date = LocalDate.now();
         }
+        Map<Integer, List<Token>> byHour = tokensByHour(branchId, date);
 
         List<ServiceTrendDTO> trends = new ArrayList<>();
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm");
-
-        for (int hour = 8; hour <= 18; hour++) {
-            LocalDateTime hourStart = date.atTime(LocalTime.of(hour, 0));
-            LocalDateTime hourEnd = date.atTime(LocalTime.of(hour, 59, 59));
-
-            List<Token> tokens = tokenRepository.findByBranchIdAndCreatedAtBetween(
-                            branchId, hourStart, hourEnd)
-                    .stream()
+        for (int hour : chartHours(byHour)) {
+            List<Token> tokens = byHour.getOrDefault(hour, List.of()).stream()
                     .filter(t -> t.getStartAt() != null && t.getEndAt() != null)
                     .toList();
 
             double avgWaitTime = tokens.stream()
-                    .filter(t -> t.getCreatedAt() != null)
                     // Waiting ends at the first call, as in the SLA reports
                     .mapToDouble(t -> minutesBetween(t.getCreatedAt(),
                             t.getFirstCalledAt() != null ? t.getFirstCalledAt() : t.getStartAt()))
@@ -188,13 +171,33 @@ public class DashboardService {
                     .orElse(0.0);
 
             trends.add(ServiceTrendDTO.builder()
-                    .time(hourStart.format(formatter))
+                    .time(String.format("%02d:00", hour))
                     .wait(avgWaitTime)
                     .service(avgServiceTime)
                     .build());
         }
-
         return trends;
+    }
+
+    /**
+     * The day's tickets grouped by the hour they were issued. One query for the
+     * whole day; each hour is [h:00, h+1:00), so no ticket falls between hours.
+     */
+    private Map<Integer, List<Token>> tokensByHour(String branchId, LocalDate date) {
+        LocalDateTime start = date.atStartOfDay();
+        LocalDateTime end = date.plusDays(1).atStartOfDay();
+        return tokenRepository.findByBranchIdAndCreatedAtBetween(branchId, start, end).stream()
+                .filter(t -> t.getCreatedAt() != null && t.getCreatedAt().isBefore(end))
+                .collect(Collectors.groupingBy(t -> t.getCreatedAt().getHour()));
+    }
+
+    /** 08:00 to 18:00, stretched to take in any hour that has tickets. */
+    private static List<Integer> chartHours(Map<Integer, List<Token>> byHour) {
+        int first = Math.min(8, byHour.keySet().stream().min(Integer::compare).orElse(8));
+        int last = Math.max(18, byHour.keySet().stream().max(Integer::compare).orElse(18));
+        List<Integer> hours = new ArrayList<>();
+        for (int h = first; h <= last; h++) hours.add(h);
+        return hours;
     }
 
     /**
