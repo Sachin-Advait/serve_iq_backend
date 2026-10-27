@@ -50,7 +50,7 @@ public class SmsTemplateService {
             Thank you.""";
 
     static final String DEFAULT_RECEIPT_AR = """
-            صندوق تقاعد الأجهزة العسكرية والأمنية
+            إم إس إس بي إف
             نظام إدارة الزوار
 
             رقم الانتظار: {token}
