@@ -1,5 +1,6 @@
 package com.gis.servelq.services;
 
+import org.springframework.util.StringUtils;
 import com.gis.servelq.Exceptions.ResourceNotFoundException;
 import com.gis.servelq.events.TokenEvent;
 import com.gis.servelq.events.TokenEventPublisher;
@@ -202,7 +203,14 @@ public class FeedbackService {
      * - If start & end are both null → returns everything.
      * - If both are provided       → returns only rows whose createdAt is in [start, end).
      */
-    public Page<Feedback> getAll(LocalDateTime start, LocalDateTime end, Pageable pageable) {
+    public Page<Feedback> getAll(LocalDateTime start, LocalDateTime end, String agentId, Pageable pageable) {
+        if (StringUtils.hasText(agentId)) {
+            if (start != null && end != null) {
+                return feedbackRepository.findByAgentIdAndCreatedAtBetweenOrderByCreatedAtDesc(
+                        agentId, start, end, pageable);
+            }
+            return feedbackRepository.findByAgentIdOrderByCreatedAtDesc(agentId, pageable);
+        }
         if (start != null && end != null) {
             return feedbackRepository.findByCreatedAtBetweenOrderByCreatedAtDesc(start, end, pageable);
         }

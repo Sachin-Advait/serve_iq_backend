@@ -34,4 +34,15 @@ public interface FeedbackRepository extends JpaRepository<Feedback, String> {
             LocalDateTime end,
             Pageable pageable
     );
+
+    // ==================== AGENT FILTER (list only) ====================
+
+    Page<Feedback> findByAgentIdOrderByCreatedAtDesc(String agentId, Pageable pageable);
+
+    Page<Feedback> findByAgentIdAndCreatedAtBetweenOrderByCreatedAtDesc(
+            String agentId,
+            LocalDateTime start,
+            LocalDateTime end,
+            Pageable pageable
+    );
 }

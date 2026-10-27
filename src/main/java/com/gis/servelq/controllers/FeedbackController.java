@@ -51,8 +51,11 @@ public class FeedbackController {
      * GET /serveiq/api/feedback
      * GET /serveiq/api/feedback?from=2026-09-01&to=2026-09-27
      *
+     * GET /serveiq/api/feedback?agentId=...
+     *
      * `from` / `to` are inclusive dates (YYYY-MM-DD).
      * Omit them → no date filtering (return everything).
+     * `agentId` → only feedback for tickets that agent served.
      */
     @GetMapping
     public Page<Feedback> getAllFeedback(
@@ -62,13 +65,15 @@ public class FeedbackController {
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
 
+            @RequestParam(required = false) String agentId,
+
             @PageableDefault(size = 50, sort = "createdAt", direction = Sort.Direction.DESC)
             Pageable pageable) {
 
         LocalDateTime start = (from != null) ? from.atStartOfDay() : null;
         LocalDateTime end   = (to   != null) ? to.plusDays(1).atStartOfDay() : null;
 
-        return service.getAll(start, end, pageable);
+        return service.getAll(start, end, agentId, pageable);
     }
 
     // ==================== DELETE ====================
