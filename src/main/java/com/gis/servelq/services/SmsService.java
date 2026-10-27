@@ -42,8 +42,9 @@ public class SmsService {
 
     /** Sends the ticket receipt; returns the BatchRefCode, or null when it was not sent. */
     public String sendReceiptSms(SmsRequest request) {
+        String language = smsTemplateService.effectiveLanguage(request.getLanguage());
         SmsSendResult result = sendTemplate(SmsTemplateCode.TOKEN_RECEIPT, request.getTo(),
-                request.getLanguage(), receiptValues(request), request.getTokenNo());
+                language, receiptValues(request, language), request.getTokenNo());
         return result.success() ? result.batchRefCode() : null;
     }
 
@@ -126,8 +127,8 @@ public class SmsService {
         }
     }
 
-    private static Map<String, String> receiptValues(SmsRequest request) {
-        boolean arabic = "ar".equalsIgnoreCase(request.getLanguage());
+    private static Map<String, String> receiptValues(SmsRequest request, String language) {
+        boolean arabic = "ar".equalsIgnoreCase(language);
         Map<String, String> values = new HashMap<>();
         values.put("token", request.getTokenNo());
         values.put("service", arabic && !isBlank(request.getServiceAr())

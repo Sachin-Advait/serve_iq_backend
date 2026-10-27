@@ -14,6 +14,8 @@ public class SmsSettingsDTO {
     private String sender;
     private Integer priority;
     private String appId;
+    /** "en", "ar", or null/blank for the visitor's kiosk language. */
+    private String language;
 
     private String defaultSender;
     private String defaultPriority;

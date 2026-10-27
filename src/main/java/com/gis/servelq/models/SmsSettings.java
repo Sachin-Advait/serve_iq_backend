@@ -31,6 +31,10 @@ public class SmsSettings {
     @Column(name = "app_id", length = 50)
     private String appId;
 
+    /** "en" or "ar" for every SMS; null uses the visitor's kiosk language. */
+    @Column(length = 2)
+    private String language;
+
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;

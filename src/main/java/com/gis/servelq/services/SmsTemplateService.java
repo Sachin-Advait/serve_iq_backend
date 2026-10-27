@@ -129,6 +129,7 @@ public class SmsTemplateService {
         dto.setSender(s.getSender());
         dto.setPriority(s.getPriority());
         dto.setAppId(s.getAppId());
+        dto.setLanguage(s.getLanguage());
         dto.setDefaultSender(smsOmanConfig.sender());
         dto.setDefaultPriority(smsOmanConfig.priority());
         dto.setDefaultAppId(smsOmanConfig.appId());
@@ -150,8 +151,22 @@ public class SmsTemplateService {
         }
         s.setPriority(priority);
         s.setAppId(blankToNull(request.getAppId()));
+        String language = blankToNull(request.getLanguage());
+        if (language != null) {
+            language = language.toLowerCase(Locale.ROOT);
+            if (!language.equals("en") && !language.equals("ar")) {
+                throw new BusinessException("SMS language must be English (en) or Arabic (ar)");
+            }
+        }
+        s.setLanguage(language);
         settingsRepository.save(s);
         return settingsDto();
+    }
+
+    /** The admin's chosen SMS language, or the visitor's when none is chosen. */
+    public String effectiveLanguage(String visitorLanguage) {
+        String saved = settings().getLanguage();
+        return !isBlank(saved) ? saved : visitorLanguage;
     }
 
     public String effectiveSender() {
