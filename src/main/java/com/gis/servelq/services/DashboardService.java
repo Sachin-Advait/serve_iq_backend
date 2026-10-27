@@ -80,12 +80,11 @@ public class DashboardService {
         ServiceSlaResolver.Tally servingTally = ServiceSlaResolver.servingTally(todayTokens,
                 serviceSlaResolver.servingForBranch(branchId), asOf);
 
-        // 4. Active Counters: an agent is logged in and the counter is not on a break
+        // 4. Active Counters: enabled and not paused, out of all the branch's counters
         List<Counter> counters = counterRepository.findByBranchId(branchId);
-        long totalCounters = counters.stream().filter(c -> Boolean.TRUE.equals(c.getEnabled())).count();
+        long totalCounters = counters.size();
         long activeCounters = counters.stream()
-                .filter(c -> Boolean.TRUE.equals(c.getEnabled()) && c.getUserId() != null
-                        && !Boolean.TRUE.equals(c.getPaused()))
+                .filter(c -> Boolean.TRUE.equals(c.getEnabled()) && !Boolean.TRUE.equals(c.getPaused()))
                 .count();
         double utilizationRate = totalCounters == 0 ? 0 :
                 (activeCounters * 100.0) / totalCounters;
