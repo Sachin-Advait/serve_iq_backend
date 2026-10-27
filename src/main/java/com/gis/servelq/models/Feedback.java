@@ -28,6 +28,15 @@ public class Feedback {
     @CreationTimestamp
     private LocalDateTime createdAt;
 
+    // Filled from the ticket when feedback is listed; not stored.
+    @Transient
+    private String tokenNumber;
+    @Transient
+    private String serviceName;
+    /** Seconds from ticket issue to first call, null if never called. */
+    @Transient
+    private Long waitSeconds;
+
     public enum MoodRating {
         SAD,
         NEUTRAL,

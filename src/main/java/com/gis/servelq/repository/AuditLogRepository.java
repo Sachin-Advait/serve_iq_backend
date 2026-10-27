@@ -52,12 +52,12 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, String> {
             Pageable pageable);
 
     @Query("SELECT a.action, COUNT(a) FROM AuditLog a " +
-            "WHERE a.branchId = :branchId AND a.createdAt >= :since " +
+            "WHERE (:branchId IS NULL OR a.branchId = :branchId) AND a.createdAt >= :since " +
             "GROUP BY a.action ORDER BY COUNT(a) DESC")
     List<Object[]> getActionStats(@Param("branchId") String branchId, @Param("since") Instant since);
 
     @Query("SELECT a.userId, a.userName, COUNT(a) as cnt FROM AuditLog a " +
-            "WHERE a.branchId = :branchId AND a.createdAt >= :since " +
+            "WHERE (:branchId IS NULL OR a.branchId = :branchId) AND a.createdAt >= :since " +
             "GROUP BY a.userId, a.userName ORDER BY cnt DESC")
     List<Object[]> getMostActiveUsers(@Param("branchId") String branchId, @Param("since") Instant since,
                                       Pageable pageable);

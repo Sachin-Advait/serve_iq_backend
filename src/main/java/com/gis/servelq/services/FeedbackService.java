@@ -204,17 +204,38 @@ public class FeedbackService {
      * - If both are provided       → returns only rows whose createdAt is in [start, end).
      */
     public Page<Feedback> getAll(LocalDateTime start, LocalDateTime end, String agentId, Pageable pageable) {
+        Page<Feedback> page;
         if (StringUtils.hasText(agentId)) {
-            if (start != null && end != null) {
-                return feedbackRepository.findByAgentIdAndCreatedAtBetweenOrderByCreatedAtDesc(
-                        agentId, start, end, pageable);
+            page = (start != null && end != null)
+                    ? feedbackRepository.findByAgentIdAndCreatedAtBetweenOrderByCreatedAtDesc(
+                            agentId, start, end, pageable)
+                    : feedbackRepository.findByAgentIdOrderByCreatedAtDesc(agentId, pageable);
+        } else {
+            page = (start != null && end != null)
+                    ? feedbackRepository.findByCreatedAtBetweenOrderByCreatedAtDesc(start, end, pageable)
+                    : feedbackRepository.findAllByOrderByCreatedAtDesc(pageable);
+        }
+        addTicketDetails(page.getContent());
+        return page;
+    }
+
+    /** Ticket number, service and waiting time for each listed feedback, in one query. */
+    private void addTicketDetails(List<Feedback> list) {
+        List<String> tokenIds = list.stream().map(Feedback::getTokenId)
+                .filter(StringUtils::hasText).distinct().toList();
+        if (tokenIds.isEmpty()) return;
+        Map<String, Token> tokens = new HashMap<>();
+        tokenRepository.findAllById(tokenIds).forEach(t -> tokens.put(t.getId(), t));
+        for (Feedback f : list) {
+            Token t = tokens.get(f.getTokenId());
+            if (t == null) continue;
+            f.setTokenNumber(t.getToken());
+            f.setServiceName(t.getServiceName());
+            LocalDateTime called = t.getFirstCalledAt() != null ? t.getFirstCalledAt() : t.getStartAt();
+            if (t.getCreatedAt() != null && called != null) {
+                f.setWaitSeconds(Math.max(0, Duration.between(t.getCreatedAt(), called).getSeconds()));
             }
-            return feedbackRepository.findByAgentIdOrderByCreatedAtDesc(agentId, pageable);
         }
-        if (start != null && end != null) {
-            return feedbackRepository.findByCreatedAtBetweenOrderByCreatedAtDesc(start, end, pageable);
-        }
-        return feedbackRepository.findAllByOrderByCreatedAtDesc(pageable);
     }
 
     public void delete(String id, AuthenticatedUser user) {

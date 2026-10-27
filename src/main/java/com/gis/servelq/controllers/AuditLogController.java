@@ -57,15 +57,15 @@ public class AuditLogController {
         return ResponseEntity.ok(new ApiResponseDTO<>(true, "Audit logs retrieved successfully", logs));
     }
     /**
-     * Get audit statistics
+     * Get audit statistics; without branchId, across all branches
      * Example: /api/admin/audit-logs/stats?branchId=BR001&days=30
      */
     @GetMapping("/stats")
     public ResponseEntity<ApiResponseDTO<Map<String, Object>>> getAuditStats(
-            @RequestParam String branchId,
+            @RequestParam(required = false) String branchId,
             @RequestParam(defaultValue = "30") int days) {
 
-        Map<String, Object> stats = auditLogService.getAuditStats(branchId, days);
+        Map<String, Object> stats = auditLogService.getAuditStats(StringUtils.hasText(branchId) ? branchId : null, days);
         return ResponseEntity.ok(new ApiResponseDTO<>(true, "Audit stats retrieved successfully", stats));
     }
 }
