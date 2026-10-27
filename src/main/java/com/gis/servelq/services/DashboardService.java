@@ -3,7 +3,6 @@ package com.gis.servelq.services;
 import com.gis.servelq.dto.*;
 import com.gis.servelq.models.Counter;
 import com.gis.servelq.models.Token;
-import com.gis.servelq.models.TokenStatus;
 import com.gis.servelq.repository.CounterRepository;
 import com.gis.servelq.repository.TokenRepository;
 import lombok.RequiredArgsConstructor;
@@ -42,7 +41,6 @@ public class DashboardService {
                 .kpis(getKpis(branchId, date))
                 .visitorFlow(getVisitorFlow(branchId, date))
                 .serviceTrends(getServiceTrends(branchId, date))
-                .aiRecommendations(getAiRecommendations(branchId))
                 .build();
     }
 
@@ -198,71 +196,6 @@ public class DashboardService {
         List<Integer> hours = new ArrayList<>();
         for (int h = first; h <= last; h++) hours.add(h);
         return hours;
-    }
-
-    /**
-     * Generate AI recommendations based on current queue status
-     */
-    public List<AiRecommendationDTO> getAiRecommendations(String branchId) {
-        List<AiRecommendationDTO> recommendations = new ArrayList<>();
-        List<Counter> counters = counterRepository.findByBranchId(branchId);
-
-        for (Counter counter : counters) {
-            if (!counter.getEnabled()) continue;
-
-            // Get waiting tokens for this counter's service
-            long waitingTokens = CounterServiceLinker.serviceIdsOf(counter).stream()
-                    .mapToLong(id -> tokenRepository.countByServiceIdAndStatus(id, TokenStatus.WAITING))
-                    .sum();
-
-            // Get current serving tokens
-            long servingTokens = tokenRepository
-                    .countByAssignedCounterIdAndStatus(counter.getId(), TokenStatus.SERVING);
-
-            String action;
-            String reason;
-            String impact;
-            int confidence;
-
-            if (waitingTokens > 10 && servingTokens == 0) {
-                action = "Open";
-                reason = "High queue backlog detected";
-                impact = "↓ wait time ~" + (waitingTokens * 2) + "%";
-                confidence = 85 + (int)(Math.random() * 10);
-            } else if (waitingTokens == 0 && servingTokens == 0) {
-                action = "Pause";
-                reason = "No traffic for this counter";
-                impact = "---";
-                confidence = 90 + (int)(Math.random() * 5);
-            } else if (waitingTokens > 5 && servingTokens > 0) {
-                action = "Stay Active";
-                reason = "Steady demand, continue serving";
-                impact = "Maintain current flow";
-                confidence = 80 + (int)(Math.random() * 15);
-            } else {
-                action = "Monitor";
-                reason = "Low activity, monitor queue";
-                impact = "---";
-                confidence = 70 + (int)(Math.random() * 20);
-            }
-
-            // Only include actionable recommendations
-            if (!action.equals("Monitor") || waitingTokens > 3) {
-                recommendations.add(AiRecommendationDTO.builder()
-                        .counter(counter.getCode())
-                        .action(action)
-                        .reason(reason)
-                        .impact(impact)
-                        .confidence(Math.min(confidence, 98))
-                        .build());
-            }
-        }
-
-        // Sort by confidence descending
-        recommendations.sort((a, b) -> Integer.compare(b.getConfidence(), a.getConfidence()));
-
-        // Limit to top 5 recommendations
-        return recommendations.stream().limit(5).collect(Collectors.toList());
     }
 
     /**

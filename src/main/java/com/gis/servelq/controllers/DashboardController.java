@@ -66,14 +66,4 @@ public class DashboardController {
                 dashboardService.getServiceTrends(branchId, date)));
     }
 
-    /**
-     * Get AI recommendations
-     */
-    @GetMapping("/ai-recommendations")
-    public ResponseEntity<ApiResponseDTO<?>> getAiRecommendations(
-            @RequestParam String branchId) {
-
-        return ResponseEntity.ok(new ApiResponseDTO<>(true, "AI recommendations retrieved",
-                dashboardService.getAiRecommendations(branchId)));
-    }
 }
