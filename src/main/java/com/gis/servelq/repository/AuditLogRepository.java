@@ -26,6 +26,7 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, String> {
     @Query(value = "SELECT * FROM audit_logs a WHERE " +
             "(:branchId IS NULL OR a.branch_id = CAST(:branchId AS VARCHAR)) AND " +
             "(:userId IS NULL OR a.user_id = CAST(:userId AS VARCHAR)) AND " +
+            "(:userRole IS NULL OR a.user_role = CAST(:userRole AS VARCHAR)) AND " +
             "(:action IS NULL OR a.action = CAST(:action AS VARCHAR)) AND " +
             "(:entityType IS NULL OR a.entity_type = CAST(:entityType AS VARCHAR)) AND " +
             "(CAST(:startDate AS TIMESTAMP) IS NULL OR a.created_at >= CAST(:startDate AS TIMESTAMP)) AND " +
@@ -34,6 +35,7 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, String> {
             countQuery = "SELECT COUNT(*) FROM audit_logs a WHERE " +
                     "(:branchId IS NULL OR a.branch_id = CAST(:branchId AS VARCHAR)) AND " +
                     "(:userId IS NULL OR a.user_id = CAST(:userId AS VARCHAR)) AND " +
+                    "(:userRole IS NULL OR a.user_role = CAST(:userRole AS VARCHAR)) AND " +
                     "(:action IS NULL OR a.action = CAST(:action AS VARCHAR)) AND " +
                     "(:entityType IS NULL OR a.entity_type = CAST(:entityType AS VARCHAR)) AND " +
                     "(CAST(:startDate AS TIMESTAMP) IS NULL OR a.created_at >= CAST(:startDate AS TIMESTAMP)) AND " +
@@ -42,6 +44,7 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, String> {
     Page<AuditLog> searchAuditLogs(
             @Param("branchId") String branchId,
             @Param("userId") String userId,
+            @Param("userRole") String userRole,
             @Param("action") String action,
             @Param("entityType") String entityType,
             @Param("startDate") Instant startDate,

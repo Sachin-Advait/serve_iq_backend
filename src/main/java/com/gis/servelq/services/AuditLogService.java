@@ -103,7 +103,7 @@ public class AuditLogService {
 
     @Transactional(readOnly = true)
     public PageResponseDTO<AuditLogDTO> searchAuditLogs(
-            String branchId, String userId, AuditAction action,
+            String branchId, String userId, String userRole, AuditAction action,
             String entityType, Instant startDate, Instant endDate,
             int page, int size) {
 
@@ -113,7 +113,7 @@ public class AuditLogService {
         String actionStr = action != null ? action.name() : null;
 
         Page<AuditLog> auditPage = auditLogRepository.searchAuditLogs(
-                branchId, userId, actionStr, entityType, startDate, endDate, pageable);
+                branchId, userId, userRole, actionStr, entityType, startDate, endDate, pageable);
 
         Page<AuditLogDTO> dtoPage = auditPage.map(this::convertToDTO);
         return new PageResponseDTO<>(dtoPage);

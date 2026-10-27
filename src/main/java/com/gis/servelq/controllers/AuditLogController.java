@@ -1,5 +1,6 @@
 package com.gis.servelq.controllers;
 
+import org.springframework.util.StringUtils;
 import com.gis.servelq.dto.ApiResponseDTO;
 import com.gis.servelq.dto.AuditLogDTO;
 import com.gis.servelq.dto.PageResponseDTO;
@@ -25,11 +26,13 @@ public class AuditLogController {
     /**
      * Search audit logs with filters
      * Example: /api/admin/audit-logs?branchId=BR001&action=TOKEN_GENERATED&startDate=2026-08-01
+     * `role` filters by the role the user had when they acted (e.g. MANAGER).
      */
     @GetMapping
     public ResponseEntity<ApiResponseDTO<PageResponseDTO<AuditLogDTO>>> getAuditLogs(
             @RequestParam(required = false) String branchId,
             @RequestParam(required = false) String userId,
+            @RequestParam(required = false) String role,
             @RequestParam(required = false) String action,
             @RequestParam(required = false) String entityType,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant startDate,
@@ -48,7 +51,8 @@ public class AuditLogController {
         }
 
         PageResponseDTO<AuditLogDTO> logs = auditLogService.searchAuditLogs(
-                branchId, userId, auditAction, entityType, startDate, endDate, page, size);
+                branchId, userId, StringUtils.hasText(role) ? role : null, auditAction, entityType,
+                startDate, endDate, page, size);
 
         return ResponseEntity.ok(new ApiResponseDTO<>(true, "Audit logs retrieved successfully", logs));
     }
