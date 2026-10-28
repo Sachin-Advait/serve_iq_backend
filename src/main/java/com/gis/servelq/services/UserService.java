@@ -103,17 +103,25 @@ public class UserService {
         Pageable pageable = PageRequest.of(page, size, sort);
         Page<User> userPage;
 
-        UserRole roleEnum = null;
+        // One role, or several separated by commas (e.g. "AGENT,USER")
+        java.util.List<UserRole> roles = new java.util.ArrayList<>();
         if (role != null && !role.isEmpty() && !"all".equalsIgnoreCase(role)) {
-            try {
-                roleEnum = UserRole.valueOf(role.toUpperCase());
-            } catch (IllegalArgumentException ignored) {
+            for (String part : role.split(",")) {
+                try {
+                    roles.add(UserRole.valueOf(part.trim().toUpperCase()));
+                } catch (IllegalArgumentException ignored) {
+                }
             }
         }
+        UserRole roleEnum = roles.size() == 1 ? roles.get(0) : null;
 
         boolean hasSearch = search != null && !search.trim().isEmpty();
 
-        if (hasSearch && roleEnum != null) {
+        if (roles.size() > 1) {
+            userPage = hasSearch
+                    ? userRepository.searchUsersInRoles(search.trim(), roles, pageable)
+                    : userRepository.findByRoleIn(roles, pageable);
+        } else if (hasSearch && roleEnum != null) {
             userPage = userRepository.searchUsers(search.trim(), roleEnum, pageable);
         } else if (hasSearch) {
             userPage = userRepository.findByNameContainingIgnoreCaseOrEmailContainingIgnoreCase(

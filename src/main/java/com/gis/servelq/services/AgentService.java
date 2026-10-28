@@ -692,7 +692,7 @@ public class AgentService {
 
     @Transactional
     public void logout(AuthenticatedUser currentUser) {
-        if (currentUser == null || !"USER".equals(currentUser.role())) return;
+        if (currentUser == null || !UserRole.isCounterAgent(currentUser.role())) return;
         counterService.logoutFromCounter(currentUser);
         userSessionService.checkOut(currentUser.id());
     }

@@ -32,6 +32,16 @@ public interface UserRepository extends JpaRepository<User, String> {
                            @Param("role") UserRole role,
                            Pageable pageable);
 
+    Page<User> findByRoleIn(java.util.Collection<UserRole> roles, Pageable pageable);
+
+    // Same as searchUsers, for several roles at once (e.g. USER and AGENT)
+    @Query("SELECT u FROM User u WHERE " +
+            "(LOWER(u.name) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+            "u.role IN :roles")
+    Page<User> searchUsersInRoles(@Param("search") String search,
+                                  @Param("roles") java.util.Collection<UserRole> roles,
+                                  Pageable pageable);
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     // Device accounts (TV, kiosk, feedback screen) are left signed in; they log
     // in once and have nobody to log them back in.

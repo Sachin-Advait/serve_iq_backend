@@ -38,7 +38,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class UserSessionService {
 
-    private static final Set<UserRole> TRACKED = Set.of(UserRole.USER, UserRole.ADMIN, UserRole.RECEPTIONIST,
+    private static final Set<UserRole> TRACKED = Set.of(UserRole.USER, UserRole.AGENT, UserRole.ADMIN, UserRole.RECEPTIONIST,
             UserRole.MANAGER, UserRole.SUPERVISOR);
 
     private final UserSessionRepository userSessionRepository;

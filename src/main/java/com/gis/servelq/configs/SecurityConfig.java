@@ -110,8 +110,10 @@ public class SecurityConfig {
     @Bean
     public RoleHierarchy roleHierarchy() {
         return RoleHierarchyImpl.withDefaultRolePrefix()
-                .role("ADMIN").implies("MANAGER", "SUPERVISOR", "USER", "DISPLAY", "KIOSK", "RECEPTIONIST", "FEEDBACK")
+                .role("ADMIN").implies("MANAGER", "SUPERVISOR", "USER", "AGENT", "DISPLAY", "KIOSK", "RECEPTIONIST", "FEEDBACK")
                 .role("MANAGER").implies("SUPERVISOR")
+                // An agent can do everything a user can
+                .role("AGENT").implies("USER")
                 .build();
     }
 

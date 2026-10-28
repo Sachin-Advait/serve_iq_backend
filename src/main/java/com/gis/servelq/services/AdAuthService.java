@@ -162,7 +162,7 @@ public class AdAuthService {
         // Counter agents get their counter state handled by CounterService.claimCounter
         // (which preserves a counter that is mid-call/serving). Resetting it here would
         // flip a busy counter to IDLE before the claim runs.
-        if (user.getRole() == UserRole.USER) {
+        if (user.getRole().isCounterAgent()) {
             return;
         }
         // A feedback screen only shows its counter; its login must not reopen a counter

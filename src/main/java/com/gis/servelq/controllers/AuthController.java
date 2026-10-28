@@ -66,7 +66,7 @@ public class AuthController {
 
         User user = authResult.getUser();
 
-        if (user.getRole() == UserRole.USER) {
+        if (user.getRole().isCounterAgent()) {
             if (!StringUtils.hasText(dto.getCounterId())) {
                 return ResponseEntity.badRequest().body("Please select a counter");
             }
@@ -106,7 +106,7 @@ public class AuthController {
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@AuthenticationPrincipal AuthenticatedUser currentUser) {
         if (currentUser == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        if (UserRole.USER.name().equals(currentUser.role())) {
+        if (UserRole.isCounterAgent(currentUser.role())) {
             agentService.logout(currentUser);
         } else {
             userSessionService.checkOut(currentUser.id());

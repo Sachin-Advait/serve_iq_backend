@@ -532,7 +532,7 @@ public class OperationsReportService {
     public TabularReportDTO agentUtilization(String branchId, LocalDate from, LocalDate to) {
         Range r = new Range(branchId, from, to);
         LocalDateTime cap = r.cap();
-        List<UserSession> sessions = userSessionRepository.findOverlapping(branchId, UserRole.USER, r.start, r.end);
+        List<UserSession> sessions = userSessionRepository.findOverlapping(branchId, List.of(UserRole.USER, UserRole.AGENT), r.start, r.end);
         List<CounterBreak> breaks = counterBreakRepository.findOverlapping(branchId, r.start, r.end);
         // Serving time comes from tokens served in the range
         List<Token> servedTimes = r.tokens.stream()

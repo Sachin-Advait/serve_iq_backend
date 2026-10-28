@@ -121,7 +121,7 @@ class OperationsReportServiceTest {
         s.setCounterId("C1");
         s.setLoginAt(NINE);
         s.setLogoutAt(NINE.plusHours(4));
-        when(userSessionRepository.findOverlapping(eq("BR"), eq(UserRole.USER), any(), any())).thenReturn(List.of(s));
+        when(userSessionRepository.findOverlapping(eq("BR"), eq(List.of(UserRole.USER, UserRole.AGENT)), any(), any())).thenReturn(List.of(s));
         CounterBreak b = new CounterBreak();
         b.setCounterId("C1");
         b.setUserId("U1");

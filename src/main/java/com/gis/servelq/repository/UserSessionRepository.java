@@ -19,11 +19,11 @@ public interface UserSessionRepository extends JpaRepository<UserSession, String
 
     List<UserSession> findByUserIdOrderByLoginAtDesc(String userId);
 
-    // Sessions of one role in a branch that overlap [from, to)
-    @Query("SELECT s FROM UserSession s WHERE s.branchId = :branchId AND s.role = :role " +
+    // Sessions of the given roles in a branch that overlap [from, to)
+    @Query("SELECT s FROM UserSession s WHERE s.branchId = :branchId AND s.role IN :roles " +
             "AND s.loginAt < :to AND (s.logoutAt IS NULL OR s.logoutAt > :from)")
     List<UserSession> findOverlapping(@Param("branchId") String branchId,
-                                      @Param("role") UserRole role,
+                                      @Param("roles") java.util.Collection<UserRole> roles,
                                       @Param("from") LocalDateTime from,
                                       @Param("to") LocalDateTime to);
 

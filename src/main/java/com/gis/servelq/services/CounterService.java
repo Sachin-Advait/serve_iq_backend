@@ -694,7 +694,7 @@ public class CounterService {
         if (currentUser == null) throw new BusinessException("Not authenticated");
         User user = userRepository.findById(currentUser.id())   // adjust accessor name if needed
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        if (user.getRole() != UserRole.USER) {
+        if (!user.getRole().isCounterAgent()) {
             throw new BusinessException("Only counter agents can log in to a counter");
         }
         return user;
@@ -988,11 +988,11 @@ public class CounterService {
     }
 
     /**
-     * USER-role agents may only operate the counter they currently hold. Staff roles are unrestricted.
+     * USER/AGENT-role agents may only operate the counter they currently hold. Staff roles are unrestricted.
      */
     public void assertCanOperate(String counterId, AuthenticatedUser actor) {
         if (actor == null) throw new BusinessException("Not authenticated");
-        if (!"USER".equals(actor.role())) return;
+        if (!UserRole.isCounterAgent(actor.role())) return;
         Counter counter = counterRepository.findById(counterId)
                 .orElseThrow(() -> new ResourceNotFoundException("Counter not found"));
         if (!actor.isSameUser(counter.getUserId())) {
