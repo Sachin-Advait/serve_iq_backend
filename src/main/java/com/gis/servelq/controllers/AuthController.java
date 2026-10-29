@@ -2,6 +2,7 @@ package com.gis.servelq.controllers;
 
 import com.gis.servelq.dto.*;
 import com.gis.servelq.models.AuditAction;
+import com.gis.servelq.models.LoginApp;
 import com.gis.servelq.models.User;
 import com.gis.servelq.models.UserRole;
 import com.gis.servelq.repository.UserRepository;
@@ -65,6 +66,19 @@ public class AuthController {
         }
 
         User user = authResult.getUser();
+
+        // Checked before the counter claim and check-in so a refused login leaves nothing behind.
+        if (StringUtils.hasText(dto.getApp())) {
+            LoginApp app = LoginApp.from(dto.getApp());
+            if (app == null || !app.allows(user.getRole())) {
+                auditLogService.log(
+                        AuditAction.LOGIN_FAILED, "User", user.getId(), user.getName(),
+                        "Role " + user.getRole() + " refused on app " + dto.getApp(),
+                        null, null, request);
+                return ResponseEntity.badRequest().body(new ApiResponseDTO<>(false,
+                        "This account cannot sign in to this app", null));
+            }
+        }
 
         if (user.getRole().isCounterAgent()) {
             if (!StringUtils.hasText(dto.getCounterId())) {

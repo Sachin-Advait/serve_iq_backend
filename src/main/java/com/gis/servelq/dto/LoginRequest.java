@@ -12,4 +12,7 @@ public class LoginRequest {
     private String fcmToken;
 
     private String counterId;
+
+    /** TV, FEEDBACK, KIOSK or AGENT; see LoginApp. */
+    private String app;
 }
