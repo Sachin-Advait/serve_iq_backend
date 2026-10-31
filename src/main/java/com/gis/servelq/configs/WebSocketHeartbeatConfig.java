@@ -16,10 +16,11 @@ public class WebSocketHeartbeatConfig {
     private final SimpMessagingTemplate messagingTemplate;
 
     /**
-     * Send heartbeat every 60 seconds to all TV display topics
-     * This keeps the connection alive and lets clients know the server is responsive
+     * Send a PING to /topic/heartbeat every 10 seconds. Every app socket
+     * subscribes to it and reconnects after 25s without one, so a socket that
+     * died silently is replaced in seconds instead of missing pushes.
      */
-    @Scheduled(fixedRate = 60000) // Every 60 seconds
+    @Scheduled(fixedRate = 10000) // Every 10 seconds
     public void sendHeartbeat() {
         try {
             // Send to all branches - or make this dynamic based on active subscriptions
