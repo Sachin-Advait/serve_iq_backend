@@ -11,6 +11,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 
 @Service
 @Slf4j
@@ -21,11 +22,13 @@ public class SocketService {
     private final TVDisplayService tvDisplayService;
     private final AppConfigService appConfigService;
     private final CounterService counterService;
+    private final SocketVersionService socketVersionService;
 
     public void broadcast(String destination, Object payload) {
         log.info("🔥 WEBSOCKET PUSH → destination={}", destination);
         log.debug("WEBSOCKET payload={}", payload);
-        messagingTemplate.convertAndSend(destination, payload);
+        long version = socketVersionService.next(destination);
+        messagingTemplate.convertAndSend(destination, payload, Map.of("version", String.valueOf(version)));
     }
 
     public void notifyCounterDisplay(String counterId, Object payload) {
