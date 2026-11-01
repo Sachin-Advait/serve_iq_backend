@@ -52,7 +52,7 @@ public class TemplateService {
             log.info("After creation, found {} templates", templates.size());
         }
 
-        if (appType == AppType.TV_DISPLAY && ensureTvDefaultTemplates()) {
+        if (ensureDefaultTemplates(appType)) {
             templates = templateRepository.findByAppTypeOrderByCreatedAtDesc(appType.name());
         }
 
@@ -87,8 +87,8 @@ public class TemplateService {
                     AppConfigTemplate template = new AppConfigTemplate();
                     template.setId(UUID.randomUUID().toString());
                     template.setAppType(appType.name());
-                    template.setTemplateName(appType == AppType.TV_DISPLAY
-                            ? TV_DARK_TEMPLATE : "Default Template");
+                    DefaultSpec spec = defaultSpecs(appType).get(0);
+                    template.setTemplateName(spec.name());
                     template.setDescription("System default template");
                     template.setActive(true);
                     template.setDefault(true);
@@ -96,10 +96,8 @@ public class TemplateService {
                     template.setUpdatedAt(LocalDateTime.now());
 
                     copyConfigToTemplate(currentConfig, template);
-                    if (appType == AppType.TV_DISPLAY) {
-                        template.setTheme(THEME_DARK);
-                        template.setAppLanguage("ARABIC");
-                    }
+                    template.setTheme(spec.theme());
+                    template.setAppLanguage(spec.language());
 
                     AppConfigTemplate saved = templateRepository.save(template);
                     log.info("Default template saved with ID: {}", saved.getId());
@@ -110,53 +108,74 @@ public class TemplateService {
                 });
     }
 
-    static final String TV_DARK_TEMPLATE = "Arabic Dark";
-    static final String TV_LIGHT_TEMPLATE = "Arabic Light";
     static final String THEME_DARK = "DARK";
     static final String THEME_LIGHT = "LIGHT";
 
+    /** One built-in default template: its name, language and TV theme. */
+    private record DefaultSpec(String name, String language, String theme) {}
+
     /**
-     * The TV has two default templates, Arabic Dark and Arabic Light, both
-     * in Arabic and neither deletable. The original "Default Template"
-     * becomes Arabic Dark; Arabic Light is a copy of it with the light
-     * design. Returns true when something changed.
+     * Each app has an Arabic and an English default template; the TV has one
+     * of each per theme. The first is the fallback when no template is
+     * active.
      */
-    private boolean ensureTvDefaultTemplates() {
+    private static List<DefaultSpec> defaultSpecs(AppType appType) {
+        if (appType == AppType.TV_DISPLAY) {
+            return List.of(
+                    new DefaultSpec("Arabic Dark", "ARABIC", THEME_DARK),
+                    new DefaultSpec("Arabic Light", "ARABIC", THEME_LIGHT),
+                    new DefaultSpec("English Dark", "ENGLISH", THEME_DARK),
+                    new DefaultSpec("English Light", "ENGLISH", THEME_LIGHT));
+        }
+        return List.of(
+                new DefaultSpec("Arabic", "ARABIC", null),
+                new DefaultSpec("English", "ENGLISH", null));
+    }
+
+    /**
+     * Makes sure every default template of [appType] exists, none deletable.
+     * The original "Default Template" is renamed to the first one (Arabic);
+     * the others are copies of it with their own language and theme.
+     * Returns true when something changed.
+     */
+    private boolean ensureDefaultTemplates(AppType appType) {
         List<AppConfigTemplate> defaults = templateRepository
-                .findByAppTypeAndIsDefaultTrueOrderByCreatedAtAsc(AppType.TV_DISPLAY.name());
+                .findByAppTypeAndIsDefaultTrueOrderByCreatedAtAsc(appType.name());
         if (defaults.isEmpty()) return false;
+        List<DefaultSpec> specs = defaultSpecs(appType);
         boolean changed = false;
 
-        AppConfigTemplate dark = defaults.stream()
-                .filter(t -> !THEME_LIGHT.equals(t.getTheme()))
-                .findFirst().orElse(null);
-        if (dark != null && dark.getTheme() == null) {
-            dark.setTemplateName(TV_DARK_TEMPLATE);
-            dark.setTheme(THEME_DARK);
-            dark.setAppLanguage("ARABIC");
-            dark.setUpdatedAt(LocalDateTime.now());
-            templateRepository.save(dark);
-            if (dark.isActive()) applyTemplateToConfig(dark);
+        AppConfigTemplate first = defaults.get(0);
+        boolean anyNamed = defaults.stream().anyMatch(t ->
+                specs.stream().anyMatch(spec -> spec.name().equals(t.getTemplateName())));
+        if (!anyNamed) {
+            DefaultSpec spec = specs.get(0);
+            first.setTemplateName(spec.name());
+            first.setAppLanguage(spec.language());
+            first.setTheme(spec.theme());
+            first.setUpdatedAt(LocalDateTime.now());
+            templateRepository.save(first);
+            if (first.isActive()) applyTemplateToConfig(first);
             changed = true;
         }
 
-        boolean hasLight = defaults.stream().anyMatch(t -> THEME_LIGHT.equals(t.getTheme()));
-        if (!hasLight) {
-            AppConfigTemplate source = dark != null ? dark : defaults.get(0);
-            AppConfigTemplate light = new AppConfigTemplate();
-            light.setId(UUID.randomUUID().toString());
-            light.setAppType(AppType.TV_DISPLAY.name());
-            copyTemplateToTemplate(source, light);
-            light.setTemplateName(TV_LIGHT_TEMPLATE);
-            light.setDescription("System default template");
-            light.setTheme(THEME_LIGHT);
-            light.setAppLanguage("ARABIC");
-            light.setActive(false);
-            light.setDefault(true);
-            // Created after Arabic Dark so Dark stays the fallback default.
-            light.setCreatedAt(LocalDateTime.now());
-            light.setUpdatedAt(LocalDateTime.now());
-            templateRepository.save(light);
+        for (DefaultSpec spec : specs) {
+            boolean exists = defaults.stream().anyMatch(t -> spec.name().equals(t.getTemplateName()));
+            if (exists) continue;
+            AppConfigTemplate copy = new AppConfigTemplate();
+            copy.setId(UUID.randomUUID().toString());
+            copy.setAppType(appType.name());
+            copyTemplateToTemplate(first, copy);
+            copy.setTemplateName(spec.name());
+            copy.setDescription("System default template");
+            copy.setAppLanguage(spec.language());
+            copy.setTheme(spec.theme());
+            copy.setActive(false);
+            copy.setDefault(true);
+            // Created after the first default, which stays the fallback.
+            copy.setCreatedAt(LocalDateTime.now());
+            copy.setUpdatedAt(LocalDateTime.now());
+            templateRepository.save(copy);
             changed = true;
         }
         return changed;
@@ -164,11 +183,23 @@ public class TemplateService {
 
     @Transactional
     public AppConfigTemplate createTemplateFromActive(AppType appType, String templateName, String description) {
+        return createTemplateFromActive(appType, templateName, description, null);
+    }
+
+    /** A copy of [sourceTemplateId], or of the active template when none is given. */
+    @Transactional
+    public AppConfigTemplate createTemplateFromActive(AppType appType, String templateName, String description,
+                                                      String sourceTemplateId) {
         if (templateName == null || templateName.trim().isEmpty()) {
             throw new BusinessException("Template name is required");
         }
 
-        AppConfigTemplate activeTemplate = getActiveTemplate(appType);
+        AppConfigTemplate activeTemplate = sourceTemplateId == null || sourceTemplateId.isBlank()
+                ? getActiveTemplate(appType)
+                : getTemplateById(sourceTemplateId);
+        if (!activeTemplate.getAppType().equals(appType.name())) {
+            throw new BusinessException("Template belongs to another app");
+        }
 
         AppConfigTemplate newTemplate = new AppConfigTemplate();
         newTemplate.setId(UUID.randomUUID().toString());

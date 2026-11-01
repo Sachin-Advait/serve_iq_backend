@@ -27,6 +27,8 @@ public class TemplateRequestDTO {
     private String foregroundFontColor;
     private String accentColor;
     private String theme;
+    // "New" in the admin panel: the template to copy; empty = the active one
+    private String sourceTemplateId;
 
     // Feedback fields
     private Boolean imageCarouselEnabled;

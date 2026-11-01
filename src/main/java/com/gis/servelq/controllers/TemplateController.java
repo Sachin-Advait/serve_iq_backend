@@ -43,7 +43,8 @@ public class TemplateController {
         AppConfigTemplate created = templateService.createTemplateFromActive(
                 appType,
                 request.getTemplateName(),
-                request.getDescription()
+                request.getDescription(),
+                request.getSourceTemplateId()
         );
         return new ApiResponseDTO<>(true, "Template created from current settings", created);
     }
