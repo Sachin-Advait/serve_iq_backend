@@ -172,6 +172,16 @@ class AgentLogoutTest {
     }
 
     @Test
+    void displayBoardLeavesOutDisabledCounters() {
+        Fixture f = agentAtCounter();
+        Counter off = counter(f.branch);
+        off.setEnabled(false);
+        counters.save(off);
+
+        assertThat(counterService.getCounterDisplayBoard(f.branch.getId())).hasSize(1);
+    }
+
+    @Test
     void paperTicketWithoutMobileNumberSaves() {
         Fixture f = agentAtCounter();
         Token t = token(f, "A005", TokenStatus.WAITING);

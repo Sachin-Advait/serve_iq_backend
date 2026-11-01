@@ -555,13 +555,16 @@ public class CounterService {
     }
 
     /**
-     * TV/display-board feed: every counter in the branch with its current
+     * TV/display-board feed: every enabled counter in the branch with its current
      * token number, serving service, and status — built with two bulk
      * queries (services, active tokens) instead of one query per counter.
      */
     @Transactional(readOnly = true)
     public List<CounterDisplayDTO> getCounterDisplayBoard(String branchId) {
-        List<Counter> counters = counterRepository.findByBranchIdOrderByCreatedAtAsc(branchId);
+        // Disabled counters are left off the board, as on the visitor TV
+        List<Counter> counters = counterRepository.findByBranchIdOrderByCreatedAtAsc(branchId).stream()
+                .filter(c -> !Boolean.FALSE.equals(c.getEnabled()))
+                .collect(Collectors.toList());
         if (counters.isEmpty()) {
             return List.of();
         }
