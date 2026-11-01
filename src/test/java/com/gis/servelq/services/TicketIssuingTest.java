@@ -15,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalTime;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -83,6 +84,14 @@ class TicketIssuingTest {
         assertThatThrownBy(() -> branchService.assertTicketIssuingOpen("branch-1", "en"))
                 .isInstanceOf(TicketIssuingClosedException.class)
                 .hasMessageStartingWith("Tickets are issued from");
+    }
+
+    @Test
+    void kioskStatusIsOpenOrGivesTheVisitorMessage() {
+        assertThat(branchService.ticketIssuingClosedMessage("branch-1", "en")).isNull();
+
+        branch.setTicketIssuingEnabled(false);
+        assertThat(branchService.ticketIssuingClosedMessage("branch-1", "ar")).contains("توقف إصدار التذاكر");
     }
 
     @Test

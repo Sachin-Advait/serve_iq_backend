@@ -218,6 +218,19 @@ public class BranchService {
         }
     }
 
+    /**
+     * Null while the branch issues tickets, otherwise the visitor message
+     * (stopped, or outside the issuing hours) in the kiosk's language.
+     */
+    public String ticketIssuingClosedMessage(String branchId, String language) {
+        try {
+            assertTicketIssuingOpen(branchId, language);
+            return null;
+        } catch (TicketIssuingClosedException e) {
+            return e.getMessage();
+        }
+    }
+
     private static String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }

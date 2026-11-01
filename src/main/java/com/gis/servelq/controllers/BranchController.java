@@ -13,7 +13,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
@@ -77,6 +79,17 @@ public class BranchController {
                                                                  @RequestBody TicketIssuingRequest body,
                                                                  @AuthenticationPrincipal AuthenticatedUser user) {
         return ResponseEntity.ok(branchService.updateTicketIssuing(id, body, user));
+    }
+
+    // Whether the kiosk may issue tickets now; message is null while open
+    @GetMapping("/{id}/ticket-issuing/status")
+    public ResponseEntity<Map<String, Object>> ticketIssuingStatus(@PathVariable String id,
+                                                                   @RequestParam(required = false) String language) {
+        String message = branchService.ticketIssuingClosedMessage(id, language);
+        Map<String, Object> body = new HashMap<>();
+        body.put("open", message == null);
+        body.put("message", message);
+        return ResponseEntity.ok(body);
     }
 
     // Delete branch

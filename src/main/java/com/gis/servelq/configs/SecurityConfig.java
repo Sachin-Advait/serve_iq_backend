@@ -59,6 +59,9 @@ public class SecurityConfig {
                         // logged in, so the token records who created it.
                         .requestMatchers(HttpMethod.POST, "/serveiq/api/tokens/generate")
                         .hasAnyRole("SUPERVISOR", "RECEPTIONIST", "KIOSK")
+                        // The kiosk blocks its pages while ticket issuing is closed
+                        .requestMatchers(HttpMethod.GET, "/serveiq/api/branches/*/ticket-issuing/status")
+                        .hasAnyRole("SUPERVISOR", "RECEPTIONIST", "KIOSK")
                         // The feedback screen is logged in; feedback is credited by its user.
                         .requestMatchers(HttpMethod.POST, "/serveiq/api/feedback", "/serveiq/api/feedback/timeout")
                         .hasAnyRole("ADMIN", "FEEDBACK")
