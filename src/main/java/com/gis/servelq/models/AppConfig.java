@@ -32,6 +32,7 @@ public class AppConfig {
     private Integer flickerTime;        // TV: Rotation time in seconds
     private String foregroundFontColor;
     private String accentColor;
+    private String theme;               // TV: DARK or LIGHT board design
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "app_config_component_order", joinColumns = @JoinColumn(name = "config_id"))

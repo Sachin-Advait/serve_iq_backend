@@ -50,6 +50,11 @@ public class AppConfigService {
     @Value("${app.base-url:http://localhost:8085}")
     private String appBaseUrl;
 
+    /** The TV and the feedback screen start in Arabic; other apps in English. */
+    public static String defaultLanguage(AppType appType) {
+        return appType == AppType.TV_DISPLAY || appType == AppType.FEEDBACK ? "ARABIC" : "ENGLISH";
+    }
+
     public AppConfig getConfig(AppType appType) {
         return configRepository.findByAppType(appType.name())
                 .orElseGet(() -> createDefaultConfig(appType));
@@ -59,7 +64,7 @@ public class AppConfigService {
         AppConfig config = new AppConfig();
         config.setId(UUID.randomUUID().toString());
         config.setAppType(appType.name());
-        config.setAppLanguage("ENGLISH");
+        config.setAppLanguage(defaultLanguage(appType));
         config.setPrimaryColor("#3B3121");
         config.setSecondaryColor("#FFFFFF");
         config.setDefaultEnabled(true);
@@ -274,7 +279,7 @@ public class AppConfigService {
         AppConfig config = getConfig(appType);
 
         config.setDefaultEnabled(true);
-        config.setAppLanguage("ENGLISH");
+        config.setAppLanguage(defaultLanguage(appType));
         config.setPrimaryColor("#3B3121");
         config.setSecondaryColor("#FFFFFF");
 
@@ -365,6 +370,7 @@ public class AppConfigService {
                     .secondaryColor(config.getSecondaryColor())
                     .foregroundFontColor(config.getForegroundFontColor())
                     .accentColor(config.getAccentColor())
+                    .theme(config.getTheme())
                     .tickerEnabled(config.getTickerEnabled())
                     .tickerSpeed(config.getTickerSpeed())
                     .videosEnabled(config.getVideosEnabled())

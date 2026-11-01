@@ -11,6 +11,9 @@ import java.util.Optional;
 public interface AppConfigTemplateRepository extends JpaRepository<AppConfigTemplate, String> {
     List<AppConfigTemplate> findByAppTypeOrderByCreatedAtDesc(String appType);
     Optional<AppConfigTemplate> findByAppTypeAndIsActiveTrue(String appType);
-    Optional<AppConfigTemplate> findByAppTypeAndIsDefaultTrue(String appType);
+    // The TV has two default templates (Arabic Dark first, Arabic Light); the
+    // oldest one is the fallback when no template is active.
+    Optional<AppConfigTemplate> findFirstByAppTypeAndIsDefaultTrueOrderByCreatedAtAsc(String appType);
+    List<AppConfigTemplate> findByAppTypeAndIsDefaultTrueOrderByCreatedAtAsc(String appType);
     long countByAppTypeAndIsActiveTrue(String appType);
 }

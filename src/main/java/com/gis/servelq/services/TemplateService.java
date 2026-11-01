@@ -52,6 +52,10 @@ public class TemplateService {
             log.info("After creation, found {} templates", templates.size());
         }
 
+        if (appType == AppType.TV_DISPLAY && ensureTvDefaultTemplates()) {
+            templates = templateRepository.findByAppTypeOrderByCreatedAtDesc(appType.name());
+        }
+
         templates.forEach(t -> {
             if (t.getComponentOrder() != null) {
                 t.getComponentOrder().size();
@@ -73,7 +77,7 @@ public class TemplateService {
     }
 
     private AppConfigTemplate createDefaultTemplateInternal(AppType appType) {
-        return templateRepository.findByAppTypeAndIsDefaultTrue(appType.name())
+        return templateRepository.findFirstByAppTypeAndIsDefaultTrueOrderByCreatedAtAsc(appType.name())
                 .orElseGet(() -> {
                     log.info("Creating default template for app type: {}", appType);
 
@@ -83,7 +87,8 @@ public class TemplateService {
                     AppConfigTemplate template = new AppConfigTemplate();
                     template.setId(UUID.randomUUID().toString());
                     template.setAppType(appType.name());
-                    template.setTemplateName("Default Template");
+                    template.setTemplateName(appType == AppType.TV_DISPLAY
+                            ? TV_DARK_TEMPLATE : "Default Template");
                     template.setDescription("System default template");
                     template.setActive(true);
                     template.setDefault(true);
@@ -91,6 +96,10 @@ public class TemplateService {
                     template.setUpdatedAt(LocalDateTime.now());
 
                     copyConfigToTemplate(currentConfig, template);
+                    if (appType == AppType.TV_DISPLAY) {
+                        template.setTheme(THEME_DARK);
+                        template.setAppLanguage("ARABIC");
+                    }
 
                     AppConfigTemplate saved = templateRepository.save(template);
                     log.info("Default template saved with ID: {}", saved.getId());
@@ -99,6 +108,58 @@ public class TemplateService {
 
                     return saved;
                 });
+    }
+
+    static final String TV_DARK_TEMPLATE = "Arabic Dark";
+    static final String TV_LIGHT_TEMPLATE = "Arabic Light";
+    static final String THEME_DARK = "DARK";
+    static final String THEME_LIGHT = "LIGHT";
+
+    /**
+     * The TV has two default templates, Arabic Dark and Arabic Light, both
+     * in Arabic and neither deletable. The original "Default Template"
+     * becomes Arabic Dark; Arabic Light is a copy of it with the light
+     * design. Returns true when something changed.
+     */
+    private boolean ensureTvDefaultTemplates() {
+        List<AppConfigTemplate> defaults = templateRepository
+                .findByAppTypeAndIsDefaultTrueOrderByCreatedAtAsc(AppType.TV_DISPLAY.name());
+        if (defaults.isEmpty()) return false;
+        boolean changed = false;
+
+        AppConfigTemplate dark = defaults.stream()
+                .filter(t -> !THEME_LIGHT.equals(t.getTheme()))
+                .findFirst().orElse(null);
+        if (dark != null && dark.getTheme() == null) {
+            dark.setTemplateName(TV_DARK_TEMPLATE);
+            dark.setTheme(THEME_DARK);
+            dark.setAppLanguage("ARABIC");
+            dark.setUpdatedAt(LocalDateTime.now());
+            templateRepository.save(dark);
+            if (dark.isActive()) applyTemplateToConfig(dark);
+            changed = true;
+        }
+
+        boolean hasLight = defaults.stream().anyMatch(t -> THEME_LIGHT.equals(t.getTheme()));
+        if (!hasLight) {
+            AppConfigTemplate source = dark != null ? dark : defaults.get(0);
+            AppConfigTemplate light = new AppConfigTemplate();
+            light.setId(UUID.randomUUID().toString());
+            light.setAppType(AppType.TV_DISPLAY.name());
+            copyTemplateToTemplate(source, light);
+            light.setTemplateName(TV_LIGHT_TEMPLATE);
+            light.setDescription("System default template");
+            light.setTheme(THEME_LIGHT);
+            light.setAppLanguage("ARABIC");
+            light.setActive(false);
+            light.setDefault(true);
+            // Created after Arabic Dark so Dark stays the fallback default.
+            light.setCreatedAt(LocalDateTime.now());
+            light.setUpdatedAt(LocalDateTime.now());
+            templateRepository.save(light);
+            changed = true;
+        }
+        return changed;
     }
 
     @Transactional
@@ -149,6 +210,7 @@ public class TemplateService {
         if (request.getSecondaryColor() != null) template.setSecondaryColor(request.getSecondaryColor());
         if (request.getForegroundFontColor() != null) template.setForegroundFontColor(request.getForegroundFontColor());
         if (request.getAccentColor() != null) template.setAccentColor(request.getAccentColor());
+        if (request.getTheme() != null) template.setTheme(request.getTheme());
         if (request.getTickerEnabled() != null) template.setTickerEnabled(request.getTickerEnabled());
         if (request.getTickerSpeed() != null) template.setTickerSpeed(request.getTickerSpeed());
         if (request.getVideosEnabled() != null) template.setVideosEnabled(request.getVideosEnabled());
@@ -221,6 +283,8 @@ public class TemplateService {
             activeTemplate.setForegroundFontColor(updatedConfig.getForegroundFontColor());
         if (updatedConfig.getAccentColor() != null)
             activeTemplate.setAccentColor(updatedConfig.getAccentColor());
+        if (updatedConfig.getTheme() != null)
+            activeTemplate.setTheme(updatedConfig.getTheme());
         if (updatedConfig.getTickerEnabled() != null)
             activeTemplate.setTickerEnabled(updatedConfig.getTickerEnabled());
         if (updatedConfig.getTickerSpeed() != null)
@@ -315,6 +379,7 @@ public class TemplateService {
         if (request.getSecondaryColor() != null) template.setSecondaryColor(request.getSecondaryColor());
         if (request.getForegroundFontColor() != null) template.setForegroundFontColor(request.getForegroundFontColor());
         if (request.getAccentColor() != null) template.setAccentColor(request.getAccentColor());
+        if (request.getTheme() != null) template.setTheme(request.getTheme());
         if (request.getTickerEnabled() != null) template.setTickerEnabled(request.getTickerEnabled());
         if (request.getTickerSpeed() != null) template.setTickerSpeed(request.getTickerSpeed());
         if (request.getVideosEnabled() != null) template.setVideosEnabled(request.getVideosEnabled());
@@ -493,7 +558,7 @@ public class TemplateService {
 
     @Transactional
     public AppConfigTemplate activateDefaultTemplate(AppType appType) {
-        return templateRepository.findByAppTypeAndIsDefaultTrue(appType.name())
+        return templateRepository.findFirstByAppTypeAndIsDefaultTrueOrderByCreatedAtAsc(appType.name())
                 .map(template -> {
                     List<AppConfigTemplate> templates = templateRepository.findByAppTypeOrderByCreatedAtDesc(appType.name());
                     for (AppConfigTemplate t : templates) {
@@ -526,6 +591,7 @@ public class TemplateService {
         config.setSecondaryColor(template.getSecondaryColor());
         config.setForegroundFontColor(template.getForegroundFontColor());
         config.setAccentColor(template.getAccentColor());
+        config.setTheme(template.getTheme());
         config.setTickerEnabled(template.getTickerEnabled());
         config.setTickerSpeed(template.getTickerSpeed());
         config.setVideosEnabled(template.getVideosEnabled());
@@ -586,6 +652,7 @@ public class TemplateService {
         template.setSecondaryColor(config.getSecondaryColor());
         template.setForegroundFontColor(config.getForegroundFontColor());
         template.setAccentColor(config.getAccentColor());
+        template.setTheme(config.getTheme());
         template.setTickerEnabled(config.getTickerEnabled());
         template.setTickerSpeed(config.getTickerSpeed());
         template.setVideosEnabled(config.getVideosEnabled());
@@ -639,6 +706,7 @@ public class TemplateService {
         target.setSecondaryColor(source.getSecondaryColor());
         target.setForegroundFontColor(source.getForegroundFontColor());
         target.setAccentColor(source.getAccentColor());
+        target.setTheme(source.getTheme());
         target.setTickerEnabled(source.getTickerEnabled());
         target.setTickerSpeed(source.getTickerSpeed());
         target.setVideosEnabled(source.getVideosEnabled());
