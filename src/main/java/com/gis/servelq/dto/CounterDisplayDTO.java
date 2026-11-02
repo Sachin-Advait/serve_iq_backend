@@ -17,6 +17,7 @@ public class CounterDisplayDTO {
     private CounterStatus counterStatus;
 
     private String tokenNumber;
+    private String arabicTokenNumber;
 
     private String serviceName;
     private String arabicService;

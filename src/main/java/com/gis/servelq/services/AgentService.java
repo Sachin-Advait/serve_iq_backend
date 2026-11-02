@@ -416,14 +416,17 @@ public class AgentService {
         // Only visitors finished today; earlier days belong in the reports.
         return tokenRepository.findTop20ByStatusAndAssignedCounterIdAndEndAtGreaterThanEqualOrderByEndAtDesc(
                         TokenStatus.DONE, counterId, LocalDate.now().atStartOfDay())
-                .stream().map(token -> RecentServiceDTO.fromEntity(
-                        token.getToken(),
-                        token.getMobileNumber(),
-                        token.getServiceName(),
-                        token.getStartAt(),
-                        token.getEndAt(),
-                        token.getAgentNote()
-                )).collect(Collectors.toList());
+                .stream().map(token -> {
+                    RecentServiceDTO dto = RecentServiceDTO.fromEntity(
+                            token.getToken(),
+                            token.getMobileNumber(),
+                            token.getServiceName(),
+                            token.getStartAt(),
+                            token.getEndAt(),
+                            token.getAgentNote());
+                    dto.setArabicToken(token.arabicTokenOrToken());
+                    return dto;
+                }).collect(Collectors.toList());
     }
 
     @Transactional

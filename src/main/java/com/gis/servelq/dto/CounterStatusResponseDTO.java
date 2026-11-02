@@ -15,6 +15,7 @@ public class CounterStatusResponseDTO {
 
     // These fields will be null when no token is assigned or upcoming
     private String tokenNumber;
+    private String arabicTokenNumber;
     private String tokenId;
     private String serviceId;
     private String serviceName;
@@ -23,6 +24,7 @@ public class CounterStatusResponseDTO {
     public void clearTokenDetails() {
         this.tokenId = null;
         this.tokenNumber = null;
+        this.arabicTokenNumber = null;
         this.serviceId = null;
         this.serviceName = null;
         this.serviceCode = null;  // ADD THIS LINE

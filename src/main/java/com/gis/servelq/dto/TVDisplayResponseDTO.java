@@ -10,6 +10,9 @@ public class TVDisplayResponseDTO {
     private List<DisplayToken> nowServing;
     private List<String> upcomingTokens;
     private List<String> holdTokens;
+    // Same lists in Arabic form (001أ), in the same order
+    private List<String> upcomingArabicTokens;
+    private List<String> holdArabicTokens;
     // Every counter in the branch, for the TV's "Current counters" grid
     private List<CounterTile> counters;
     private String branchName;
@@ -22,6 +25,7 @@ public class TVDisplayResponseDTO {
     @Data
     public static class DisplayToken {
         private String token;
+        private String arabicToken;
         private String counter;
         private String service;
     }
@@ -33,5 +37,6 @@ public class TVDisplayResponseDTO {
         // CALLING, SERVING, IDLE or CLOSED (disabled, paused or no agent)
         private String status;
         private String token;
+        private String arabicToken;
     }
 }

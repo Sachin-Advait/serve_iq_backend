@@ -8,6 +8,7 @@ import lombok.Data;
 public class AgentCallResponseDTO {
     private String tokenId;
     private String token;
+    private String arabicToken;
     private String serviceName;
     private String serviceArabicName;
     private String mobileNumber;
@@ -16,6 +17,7 @@ public class AgentCallResponseDTO {
         AgentCallResponseDTO response = new AgentCallResponseDTO();
         response.setTokenId(token.getId());
         response.setToken(token.getToken());
+        response.setArabicToken(token.arabicTokenOrToken());
         response.setServiceName(token.getServiceName());
         response.setServiceArabicName(token.getServiceArabicName());
         response.setMobileNumber(token.getMobileNumber());

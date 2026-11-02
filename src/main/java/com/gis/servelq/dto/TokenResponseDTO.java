@@ -17,6 +17,7 @@ public class TokenResponseDTO {
 
     private String id;
     private String token;
+    private String arabicToken;
 
     private String serviceName;
 
@@ -55,6 +56,7 @@ public class TokenResponseDTO {
 
         dto.setId(token.getId());
         dto.setToken(token.getToken());
+        dto.setArabicToken(token.arabicTokenOrToken());
         dto.setServiceId(token.getServiceId());
         dto.setServiceName(token.getServiceName());
         dto.setServiceArabicName(token.getServiceArabicName());

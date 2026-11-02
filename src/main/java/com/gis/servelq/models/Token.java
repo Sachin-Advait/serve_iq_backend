@@ -38,6 +38,17 @@ public class Token {
     @NotBlank
     private String token;
 
+    // Arabic form of the ticket: number then the sub-service's Arabic code,
+    // e.g. 001أ for A001. Null when the service has no Arabic code (or for
+    // category tickets); use arabicTokenOrToken() to display.
+    @Column(name = "arabic_token", length = 20)
+    private String arabicToken;
+
+    /** The number to show in Arabic: the Arabic form, or the English one if there is none. */
+    public String arabicTokenOrToken() {
+        return arabicToken != null && !arabicToken.isBlank() ? arabicToken : token;
+    }
+
     // Letter part of the ticket (token minus its number). The sequence is
     // counted per prefix, so this is what the uniqueness is scoped to.
     @NotBlank

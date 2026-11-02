@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 @Data
 public class RecentServiceDTO {
     private String token;
+    private String arabicToken;
     private String civilId;
     private String serviceName;
     private Long timeTakenInMinutes;

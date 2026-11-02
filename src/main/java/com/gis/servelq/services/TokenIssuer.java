@@ -59,6 +59,12 @@ public class TokenIssuer {
 
         Token token = new Token();
         token.setToken(prefix + String.format("%03d", nextSeq));
+        // Arabic: number then the Arabic code (001أ). Only normal tickets use
+        // the service's code; a category ticket keeps its English prefix.
+        String arabicCode = service.getArabicCode();
+        if (priority == 50 && arabicCode != null && !arabicCode.isBlank()) {
+            token.setArabicToken(String.format("%03d", nextSeq) + arabicCode.trim());
+        }
         token.setTokenPrefix(prefix);
         token.setTokenSeq(nextSeq);
         token.setTokenDate(today);

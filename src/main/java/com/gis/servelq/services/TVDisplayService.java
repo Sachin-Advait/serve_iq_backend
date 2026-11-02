@@ -71,6 +71,7 @@ public class TVDisplayService {
         response.setLatestCalls(latestCalled.stream().map(token -> {
             TVDisplayResponseDTO.DisplayToken dt = new TVDisplayResponseDTO.DisplayToken();
             dt.setToken(token.getToken());
+            dt.setArabicToken(token.arabicTokenOrToken());
             dt.setCounter(token.getAssignedCounterName());
             dt.setService(token.getServiceName());
             return dt;
@@ -79,6 +80,7 @@ public class TVDisplayService {
         response.setNowServing(nowServing.stream().map(token -> {
             TVDisplayResponseDTO.DisplayToken dt = new TVDisplayResponseDTO.DisplayToken();
             dt.setToken(token.getToken());
+            dt.setArabicToken(token.arabicTokenOrToken());
             dt.setCounter(token.getAssignedCounterName());
             dt.setService(token.getServiceName());
             return dt;
@@ -92,6 +94,14 @@ public class TVDisplayService {
 
         response.setHoldTokens(hold.stream()
                 .map(Token::getToken)
+                .collect(Collectors.toList()));
+
+        response.setUpcomingArabicTokens(upcoming.stream()
+                .map(Token::arabicTokenOrToken)
+                .collect(Collectors.toList()));
+
+        response.setHoldArabicTokens(hold.stream()
+                .map(Token::arabicTokenOrToken)
                 .collect(Collectors.toList()));
 
         response.setWaiting(waitingCount);
@@ -127,6 +137,7 @@ public class TVDisplayService {
             Token t = active.get(c.getId());
             if (t != null) {
                 tile.setToken(t.getToken());
+                tile.setArabicToken(t.arabicTokenOrToken());
                 tile.setStatus(t.getStatus().name());
             } else if (c.getUserId() == null) {
                 tile.setStatus("CLOSED");

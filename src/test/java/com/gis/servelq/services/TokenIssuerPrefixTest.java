@@ -37,6 +37,7 @@ class TokenIssuerPrefixTest {
         sub.setId("sub");
         sub.setCode("X");
         sub.setParentId("main");
+        sub.setArabicCode("أ");
         Branch branch = new Branch();
         branch.setId("b1");
 
@@ -52,7 +53,10 @@ class TokenIssuerPrefixTest {
         request.setBranchId("b1");
         request.setPriority(50);
 
-        assertThat(tokenIssuer.issueOnce(request).getToken()).isEqualTo("X005");
+        Token issued = tokenIssuer.issueOnce(request);
+        assertThat(issued.getToken()).isEqualTo("X005");
+        assertThat(issued.getArabicToken()).isEqualTo("005أ");
+        assertThat(issued.arabicTokenOrToken()).isEqualTo("005أ");
     }
 
     @Test
@@ -90,5 +94,8 @@ class TokenIssuerPrefixTest {
         assertThat(tokenA.getTokenPrefix()).isEqualTo("A");
         assertThat(tokenB.getToken()).isEqualTo("B001");
         assertThat(tokenB.getTokenPrefix()).isEqualTo("B");
+        // No Arabic code: the Arabic display falls back to the English number
+        assertThat(tokenB.getArabicToken()).isNull();
+        assertThat(tokenB.arabicTokenOrToken()).isEqualTo("B001");
     }
 }

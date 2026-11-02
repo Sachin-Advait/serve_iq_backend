@@ -470,6 +470,7 @@ public class CounterService {
             if (token != null) {
                 response.setTokenId(token.getId());
                 response.setTokenNumber(token.getToken());
+                response.setArabicTokenNumber(token.arabicTokenOrToken());
                 response.setServiceId(token.getServiceId());
 
                 if (StringUtils.hasText(token.getServiceId())) {
@@ -606,6 +607,7 @@ public class CounterService {
             dto.setCounterStatus(displayStatus(counter, activeToken));
             if (activeToken != null) {
                 dto.setTokenNumber(activeToken.getToken());
+                dto.setArabicTokenNumber(activeToken.arabicTokenOrToken());
                 dto.setCalledAt(activeToken.getStartAt());
                 dto.setServiceName(serviceNameById.get(activeToken.getServiceId()));
                 dto.setArabicService(arabicServiceNameById.get(activeToken.getServiceId()));
