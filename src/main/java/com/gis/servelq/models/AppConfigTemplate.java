@@ -39,6 +39,10 @@ public class AppConfigTemplate {
     private String accentColor;
     private String theme;
 
+    // Which built-in default this is (ARABIC, ENGLISH, ARABIC_DARK, ...);
+    // null for templates made in the admin panel. Stays when it is renamed.
+    private String defaultKey;
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "app_config_template_component_order", joinColumns = @JoinColumn(name = "template_id"))
     @Column(name = "component")

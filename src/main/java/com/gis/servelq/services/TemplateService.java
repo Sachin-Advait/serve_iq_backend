@@ -112,7 +112,7 @@ public class TemplateService {
     static final String THEME_LIGHT = "LIGHT";
 
     /** One built-in default template: its name, language and TV theme. */
-    private record DefaultSpec(String name, String language, String theme) {}
+    private record DefaultSpec(String key, String name, String language, String theme) {}
 
     /**
      * Each app has an Arabic and an English default template; the TV has one
@@ -122,14 +122,14 @@ public class TemplateService {
     private static List<DefaultSpec> defaultSpecs(AppType appType) {
         if (appType == AppType.TV_DISPLAY) {
             return List.of(
-                    new DefaultSpec("Arabic Dark", "ARABIC", THEME_DARK),
-                    new DefaultSpec("Arabic Light", "ARABIC", THEME_LIGHT),
-                    new DefaultSpec("English Dark", "ENGLISH", THEME_DARK),
-                    new DefaultSpec("English Light", "ENGLISH", THEME_LIGHT));
+                    new DefaultSpec("ARABIC_DARK", "Arabic Dark", "ARABIC", THEME_DARK),
+                    new DefaultSpec("ARABIC_LIGHT", "Arabic Light", "ARABIC", THEME_LIGHT),
+                    new DefaultSpec("ENGLISH_DARK", "English Dark", "ENGLISH", THEME_DARK),
+                    new DefaultSpec("ENGLISH_LIGHT", "English Light", "ENGLISH", THEME_LIGHT));
         }
         return List.of(
-                new DefaultSpec("Arabic", "ARABIC", null),
-                new DefaultSpec("English", "ENGLISH", null));
+                new DefaultSpec("ARABIC", "Arabic", "ARABIC", null),
+                new DefaultSpec("ENGLISH", "English", "ENGLISH", null));
     }
 
     /**
@@ -145,11 +145,27 @@ public class TemplateService {
         List<DefaultSpec> specs = defaultSpecs(appType);
         boolean changed = false;
 
+        // Defaults are matched by a fixed key, not by name, so renaming one
+        // in the admin panel edits that template instead of bringing the old
+        // name back as a new one. Older rows have no key yet: each takes the
+        // key of the default whose name it still has.
+        for (DefaultSpec spec : specs) {
+            if (defaults.stream().anyMatch(t -> spec.key().equals(t.getDefaultKey()))) continue;
+            for (AppConfigTemplate t : defaults) {
+                if (t.getDefaultKey() == null && spec.name().equals(t.getTemplateName())) {
+                    t.setDefaultKey(spec.key());
+                    templateRepository.save(t);
+                    changed = true;
+                    break;
+                }
+            }
+        }
+
+        // The original "Default Template" becomes the first default.
         AppConfigTemplate first = defaults.get(0);
-        boolean anyNamed = defaults.stream().anyMatch(t ->
-                specs.stream().anyMatch(spec -> spec.name().equals(t.getTemplateName())));
-        if (!anyNamed) {
+        if (defaults.stream().allMatch(t -> t.getDefaultKey() == null)) {
             DefaultSpec spec = specs.get(0);
+            first.setDefaultKey(spec.key());
             first.setTemplateName(spec.name());
             first.setAppLanguage(spec.language());
             first.setTheme(spec.theme());
@@ -160,12 +176,13 @@ public class TemplateService {
         }
 
         for (DefaultSpec spec : specs) {
-            boolean exists = defaults.stream().anyMatch(t -> spec.name().equals(t.getTemplateName()));
+            boolean exists = defaults.stream().anyMatch(t -> spec.key().equals(t.getDefaultKey()));
             if (exists) continue;
             AppConfigTemplate copy = new AppConfigTemplate();
             copy.setId(UUID.randomUUID().toString());
             copy.setAppType(appType.name());
             copyTemplateToTemplate(first, copy);
+            copy.setDefaultKey(spec.key());
             copy.setTemplateName(spec.name());
             copy.setDescription("System default template");
             copy.setAppLanguage(spec.language());
