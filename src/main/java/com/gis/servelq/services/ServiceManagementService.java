@@ -54,7 +54,7 @@ public class ServiceManagementService {
         Services newService = new Services();
 
         newService.setCode(CodeUniquenessValidator.normalize(code));
-        newService.setArabicCode(isSub ? blankToNull(checkLength(serviceRequest.getArabicCode(), "Arabic code")) : null);
+        newService.setArabicCode(isSub ? requireArabicCode(serviceRequest.getArabicCode()) : null);
         newService.setName(serviceRequest.getName());
         newService.setArabicName(serviceRequest.getArabicName());
         newService.setDescription(blankToNull(serviceRequest.getDescription()));
@@ -149,7 +149,7 @@ public class ServiceManagementService {
         // Prefix must stay unique in the branch the service ends up in, also
         // when only the branch changes.
         // Main service codes are hidden and filled automatically, so only a
-        // sub-service's code can be changed.
+        // sub-service's code can be changed here. Codes stay unique either way.
         String targetBranchId = updateRequest.getBranchId() != null ? updateRequest.getBranchId() : service.getBranchId();
         boolean isSub = CodeUniquenessValidator.isSubService(service);
         if (isSub) {
@@ -161,8 +161,10 @@ public class ServiceManagementService {
                 service.setCode(CodeUniquenessValidator.normalize(code));
             }
             if (updateRequest.getArabicCode() != null) {
-                service.setArabicCode(blankToNull(checkLength(updateRequest.getArabicCode(), "Arabic code")));
+                service.setArabicCode(requireArabicCode(updateRequest.getArabicCode()));
             }
+        } else if (!targetBranchId.equals(service.getBranchId())) {
+            codeUniquenessValidator.checkServiceCode(service.getCode(), targetBranchId, service.getId());
         }
 
         // Update only non-null fields
@@ -272,6 +274,15 @@ public class ServiceManagementService {
         return value == null ? null : value.trim();
     }
 
+    // Sub-services must have an Arabic code, at most 2 characters
+    private static String requireArabicCode(String value) {
+        String code = checkLength(value, "Arabic code");
+        if (code == null || code.isEmpty()) {
+            throw new BusinessException("Arabic code is required");
+        }
+        return code;
+    }
+
     // Next free S-number among the branch's main services: S1, S2, S3, ...
     private String nextMainServiceCode(String branchId) {
         int max = 0;
@@ -281,7 +292,12 @@ public class ServiceManagementService {
                 max = Math.max(max, Integer.parseInt(m.group(1)));
             }
         }
-        return "S" + (max + 1);
+        int n = max + 1;
+        // Skip an S-number already taken by a sub-service or category
+        while (!codeUniquenessValidator.isServiceCodeFree("S" + n, branchId)) {
+            n++;
+        }
+        return "S" + n;
     }
 
     // Helper method to clone service for audit comparison

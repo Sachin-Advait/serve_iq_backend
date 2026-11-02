@@ -76,29 +76,18 @@ class CodeUniquenessValidatorTest {
     }
 
     @Test
-    void subServiceCannotTakeAnotherSubServicePrefixInTheBranch() {
+    void serviceCannotTakeAnotherServicePrefixInTheBranch() {
         when(serviceRepository.findByNormalizedCodeAndBranchId("A", "b1"))
-                .thenReturn(List.of(service("s2", "A", "Pensions", "s1")));
+                .thenReturn(List.of(service("s1", "A", "Pensions", null)));
 
         assertThatThrownBy(() -> validator.checkServiceCode("a", "b1", null))
-                .hasMessageContaining("sub-service \"Pensions\"");
-    }
-
-    @Test
-    void hiddenMainServiceCodesDoNotBlockAPrefix() {
-        when(serviceRepository.findByNormalizedCodeAndBranchId("A", "b1"))
-                .thenReturn(List.of(service("s1", "A", "Pensions", null)));
-        when(serviceRepository.findByNormalizedCode("A"))
-                .thenReturn(List.of(service("s1", "A", "Pensions", null)));
-
-        assertThatCode(() -> validator.checkServiceCode("A", "b1", null)).doesNotThrowAnyException();
-        assertThatCode(() -> validator.checkCategoryCode("A", null)).doesNotThrowAnyException();
+                .hasMessageContaining("service \"Pensions\"");
     }
 
     @Test
     void updatingKeepsItsOwnPrefix() {
         when(serviceRepository.findByNormalizedCodeAndBranchId("A", "b1"))
-                .thenReturn(List.of(service("s1", "A", "Pensions", "m1")));
+                .thenReturn(List.of(service("s1", "A", "Pensions", null)));
         when(categoryRepository.findByNormalizedCode("V")).thenReturn(List.of(category("c1", "V", "VIP")));
 
         assertThatCode(() -> validator.checkServiceCode("A", "b1", "s1")).doesNotThrowAnyException();
