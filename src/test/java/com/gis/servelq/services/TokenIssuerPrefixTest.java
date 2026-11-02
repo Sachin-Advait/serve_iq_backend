@@ -32,10 +32,7 @@ class TokenIssuerPrefixTest {
     @InjectMocks private TokenIssuer tokenIssuer;
 
     @Test
-    void subServiceTicketUsesMainServiceLetter() {
-        Services main = new Services();
-        main.setId("main");
-        main.setCode("A");
+    void subServiceTicketUsesItsOwnCode() {
         Services sub = new Services();
         sub.setId("sub");
         sub.setCode("X");
@@ -44,9 +41,8 @@ class TokenIssuerPrefixTest {
         branch.setId("b1");
 
         when(serviceRepository.findById("sub")).thenReturn(Optional.of(sub));
-        when(serviceRepository.findById("main")).thenReturn(Optional.of(main));
         when(branchRepository.findById("b1")).thenReturn(Optional.of(branch));
-        when(tokenRepository.findLastSeqForPrefix(eq("b1"), eq("A"), any()))
+        when(tokenRepository.findLastSeqForPrefix(eq("b1"), eq("X"), any()))
                 .thenReturn(Optional.of(4));
         when(counterServiceLinker.countersForService(sub)).thenReturn(List.of());
         when(tokenRepository.saveAndFlush(any(Token.class))).thenAnswer(i -> i.getArgument(0));
@@ -56,7 +52,7 @@ class TokenIssuerPrefixTest {
         request.setBranchId("b1");
         request.setPriority(50);
 
-        assertThat(tokenIssuer.issueOnce(request).getToken()).isEqualTo("A005");
+        assertThat(tokenIssuer.issueOnce(request).getToken()).isEqualTo("X005");
     }
 
     @Test

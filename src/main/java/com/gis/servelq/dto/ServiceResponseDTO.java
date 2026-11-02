@@ -12,6 +12,7 @@ import java.util.List;
 public class ServiceResponseDTO {
     private String id;
     private String code;
+    private String arabicCode;
     private String name;
     private String arabicName;
     private String description;
@@ -30,6 +31,7 @@ public class ServiceResponseDTO {
         ServiceResponseDTO dto = new ServiceResponseDTO();
         dto.setId(service.getId());
         dto.setCode(service.getCode());
+        dto.setArabicCode(service.getArabicCode());
         dto.setName(service.getName());
         dto.setArabicName(service.getArabicName());
         dto.setDescription(service.getDescription());

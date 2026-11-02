@@ -1,5 +1,6 @@
 package com.gis.servelq.services;
 
+import com.gis.servelq.Exceptions.BusinessException;
 import com.gis.servelq.dto.ServiceRequest;
 import com.gis.servelq.dto.ServiceResponseDTO;
 import com.gis.servelq.dto.ServiceUpdateRequest;
@@ -14,6 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -29,7 +32,15 @@ public class ServiceManagementService {
 
     @Transactional
     public Services createService(ServiceRequest serviceRequest, AuthenticatedUser user) {
-        codeUniquenessValidator.checkServiceCode(serviceRequest.getCode(), serviceRequest.getBranchId(), null);
+        boolean isSub = serviceRequest.getParentId() != null && !serviceRequest.getParentId().isBlank();
+        String code;
+        if (isSub) {
+            code = checkLength(serviceRequest.getCode(), "Code");
+            codeUniquenessValidator.checkServiceCode(code, serviceRequest.getBranchId(), null);
+        } else {
+            // Main service codes are hidden and not used anywhere: S1, S2, S3, ...
+            code = nextMainServiceCode(serviceRequest.getBranchId());
+        }
 
         branchRepository.findById(serviceRequest.getBranchId())
                 .orElseThrow(() -> new RuntimeException("Branch does not exist"));
@@ -42,7 +53,8 @@ public class ServiceManagementService {
 
         Services newService = new Services();
 
-        newService.setCode(CodeUniquenessValidator.normalize(serviceRequest.getCode()));
+        newService.setCode(CodeUniquenessValidator.normalize(code));
+        newService.setArabicCode(isSub ? blankToNull(checkLength(serviceRequest.getArabicCode(), "Arabic code")) : null);
         newService.setName(serviceRequest.getName());
         newService.setArabicName(serviceRequest.getArabicName());
         newService.setDescription(blankToNull(serviceRequest.getDescription()));
@@ -136,13 +148,21 @@ public class ServiceManagementService {
 
         // Prefix must stay unique in the branch the service ends up in, also
         // when only the branch changes.
+        // Main service codes are hidden and filled automatically, so only a
+        // sub-service's code can be changed.
         String targetBranchId = updateRequest.getBranchId() != null ? updateRequest.getBranchId() : service.getBranchId();
-        boolean codeChanged = updateRequest.getCode() != null && !updateRequest.getCode().isBlank()
-                && !CodeUniquenessValidator.normalize(updateRequest.getCode()).equals(CodeUniquenessValidator.normalize(service.getCode()));
-        if (codeChanged || !targetBranchId.equals(service.getBranchId())) {
-            String code = codeChanged ? updateRequest.getCode() : service.getCode();
-            codeUniquenessValidator.checkServiceCode(code, targetBranchId, service.getId());
-            service.setCode(CodeUniquenessValidator.normalize(code));
+        boolean isSub = CodeUniquenessValidator.isSubService(service);
+        if (isSub) {
+            boolean codeChanged = updateRequest.getCode() != null && !updateRequest.getCode().isBlank()
+                    && !CodeUniquenessValidator.normalize(updateRequest.getCode()).equals(CodeUniquenessValidator.normalize(service.getCode()));
+            if (codeChanged || !targetBranchId.equals(service.getBranchId())) {
+                String code = codeChanged ? checkLength(updateRequest.getCode(), "Code") : service.getCode();
+                codeUniquenessValidator.checkServiceCode(code, targetBranchId, service.getId());
+                service.setCode(CodeUniquenessValidator.normalize(code));
+            }
+            if (updateRequest.getArabicCode() != null) {
+                service.setArabicCode(blankToNull(checkLength(updateRequest.getArabicCode(), "Arabic code")));
+            }
         }
 
         // Update only non-null fields
@@ -241,11 +261,35 @@ public class ServiceManagementService {
         serviceRepository.deleteById(id);
     }
 
+    private static final int MAX_CODE_LENGTH = 2;
+    private static final Pattern MAIN_CODE = Pattern.compile("S(\\d+)");
+
+    // Sub-service codes (English and Arabic) allow at most 2 characters
+    private static String checkLength(String value, String label) {
+        if (value != null && value.trim().length() > MAX_CODE_LENGTH) {
+            throw new BusinessException(label + " can be at most " + MAX_CODE_LENGTH + " characters");
+        }
+        return value == null ? null : value.trim();
+    }
+
+    // Next free S-number among the branch's main services: S1, S2, S3, ...
+    private String nextMainServiceCode(String branchId) {
+        int max = 0;
+        for (Services s : serviceRepository.findAllMainServicesByBranchId(branchId)) {
+            Matcher m = MAIN_CODE.matcher(s.getCode() == null ? "" : CodeUniquenessValidator.normalize(s.getCode()));
+            if (m.matches()) {
+                max = Math.max(max, Integer.parseInt(m.group(1)));
+            }
+        }
+        return "S" + (max + 1);
+    }
+
     // Helper method to clone service for audit comparison
     private Services cloneService(Services original) {
         Services clone = new Services();
         clone.setId(original.getId());
         clone.setCode(original.getCode());
+        clone.setArabicCode(original.getArabicCode());
         clone.setName(original.getName());
         clone.setArabicName(original.getArabicName());
         clone.setDescription(original.getDescription());

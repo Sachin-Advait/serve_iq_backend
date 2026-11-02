@@ -8,6 +8,8 @@ import java.util.List;
 @Data
 public class ServiceUpdateRequest {
     private String code;
+    // An empty string clears it; null leaves it unchanged
+    private String arabicCode;
     private String name;
     private String arabicName;
     private String description;

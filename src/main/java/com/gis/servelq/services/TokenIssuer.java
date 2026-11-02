@@ -52,7 +52,8 @@ public class TokenIssuer {
         int priority = request.getPriority() != null ? request.getPriority() : 50;
 
         // Each prefix has its own daily sequence: A001, B001, A002, C001.
-        String prefix = resolveTokenPrefix(mainServiceCode(service), priority);
+        // A sub-service uses its own code, not its main service's.
+        String prefix = resolveTokenPrefix(service.getCode(), priority);
         int nextSeq = tokenRepository.findLastSeqForPrefix(branch.getId(), prefix, today)
                 .orElse(0) + 1;
 
@@ -84,21 +85,6 @@ public class TokenIssuer {
     private static String currentUserId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         return auth != null && auth.getPrincipal() instanceof AuthenticatedUser user ? user.id() : null;
-    }
-
-    /**
-     * Sub-services take their main service's letter (A, B, ...), so a ticket
-     * for a sub-service of "A" is A0xx rather than the sub-service's own code.
-     */
-    private String mainServiceCode(Services service) {
-        Services current = service;
-        // Bounded walk up the parent chain, in case of bad data (a cycle).
-        for (int depth = 0; depth < 10 && current.getParentId() != null; depth++) {
-            Services parent = serviceRepository.findById(current.getParentId()).orElse(null);
-            if (parent == null) break;
-            current = parent;
-        }
-        return current.getCode();
     }
 
     private String resolveTokenPrefix(String serviceCode, int priority) {

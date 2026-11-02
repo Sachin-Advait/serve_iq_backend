@@ -19,8 +19,14 @@ public class Services {
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
+    // Main services: hidden, filled automatically (S1, S2, ...) and not used
+    // anywhere. Sub-services: the ticket prefix, at most 2 characters.
     @NotBlank
     private String code;
+
+    // Sub-services only: the Arabic letter(s) matching code, at most 2 characters
+    @Column(name = "arabic_code", length = 2)
+    private String arabicCode;
 
     @NotBlank
     private String name;

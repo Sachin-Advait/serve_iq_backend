@@ -8,8 +8,9 @@ import java.util.List;
 
 @Data
 public class ServiceRequest {
-    @NotBlank
+    // Required for a sub-service; a main service's code is filled automatically
     private String code;
+    private String arabicCode;
 
     @NotBlank
     private String name;

@@ -13,10 +13,11 @@ import java.util.Objects;
 
 /**
  * A code is the ticket prefix (A001, V001, ...), so it must be unique across
- * services, sub-services and categories together, ignoring case and spaces.
- * Services belong to one branch, so a service code only clashes with services
- * of the same branch; categories are global, so a category code clashes with
- * every service in every branch.
+ * sub-services and categories together, ignoring case and spaces.
+ * Sub-services belong to one branch, so a sub-service code only clashes with
+ * sub-services of the same branch; categories are global, so a category code
+ * clashes with every sub-service in every branch. Main service codes are
+ * hidden and filled automatically (S1, S2, ...), so they take no part.
  */
 @Component
 @RequiredArgsConstructor
@@ -34,8 +35,8 @@ public class CodeUniquenessValidator {
         String normalized = requireCode(code);
 
         for (Services s : serviceRepository.findByNormalizedCodeAndBranchId(normalized, branchId)) {
-            if (!Objects.equals(s.getId(), excludeServiceId)) {
-                throw clash(normalized, isSubService(s) ? "sub-service" : "service", s.getName());
+            if (isSubService(s) && !Objects.equals(s.getId(), excludeServiceId)) {
+                throw clash(normalized, "sub-service", s.getName());
             }
         }
         for (Category c : categoryRepository.findByNormalizedCode(normalized)) {
@@ -53,7 +54,9 @@ public class CodeUniquenessValidator {
             }
         }
         for (Services s : serviceRepository.findByNormalizedCode(normalized)) {
-            throw clash(normalized, isSubService(s) ? "sub-service" : "service", s.getName());
+            if (isSubService(s)) {
+                throw clash(normalized, "sub-service", s.getName());
+            }
         }
     }
 
@@ -65,13 +68,13 @@ public class CodeUniquenessValidator {
         return normalized;
     }
 
-    private static boolean isSubService(Services s) {
+    static boolean isSubService(Services s) {
         return s.getParentId() != null && !s.getParentId().isBlank();
     }
 
     private static BusinessException clash(String code, String kind, String name) {
         return new BusinessException(
                 "Prefix \"" + code + "\" is already used by the " + kind + " \"" + name
-                        + "\". Prefixes must be unique across services, sub-services and categories.");
+                        + "\". Prefixes must be unique across sub-services and categories.");
     }
 }
