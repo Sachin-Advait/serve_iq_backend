@@ -102,7 +102,7 @@ public class DashboardService {
         kpis.add(KpiDTO.builder()
                 .icon("CLOCK")
                 .label("AVG SERVICE TIME")
-                .value(String.format("%.1fmin", avgServiceTime))
+                .value(formatMinutes(avgServiceTime))
                 .change(serviceChange)
                 .positive(avgServiceTime <= yesterdayAvgService)
                 .build());
@@ -247,10 +247,29 @@ public class DashboardService {
     private String formatTimeChange(double current, double previous) {
         double diff = current - previous;
         if (diff < 0) {
-            return String.format("%.1fm improvement", Math.abs(diff));
+            return formatMinutes(Math.abs(diff)) + " improvement";
         } else if (diff > 0) {
-            return String.format("+%.1fm from yesterday", diff);
+            return "+" + formatMinutes(diff) + " from yesterday";
         }
         return "No change";
+    }
+
+    /**
+     * Minutes as days, hours and minutes, leaving out the larger units that
+     * are zero: 45min, 7h 27min, 1d 2h 5min. Under a minute keeps one decimal.
+     */
+    static String formatMinutes(double minutes) {
+        if (minutes < 1) {
+            return String.format("%.1fmin", minutes);
+        }
+        long total = Math.round(minutes);
+        long days = total / 1440;
+        long hours = (total % 1440) / 60;
+        long mins = total % 60;
+        StringBuilder sb = new StringBuilder();
+        if (days > 0) sb.append(days).append("d ");
+        if (days > 0 || hours > 0) sb.append(hours).append("h ");
+        sb.append(mins).append("min");
+        return sb.toString();
     }
 }
