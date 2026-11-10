@@ -139,6 +139,8 @@ public class TVDisplayService {
                 tile.setToken(t.getToken());
                 tile.setArabicToken(t.arabicTokenOrToken());
                 tile.setStatus(t.getStatus().name());
+                tile.setService(t.getServiceName());
+                tile.setServiceArabic(t.getServiceArabicName());
             } else if (c.getUserId() == null) {
                 tile.setStatus("CLOSED");
             } else if (Boolean.TRUE.equals(c.getPaused())) {

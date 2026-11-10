@@ -38,5 +38,8 @@ public class TVDisplayResponseDTO {
         private String status;
         private String token;
         private String arabicToken;
+        // Service of the token being called/served (admin live dashboard)
+        private String service;
+        private String serviceArabic;
     }
 }

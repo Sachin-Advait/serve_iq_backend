@@ -34,6 +34,8 @@ public interface UserRepository extends JpaRepository<User, String> {
 
     Page<User> findByRoleIn(java.util.Collection<UserRole> roles, Pageable pageable);
 
+    List<User> findByRoleIn(java.util.Collection<UserRole> roles);
+
     // Same as searchUsers, for several roles at once (e.g. USER and AGENT)
     @Query("SELECT u FROM User u WHERE " +
             "(LOWER(u.name) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
