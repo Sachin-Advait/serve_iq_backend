@@ -25,7 +25,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.*;
 
-/** One mail per crossing of the waiting limit, to the chosen roles of that branch. */
+/** Hourly check: each enabled branch at or over the waiting limit is mailed to the chosen roles. */
 @ExtendWith(MockitoExtension.class)
 class TokenAlertServiceTest {
 
@@ -51,7 +51,11 @@ class TokenAlertServiceTest {
         Branch b = new Branch();
         b.setId("b1");
         b.setName("Muscat");
-        lenient().when(branchRepository.findById("b1")).thenReturn(Optional.of(b));
+        Branch off = new Branch();
+        off.setId("b3");
+        off.setName("Closed");
+        off.setEnabled(false);
+        lenient().when(branchRepository.findAll()).thenReturn(List.of(b, off));
         lenient().when(mailProvider.getIfAvailable()).thenReturn(mailSender);
         lenient().when(userRepository.findByRoleIn(anyCollection())).thenReturn(List.of(
                 user("a@x.com", UserRole.ADMIN, null, true),
@@ -76,28 +80,22 @@ class TokenAlertServiceTest {
     }
 
     @Test
-    void mailsOncePerCrossing() {
+    void mailsEachHourlyRunWhileAtOrOverLimit() {
         waiting(19);
-        service.check("b1");
+        service.checkAllBranches();
         verify(mailSender, never()).send(any(SimpleMailMessage.class));
 
         waiting(20);
-        service.check("b1");
-        waiting(25);
-        service.check("b1");
-        verify(mailSender, times(1)).send(any(SimpleMailMessage.class));
-
-        waiting(10); // drops below: re-armed
-        service.check("b1");
-        waiting(20);
-        service.check("b1");
+        service.checkAllBranches();
+        service.checkAllBranches(); // still over an hour later: mailed again
         verify(mailSender, times(2)).send(any(SimpleMailMessage.class));
+        verify(tokenRepository, never()).countByStatusForBranch("b3"); // disabled branch skipped
     }
 
     @Test
     void sendsToActiveUsersOfTheBranchOrNoBranch() {
         waiting(21);
-        service.check("b1");
+        service.checkAllBranches();
         ArgumentCaptor<SimpleMailMessage> msg = ArgumentCaptor.forClass(SimpleMailMessage.class);
         verify(mailSender).send(msg.capture());
         assertThat(msg.getValue().getTo()).containsExactly("a@x.com", "m@x.com");
@@ -107,11 +105,10 @@ class TokenAlertServiceTest {
     @Test
     void nothingWhenDisabledOrNoMailHost() {
         settings.setEnabled(false);
-        service.check("b1");
+        service.checkAllBranches();
         settings.setEnabled(true);
         ReflectionTestUtils.setField(service, "mailHost", "");
-        waiting(30);
-        service.check("b1");
+        service.checkAllBranches();
         verify(mailSender, never()).send(any(SimpleMailMessage.class));
     }
 }

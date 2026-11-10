@@ -2,7 +2,6 @@ package com.gis.servelq.services;
 
 import com.gis.servelq.Exceptions.BusinessException;
 import com.gis.servelq.dto.TokenAlertSettingsDTO;
-import com.gis.servelq.events.TokenEvent;
 import com.gis.servelq.models.Branch;
 import com.gis.servelq.models.TokenAlertSettings;
 import com.gis.servelq.models.TokenStatus;
@@ -18,22 +17,19 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.event.TransactionPhase;
-import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * E-mails the chosen roles when a branch's waiting tokens (today, status
  * WAITING) reach the threshold set on the admin panel's System page.
- * One mail per crossing: once a branch has been alerted it is not mailed
- * again until its waiting count drops below the threshold. Checked after
- * every token event of the branch. Nothing is sent while MAIL_HOST is blank.
+ * A scheduler checks every enabled branch once an hour (TOKEN_ALERT_CRON,
+ * default on the hour) and mails each branch that is at or over the limit
+ * at that moment. Nothing is sent while MAIL_HOST is blank.
  */
 @Slf4j
 @Service
@@ -47,9 +43,6 @@ public class TokenAlertService {
     private final BranchRepository branchRepository;
     private final UserRepository userRepository;
     private final ObjectProvider<JavaMailSender> mailSender;
-
-    /** Branches already mailed for the current crossing. */
-    private final Set<String> alerted = ConcurrentHashMap.newKeySet();
 
     @Value("${spring.mail.host:}")
     private String mailHost;
@@ -92,49 +85,40 @@ public class TokenAlertService {
             s.setRoles(new ArrayList<>(parseRoles(request.getRoles()).stream().map(Enum::name).toList()));
         }
         settingsRepository.save(s);
-        // New limit or roles: judge every branch afresh at its next token event
-        alerted.clear();
         return settingsDto();
     }
 
     // ---- checking ----
 
-    @Async
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
-    public void onTokenEvent(TokenEvent event) {
-        if (event.getBranchId() == null) return;
-        try {
-            check(event.getBranchId());
-        } catch (Exception e) {
-            log.error("Waiting token alert check failed for branch {}", event.getBranchId(), e);
+    @Scheduled(cron = "${app.token-alert.cron:0 0 * * * *}")
+    public void checkAllBranches() {
+        TokenAlertSettings s = settings();
+        if (Boolean.FALSE.equals(s.getEnabled())) return;
+        for (Branch branch : branchRepository.findAll()) {
+            if (Boolean.FALSE.equals(branch.getEnabled())) continue;
+            try {
+                check(branch, s);
+            } catch (Exception e) {
+                log.error("Waiting token alert check failed for branch {}", branch.getId(), e);
+            }
         }
     }
 
-    /** Mails the roles once when the branch's waiting count reaches the limit. */
-    public void check(String branchId) {
-        TokenAlertSettings s = settings();
+    /** Mails the roles if the branch's waiting count is at or over the limit now. */
+    boolean check(Branch branch, TokenAlertSettings s) {
         int threshold = s.getWaitingThreshold() == null ? 0 : s.getWaitingThreshold();
-        if (Boolean.FALSE.equals(s.getEnabled()) || threshold < 1) return;
+        if (Boolean.FALSE.equals(s.getEnabled()) || threshold < 1) return false;
+        if (isBlank(mailHost)) return false;
 
-        long waiting = waitingCount(branchId);
-        if (waiting < threshold) {
-            alerted.remove(branchId);
-            return;
-        }
-        if (isBlank(mailHost)) return;
-        Branch branch = branchRepository.findById(branchId).orElse(null);
-        if (branch == null) return;
-        List<String> recipients = recipients(s.getRoles(), branchId);
-        if (recipients.isEmpty()) return;
-        if (!alerted.add(branchId)) return; // already mailed for this crossing
+        long waiting = waitingCount(branch.getId());
+        if (waiting < threshold) return false;
+        List<String> recipients = recipients(s.getRoles(), branch.getId());
+        if (recipients.isEmpty()) return false;
 
-        try {
-            send(recipients, branch.getName(), waiting, threshold, false);
-            log.info("Waiting token alert for {} ({} waiting, limit {}) sent to {}",
-                    branch.getName(), waiting, threshold, recipients);
-        } catch (Exception e) {
-            log.error("Waiting token alert mail for {} failed", branch.getName(), e);
-        }
+        send(recipients, branch.getName(), waiting, threshold, false);
+        log.info("Waiting token alert for {} ({} waiting, limit {}) sent to {}",
+                branch.getName(), waiting, threshold, recipients);
+        return true;
     }
 
     /** Sends the alert for the branch now, whatever its count, to check the setup. */
@@ -206,8 +190,8 @@ public class TokenAlertService {
         sb.append("Alert limit: ").append(threshold).append('\n');
         sb.append("Time: ").append(TIME.format(LocalDateTime.now())).append("\n\n");
         if (!test) {
-            sb.append("The waiting queue has reached the limit set in the admin panel (System page). ")
-                    .append("No further alert is sent for this branch until the queue drops below the limit.\n\n");
+            sb.append("The waiting queue is at or over the limit set in the admin panel (System page). ")
+                    .append("The queue is checked every hour; another alert follows while it stays over the limit.\n\n");
         }
         sb.append("This e-mail was sent automatically.");
         return sb.toString();
