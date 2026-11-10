@@ -180,24 +180,24 @@ public class CounterServiceLinker {
     }
 
     /**
-     * Counters a new token for this service may be called from. A sub-service
-     * with no counters of its own falls back to its parent's counters. An
-     * empty result means the service is not assigned anywhere, and its tokens
-     * are open to every counter.
+     * Counters a new token for this service may be called from: the counters
+     * of the service itself plus those of its main service (and further up),
+     * so a counter that serves a main service serves all of its sub-services,
+     * and a counter can also be given just some sub-services. An empty result
+     * means the service is not assigned anywhere, and its tokens are open to
+     * every counter.
      */
     public List<String> countersForService(Services service) {
         Set<String> seen = new HashSet<>();
+        Set<String> counters = new LinkedHashSet<>();
         Services current = service;
         while (current != null && seen.add(current.getId())) {
-            List<String> ids = clean(current.getCounterIds());
-            if (!ids.isEmpty()) {
-                return ids;
-            }
+            counters.addAll(clean(current.getCounterIds()));
             current = StringUtils.hasText(current.getParentId())
                     ? serviceRepository.findById(current.getParentId()).orElse(null)
                     : null;
         }
-        return List.of();
+        return new ArrayList<>(counters);
     }
 
     /** The services a counter handles, including a legacy single serviceId. */
