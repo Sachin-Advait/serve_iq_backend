@@ -198,8 +198,18 @@ public class AgentService {
             throw new BusinessException("No service is assigned to this counter");
         }
 
-        Token nextToken = tokenRepository.findNextToken(counterId)
-                .orElseThrow(() -> new ResourceNotFoundException("No tokens available"));
+        Token nextToken = tokenRepository.findNextToken(counterId).orElse(null);
+        if (nextToken == null) {
+            // SKIP LOCKED passes over a waiting token another counter is calling
+            // right now; say so instead of "No tokens available" while the
+            // agent can still see that token in the list.
+            boolean waiting = tokenRepository.findUpcomingTokensForCounter(counterId).stream()
+                    .anyMatch(t -> t.getStatus() == TokenStatus.WAITING);
+            if (waiting) {
+                throw new BusinessException("Token is being acquired by another counter. Please try again.");
+            }
+            throw new ResourceNotFoundException("No tokens available");
+        }
 
         closeOutReviewTokens(counterId);
 
