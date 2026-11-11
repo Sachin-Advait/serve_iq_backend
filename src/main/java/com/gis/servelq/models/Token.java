@@ -150,6 +150,11 @@ public class Token {
     @Column(name = "no_show_user_id")
     private String noShowUserId;
 
+    // When the latest no-show was marked; the agent's No-Show list hides the
+    // ticket after app.no-show.expiry-minutes
+    @Column(name = "no_show_at")
+    private LocalDateTime noShowAt;
+
     // Serving seconds at earlier counters, added up on each transfer
     @Column(name = "prior_serving_seconds", nullable = false)
     private Integer priorServingSeconds = 0;

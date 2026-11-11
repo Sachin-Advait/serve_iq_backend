@@ -927,6 +927,7 @@ public class CounterService {
                 .findByStatusInAndAssignedCounterIdOrderByCreatedAtDesc(IN_PROGRESS, counterId);
         for (Token t : inProgress) {
             t.setStatus(TokenStatus.NO_SHOW);
+            t.setNoShowAt(java.time.LocalDateTime.now());
             Token updated = tokenRepository.save(t);
             tokenEventPublisher.publish(new TokenEvent(
                     TokenEventType.TOKEN_NO_SHOW, updated.getBranchId(), updated.getId(),

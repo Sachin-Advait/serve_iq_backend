@@ -18,6 +18,7 @@ import jakarta.persistence.LockTimeoutException;
 import jakarta.persistence.PessimisticLockException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -50,8 +51,18 @@ public class AgentService {
     private final TransferReasonService transferReasonService;
     private final CounterBreakService counterBreakService;
 
+    // Minutes a no-show ticket stays in the agent's No-Show list (0 = until
+    // the end of the day). The ticket itself stays NO_SHOW for the reports.
+    @Value("${app.no-show.expiry-minutes:30}")
+    private long noShowExpiryMinutes;
+
     public List<TokenResponseDTO> getUpcomingTokensForCounter(String counterId) {
-        List<Token> tokens = tokenRepository.findUpcomingTokensForCounter(counterId);
+        LocalDateTime noShowCutoff = noShowExpiryMinutes > 0
+                ? LocalDateTime.now().minusMinutes(noShowExpiryMinutes) : null;
+        List<Token> tokens = tokenRepository.findUpcomingTokensForCounter(counterId).stream()
+                .filter(t -> t.getStatus() != TokenStatus.NO_SHOW || noShowCutoff == null
+                        || t.getNoShowAt() == null || t.getNoShowAt().isAfter(noShowCutoff))
+                .toList();
 
         // transferFrom holds the sending counter's id; the agent app shows its name.
         Set<String> fromIds = tokens.stream()
@@ -609,6 +620,7 @@ public class AgentService {
         token.setNoShowCount((token.getNoShowCount() == null ? 0 : token.getNoShowCount()) + 1);
         token.setNoShowCounterId(counter.getId());
         token.setNoShowUserId(currentUserId());
+        token.setNoShowAt(LocalDateTime.now());
         Token updated = tokenRepository.save(token);
 
         tokenEventPublisher.publish(new TokenEvent(
