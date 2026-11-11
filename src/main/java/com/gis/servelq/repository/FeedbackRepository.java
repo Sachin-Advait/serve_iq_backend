@@ -29,6 +29,8 @@ public interface FeedbackRepository extends JpaRepository<Feedback, String> {
 
     Optional<Feedback> findFirstByTokenIdOrderByCreatedAtDesc(String tokenId);
 
+    List<Feedback> findByTokenIdIn(java.util.Collection<String> tokenIds);
+
     /**
      * The feedback list with every filter optional (null = not filtered):
      * agent, [start, end), rating, and a search pattern (already lower-cased

@@ -15,6 +15,10 @@ public class RecentServiceDTO {
     // Full duration, so the agent app can show seconds for short visits
     private Long timeTakenInSeconds;
     private String note;
+    // Visitor feedback for this ticket: rating SAD / NEUTRAL / HAPPY and the
+    // optional comment; both null when no feedback was given.
+    private String feedbackRating;
+    private String feedbackReview;
 
     public static RecentServiceDTO fromEntity(String token, String civilId, String serviceName,
                                               LocalDateTime startAt, LocalDateTime endAt, String note) {

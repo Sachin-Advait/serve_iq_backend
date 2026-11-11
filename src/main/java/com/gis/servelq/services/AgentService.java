@@ -11,6 +11,7 @@ import com.gis.servelq.events.TokenEventPublisher;
 import com.gis.servelq.events.TokenEventType;
 import com.gis.servelq.models.*;
 import com.gis.servelq.repository.CounterRepository;
+import com.gis.servelq.repository.FeedbackRepository;
 import com.gis.servelq.repository.ServiceRepository;
 import com.gis.servelq.repository.TokenRepository;
 import com.gis.servelq.security.AuthenticatedUser;
@@ -41,6 +42,7 @@ import java.util.stream.Collectors;
 public class AgentService {
 
     private final TokenRepository tokenRepository;
+    private final FeedbackRepository feedbackRepository;
     private final CounterRepository counterRepository;
     private final ServiceRepository serviceRepository;
     private final TokenEventPublisher tokenEventPublisher;
@@ -168,18 +170,7 @@ public class AgentService {
                 Instant.now()
         ));
 
-        if (nextToken.getCounterIds() != null) {
-            for (String id : nextToken.getCounterIds()) {
-                tokenEventPublisher.publish(new TokenEvent(
-                        TokenEventType.AGENT_QUEUE_CHANGED,
-                        nextToken.getBranchId(),
-                        null,
-                        null,
-                        id,
-                        Instant.now()
-                ));
-            }
-        }
+        publishQueueChanged(nextToken);
 
         AgentCallResponseDTO response = AgentCallResponseDTO.fromEntity(nextToken);
 
@@ -314,10 +305,12 @@ public class AgentService {
     }
 
     // Refreshes the agent queue (upcoming, hold and no-show lists) on every
-    // counter the token can be served at.
+    // counter the token can be served at. A token whose service is not assigned
+    // to any counter (no counterIds) is in every counter's queue, so every
+    // counter of the branch is refreshed; before, none were, and a token one
+    // counter had called stayed in the others' upcoming lists.
     private void publishQueueChanged(Token token) {
-        if (token.getCounterIds() == null) return;
-        for (String id : token.getCounterIds()) {
+        for (String id : queueCounterIds(token)) {
             tokenEventPublisher.publish(new TokenEvent(
                     TokenEventType.AGENT_QUEUE_CHANGED,
                     token.getBranchId(),
@@ -327,6 +320,15 @@ public class AgentService {
                     Instant.now()
             ));
         }
+    }
+
+    private List<String> queueCounterIds(Token token) {
+        List<String> ids = token.getCounterIds() == null ? List.of()
+                : token.getCounterIds().stream().filter(StringUtils::hasText).toList();
+        if (!ids.isEmpty()) return ids;
+        return counterRepository.findByBranchId(token.getBranchId()).stream()
+                .map(Counter::getId)
+                .toList();
     }
 
     @Transactional
@@ -435,9 +437,14 @@ public class AgentService {
 
     public List<RecentServiceDTO> getRecentServices(String counterId) {
         // Only visitors finished today; earlier days belong in the reports.
-        return tokenRepository.findTop20ByStatusAndAssignedCounterIdAndEndAtGreaterThanEqualOrderByEndAtDesc(
-                        TokenStatus.DONE, counterId, LocalDate.now().atStartOfDay())
-                .stream().map(token -> {
+        List<Token> done = tokenRepository.findTop20ByStatusAndAssignedCounterIdAndEndAtGreaterThanEqualOrderByEndAtDesc(
+                TokenStatus.DONE, counterId, LocalDate.now().atStartOfDay());
+        Map<String, Feedback> feedbackByToken = done.isEmpty() ? Map.of()
+                : feedbackRepository.findByTokenIdIn(done.stream().map(Token::getId).toList()).stream()
+                        .collect(Collectors.toMap(Feedback::getTokenId, f -> f, (a, b) ->
+                                a.getCreatedAt() != null && b.getCreatedAt() != null
+                                        && b.getCreatedAt().isAfter(a.getCreatedAt()) ? b : a));
+        return done.stream().map(token -> {
                     RecentServiceDTO dto = RecentServiceDTO.fromEntity(
                             token.getToken(),
                             token.getMobileNumber(),
@@ -447,6 +454,11 @@ public class AgentService {
                             token.getAgentNote());
                     dto.setArabicToken(token.arabicTokenOrToken());
                     dto.setServiceArabicName(token.getServiceArabicName());
+                    Feedback feedback = feedbackByToken.get(token.getId());
+                    if (feedback != null) {
+                        dto.setFeedbackRating(feedback.getRating() != null ? feedback.getRating().name() : null);
+                        dto.setFeedbackReview(feedback.getReview());
+                    }
                     return dto;
                 }).collect(Collectors.toList());
     }
@@ -487,7 +499,11 @@ public class AgentService {
 
         TransferReason reason = transferReasonService.requireActive(request.getReason());
 
-        if (token.getStatus() == TokenStatus.SERVING || token.getStatus() == TokenStatus.CALLING) {
+        // Held and no-show tickets can be transferred from the agent's Hold and
+        // No-Show lists too; the counter is not serving them, so its status is left as is.
+        boolean active = token.getStatus() == TokenStatus.SERVING || token.getStatus() == TokenStatus.CALLING;
+        boolean parked = token.getStatus() == TokenStatus.HOLD || token.getStatus() == TokenStatus.NO_SHOW;
+        if (active || parked) {
             Counter toCounter = counterRepository.findById(request.getToCounterId())
                     .orElseThrow(() -> new ResourceNotFoundException("Target counter not found"));
             // Nobody would call the visitor at a counter no agent is logged into.
@@ -499,10 +515,13 @@ public class AgentService {
             Counter fromCounter = counterRepository.findById(token.getAssignedCounterId())
                     .orElseThrow(() -> new ResourceNotFoundException("Target counter not found"));
 
-            fromCounter.setStatus(CounterStatus.IDLE);
-            counterRepository.save(fromCounter);
+            if (active) {
+                fromCounter.setStatus(CounterStatus.IDLE);
+                counterRepository.save(fromCounter);
+            }
 
             String fromCounterId = token.getAssignedCounterId();
+            List<String> previousQueueCounters = parked ? queueCounterIds(token) : List.of();
 
 
             token.setIsTransfer(true);
@@ -546,6 +565,11 @@ public class AgentService {
                     toCounter.getId(),
                     Instant.now()
             ));
+            if (parked) {
+                // A no-show ticket was listed on every counter of its service.
+                previousQueueCounters.forEach(id -> tokenEventPublisher.publish(new TokenEvent(
+                        TokenEventType.AGENT_QUEUE_CHANGED, token.getBranchId(), null, null, id, Instant.now())));
+            }
             auditLogService.log(
                     AuditAction.TOKEN_TRANSFERRED,
                     "Token",
@@ -606,15 +630,19 @@ public class AgentService {
     public Token noShow(String tokenId) {
         Token token = tokenRepository.findById(tokenId).orElseThrow(() -> new ResourceNotFoundException("Token not found"));
 
-        if (token.getStatus() != TokenStatus.SERVING) {
+        // A held ticket can be marked no-show from the Hold list too.
+        boolean fromHold = token.getStatus() == TokenStatus.HOLD;
+        if (token.getStatus() != TokenStatus.SERVING && !fromHold) {
             throw new ResourceNotFoundException("Token cannot be marked no-show from status: " + token.getStatus());
         }
 
         Counter counter = counterRepository.findById(token.getAssignedCounterId())
                 .orElseThrow(() -> new ResourceNotFoundException("Target counter not found"));
 
-        counter.setStatus(CounterStatus.IDLE);
-        counterRepository.save(counter);
+        if (!fromHold) {
+            counter.setStatus(CounterStatus.IDLE);
+            counterRepository.save(counter);
+        }
 
         token.setStatus(TokenStatus.NO_SHOW);
         token.setNoShowCount((token.getNoShowCount() == null ? 0 : token.getNoShowCount()) + 1);

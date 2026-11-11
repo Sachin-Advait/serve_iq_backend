@@ -9,9 +9,11 @@ import com.gis.servelq.events.TokenEvent;
 import com.gis.servelq.events.TokenEventPublisher;
 import com.gis.servelq.events.TokenEventType;
 import com.gis.servelq.models.AuditAction;
+import com.gis.servelq.models.Counter;
 import com.gis.servelq.models.Services;
 import com.gis.servelq.models.Token;
 import com.gis.servelq.models.TokenStatus;
+import com.gis.servelq.repository.CounterRepository;
 import com.gis.servelq.repository.ServiceRepository;
 import com.gis.servelq.repository.TokenRepository;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,6 +24,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -39,6 +42,7 @@ public class TokenService {
     private final AuditLogService auditLogService;
     private final HttpServletRequest request;
     private final ServiceRepository serviceRepository;
+    private final CounterRepository counterRepository;
     private final BranchService branchService;
     private final TicketCapacityService ticketCapacityService;
 
@@ -151,17 +155,20 @@ public class TokenService {
                 Instant.now()
         ));
 
-        if (savedToken.getCounterIds() != null) {
-            for (String counterId : savedToken.getCounterIds()) {
-                tokenEventPublisher.publish(new TokenEvent(
-                        TokenEventType.AGENT_QUEUE_CHANGED,
-                        savedToken.getBranchId(),
-                        null,
-                        null,
-                        counterId,
-                        Instant.now()
-                ));
-            }
+        // A token with no counters (service not assigned anywhere) is in every
+        // counter's queue, so every counter of the branch is refreshed.
+        List<String> queueCounters = savedToken.getCounterIds() != null && !savedToken.getCounterIds().isEmpty()
+                ? savedToken.getCounterIds()
+                : counterRepository.findByBranchId(savedToken.getBranchId()).stream().map(Counter::getId).toList();
+        for (String counterId : queueCounters) {
+            tokenEventPublisher.publish(new TokenEvent(
+                    TokenEventType.AGENT_QUEUE_CHANGED,
+                    savedToken.getBranchId(),
+                    null,
+                    null,
+                    counterId,
+                    Instant.now()
+            ));
         }
     }
 
