@@ -10,6 +10,7 @@ public class RecentServiceDTO {
     private String arabicToken;
     private String civilId;
     private String serviceName;
+    private String serviceArabicName;
     private Long timeTakenInMinutes;
     // Full duration, so the agent app can show seconds for short visits
     private Long timeTakenInSeconds;

@@ -425,6 +425,7 @@ public class AgentService {
                             token.getEndAt(),
                             token.getAgentNote());
                     dto.setArabicToken(token.arabicTokenOrToken());
+                    dto.setServiceArabicName(token.getServiceArabicName());
                     return dto;
                 }).collect(Collectors.toList());
     }
