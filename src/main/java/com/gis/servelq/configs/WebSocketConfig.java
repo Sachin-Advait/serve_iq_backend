@@ -22,6 +22,10 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 .setHeartbeatValue(new long[]{HEARTBEAT_MS, HEARTBEAT_MS})
                 .setTaskScheduler(brokerHeartbeatScheduler());
         config.setApplicationDestinationPrefixes("/app");
+        // Deliver each client's messages in the order they were sent; the
+        // outbound channel is a thread pool and could otherwise let an older
+        // queue list arrive after a newer one.
+        config.setPreservePublishOrder(true);
     }
 
     /**

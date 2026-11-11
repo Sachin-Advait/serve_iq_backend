@@ -33,10 +33,8 @@ public class TokenEventDispatcher {
 
             case TOKEN_CALLED -> {
                 socketService.notifyBranchTV(event.getBranchId());
-                socketService.notifyCounterDisplay(
-                        event.getCounterId(),
-                        counterService.getCounterStatusDetails(event.getCounterId())
-                );
+                socketService.pushCounterDisplay(event.getCounterId(),
+                        () -> counterService.getCounterStatusDetails(event.getCounterId()));
                 socketService.notifyMeetingTV(event.getBranchId());
             }
 
@@ -48,23 +46,23 @@ public class TokenEventDispatcher {
                 socketService.notifyBranchTV(event.getBranchId());
                 socketService.notifyMeetingTV(event.getBranchId());
 
-                var data = counterService.getCounterStatusDetails(event.getCounterId());
-                socketService.notifyCounterDisplay(event.getCounterId(), data);
+                socketService.pushCounterDisplay(event.getCounterId(),
+                        () -> counterService.getCounterStatusDetails(event.getCounterId()));
 
-                var agentData = agentService.getUpcomingTokensForCounter(event.getCounterId());
-                socketService.notifyAgentQueue(event.getCounterId(), agentData);
+                socketService.pushAgentQueue(event.getCounterId(),
+                        () -> agentService.getUpcomingTokensForCounter(event.getCounterId()));
             }
 
             case AGENT_QUEUE_CHANGED -> {
-                var data = agentService.getUpcomingTokensForCounter(event.getCounterId());
-                socketService.notifyAgentQueue(event.getCounterId(), data);
+                socketService.pushAgentQueue(event.getCounterId(),
+                        () -> agentService.getUpcomingTokensForCounter(event.getCounterId()));
             }
 
             case COUNTER_STATUS_CHANGED -> {
                 // The TV's counter grid shows paused/closed counters too
                 socketService.notifyBranchTV(event.getBranchId());
-                var data = counterService.getCounterStatusDetails(event.getCounterId());
-                socketService.notifyCounterDisplay(event.getCounterId(), data);
+                socketService.pushCounterDisplay(event.getCounterId(),
+                        () -> counterService.getCounterStatusDetails(event.getCounterId()));
                 socketService.notifyMeetingTV(event.getBranchId());
             }
 
