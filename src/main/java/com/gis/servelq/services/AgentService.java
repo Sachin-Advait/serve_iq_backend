@@ -502,7 +502,11 @@ public class AgentService {
         // Held and no-show tickets can be transferred from the agent's Hold and
         // No-Show lists too; the counter is not serving them, so its status is left as is.
         boolean active = token.getStatus() == TokenStatus.SERVING || token.getStatus() == TokenStatus.CALLING;
-        boolean parked = token.getStatus() == TokenStatus.HOLD || token.getStatus() == TokenStatus.NO_SHOW;
+        // A ticket another counter transferred here waits in this counter's
+        // Transferred list and can be passed on again from there.
+        boolean transferredIn = token.getStatus() == TokenStatus.WAITING && Boolean.TRUE.equals(token.getIsTransfer());
+        boolean parked = token.getStatus() == TokenStatus.HOLD || token.getStatus() == TokenStatus.NO_SHOW
+                || transferredIn;
         if (active || parked) {
             Counter toCounter = counterRepository.findById(request.getToCounterId())
                     .orElseThrow(() -> new ResourceNotFoundException("Target counter not found"));
@@ -630,8 +634,11 @@ public class AgentService {
     public Token noShow(String tokenId) {
         Token token = tokenRepository.findById(tokenId).orElseThrow(() -> new ResourceNotFoundException("Token not found"));
 
-        // A held ticket can be marked no-show from the Hold list too.
-        boolean fromHold = token.getStatus() == TokenStatus.HOLD;
+        // A held ticket, or one transferred here and still waiting, can be
+        // marked no-show from the Hold / Transferred list too; the counter is
+        // not serving it, so its status is left alone.
+        boolean fromHold = token.getStatus() == TokenStatus.HOLD
+                || (token.getStatus() == TokenStatus.WAITING && Boolean.TRUE.equals(token.getIsTransfer()));
         if (token.getStatus() != TokenStatus.SERVING && !fromHold) {
             throw new ResourceNotFoundException("Token cannot be marked no-show from status: " + token.getStatus());
         }
